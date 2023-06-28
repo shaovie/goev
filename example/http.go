@@ -9,11 +9,12 @@ type Conn struct {
 }
 
 func (c *Conn) OnOpen(fd *goev.Fd) bool {
-    //
+    return true
 }
 func (c *Conn) OnRead(fd *goev.Fd) bool {
+    return true
 }
-func (c *Conn) OnClose(fd *goev.Fd) bool {
+func (c *Conn) OnClose(fd *goev.Fd) {
 }
 
 
