@@ -134,6 +134,7 @@ func (ep *evPoll) add(fd, events int, h EvHandler) error {
 		Events: uint32(events),
 	}
 	if relEvHandlerUseMap {
+        ev.Fd = int32(fd)
 		ep.evDataMapMtx.Lock()
 		ep.evDataMap[fd] = ed
 		ep.evDataMapMtx.Unlock()
@@ -153,6 +154,7 @@ func (ep *evPoll) modify(fd, events int, h EvHandler) error {
 		Events: uint32(events),
 	}
 	if relEvHandlerUseMap {
+        ev.Fd = int32(fd)
 		ep.evDataMapMtx.Lock()
 		ep.evDataMap[fd] = ed
 		ep.evDataMapMtx.Unlock()
