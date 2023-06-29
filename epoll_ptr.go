@@ -19,7 +19,7 @@ var (
 
 type epollEvent struct {
 	Events uint32
-	Fd    [8]byte // 2023.6.29 测试发现用[8]byte的内存方式还是会出现崩溃的问题
+	data    [8]byte // 2023.6.29 测试发现用[8]byte的内存方式还是会出现崩溃的问题
 	//Fd  int32
 	//Pad int32
 }
@@ -124,7 +124,7 @@ func (ep *evPoll) add(fd, events int, h EvHandler) error {
 	ev := epollEvent{
 		Events: uint32(events),
 	}
-    *(**evData)(unsafe.Pointer(&ev.Fd)) = ed
+    *(**evData)(unsafe.Pointer(&ev.data)) = ed
 	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd, &ev); err != nil {
 		return errors.New("epoll_ctl add: " + err.Error())
 	}
@@ -137,7 +137,7 @@ func (ep *evPoll) modify(fd, events int, h EvHandler) error {
 	ev := epollEvent{
 		Events: uint32(events),
 	}
-    *(**evData)(unsafe.Pointer(&ev.Fd)) = ed
+    *(**evData)(unsafe.Pointer(&ev.data)) = ed
 	
 	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd, &ev); err != nil {
 		if errors.Is(err, syscall.ENOENT) { // refer to `man 2 epoll_ctl`
@@ -197,7 +197,7 @@ func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 		if nfds > 0 {
 			for i := 0; i < nfds; i++ {
 				ev := &events[i]
-                ed := *(**evData)(unsafe.Pointer(&ev.Fd))
+                ed := *(**evData)(unsafe.Pointer(&ev.data))
 				
 				// EPOLLHUP refer to man 2 epoll_ctl
 				if ev.Events&(syscall.EPOLLHUP|syscall.EPOLLERR) != 0 {
