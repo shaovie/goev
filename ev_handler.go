@@ -44,21 +44,21 @@ type EvHandler interface {
 type NullEvHandler struct{}
 
 func (n *NullEvHandler) OnOpen(fd *Fd) bool {
-    panic("NullEvHandler OnOpen")
+	panic("NullEvHandler OnOpen")
 	return false
 }
 func (n *NullEvHandler) OnRead(fd *Fd) bool {
-    panic("NullEvHandler OnRead")
+	panic("NullEvHandler OnRead")
 	return false
 }
 func (n *NullEvHandler) OnWrite(fd *Fd) bool {
-    panic("NullEvHandler OnWrite")
+	panic("NullEvHandler OnWrite")
 	return false
 }
 func (n *NullEvHandler) OnNotify(fd *Fd) bool {
-    panic("NullEvHandler OnNotify")
+	panic("NullEvHandler OnNotify")
 	return false
 }
 func (n *NullEvHandler) OnClose(fd *Fd) {
-    panic("NullEvHandler OnClose")
+	panic("NullEvHandler OnClose")
 }

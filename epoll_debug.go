@@ -1,15 +1,69 @@
-//go:build !debug
-// +build !debug
+//go:build debug
+// +build debug
 
 package goev
 
 import (
 	"errors"
+	"reflect"
 	"runtime"
 	"sync"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
+
+var relEvHandlerUseMap bool = true // DEBUG
+
+var (
+	_zero uintptr
+)
+
+type epollEvent struct {
+	Events uint32
+	// Fd    [8]byte // 2023.6.29 测试发现用[8]byte的内存方式还是会出现崩溃的问题
+	Fd  int32
+	Pad int32
+}
+
+func errnoErr(e syscall.Errno) error {
+	switch e {
+	case 0:
+		return nil
+	case unix.EAGAIN:
+		return syscall.EAGAIN
+	case unix.EINVAL:
+		return syscall.EINVAL
+	case unix.ENOENT:
+		return syscall.ENOENT
+	}
+	return e
+}
+func epollWait(epfd int, events []epollEvent, msec int) (n int, err error) {
+	var _p0 unsafe.Pointer
+	if len(events) > 0 {
+		_p0 = unsafe.Pointer(&events[0])
+	} else {
+		_p0 = unsafe.Pointer(&_zero)
+	}
+
+	r0, _, e1 := unix.Syscall6(unix.SYS_EPOLL_WAIT, uintptr(epfd), uintptr(_p0), uintptr(len(events)), uintptr(msec), 0, 0)
+	n = int(r0)
+	if e1 != 0 {
+		err = errnoErr(e1)
+	}
+
+	return
+}
+func epollCtl(epfd int, op int, fd int, event *epollEvent) (err error) {
+	_, _, e1 := unix.RawSyscall6(unix.SYS_EPOLL_CTL, uintptr(epfd), uintptr(op), uintptr(fd), uintptr(unsafe.Pointer(event)), 0, 0)
+	if e1 != 0 {
+		err = errnoErr(e1)
+	}
+
+	return
+}
 
 // evData
 type evData struct {
@@ -30,17 +84,25 @@ func (ed *evData) reset(fd int, h EvHandler) {
 type evPoll struct {
 	efd int // epoll fd
 
-	// L/F模型线程数量
+	// 多个线程轮流执行epoll_wait, 获取到I/O事件, 马上通知其他
 	pollThreadNum     int
 	multiplePollerMtx sync.Mutex
 
 	// TODO Put回收操作还没想好一个优雅的方式
 	// evDataPool *sync.Pool
 
+	evDataMap    map[int]*evData
+	evDataMapMtx sync.Mutex
+
 	evPollSize int // epoll_wait一次轮询获取固定数量准备好的I/O事件, 此参数有利于多线程轮换
 }
 
 func (ep *evPoll) open(pollThreadNum, evPollSize int) error {
+	var ev epollEvent
+	if relEvHandlerUseMap && reflect.TypeOf(ev).Kind() != reflect.Int32 {
+		panic("epollEvent struct Fd should be int32")
+	}
+	ep.evDataMap = make(map[int]*evData) // DEUBG
 	if pollThreadNum < 1 {
 		return errors.New("EvPollThreadNum < 1")
 	}
@@ -68,11 +130,17 @@ func (ep *evPoll) add(fd, events int, h EvHandler) error {
 	ed := &evData{} // TODO ep.evDataPool.Get().(*evData)
 	ed.reset(fd, h)
 
-	ev := syscall.EpollEvent{
+	ev := epollEvent{
 		Events: uint32(events),
 	}
-	*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
-	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd, &ev); err != nil {
+	if relEvHandlerUseMap {
+		ep.evDataMapMtx.Lock()
+		ep.evDataMap[fd] = ed
+		ep.evDataMapMtx.Unlock()
+	} else {
+		*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
+	}
+	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd, &ev); err != nil {
 		return errors.New("epoll_ctl add: " + err.Error())
 	}
 	return nil
@@ -81,13 +149,19 @@ func (ep *evPoll) modify(fd, events int, h EvHandler) error {
 	ed := &evData{} // TODO ep.evDataPool.Get().(*evData)
 	ed.reset(fd, h)
 
-	ev := syscall.EpollEvent{
+	ev := epollEvent{
 		Events: uint32(events),
 	}
-	*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
-	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd, &ev); err != nil {
+	if relEvHandlerUseMap {
+		ep.evDataMapMtx.Lock()
+		ep.evDataMap[fd] = ed
+		ep.evDataMapMtx.Unlock()
+	} else {
+		*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
+	}
+	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd, &ev); err != nil {
 		if errors.Is(err, syscall.ENOENT) { // refer to `man 2 epoll_ctl`
-			if err = syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd, &ev); err != nil {
+			if err = epollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd, &ev); err != nil {
 				return errors.New("epoll_ctl add: " + err.Error())
 			}
 			return nil
@@ -99,7 +173,12 @@ func (ep *evPoll) modify(fd, events int, h EvHandler) error {
 func (ep *evPoll) remove(fd int) error {
 	// The event argument is ignored and can be NULL (but see `man 2 epoll_ctl` BUGS)
 	// kernel versions > 2.6.9
-	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_DEL, fd, nil); err != nil {
+	if relEvHandlerUseMap {
+		ep.evDataMapMtx.Lock()
+		delete(ep.evDataMap, fd)
+		ep.evDataMapMtx.Unlock()
+	}
+	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_DEL, fd, nil); err != nil {
 		return errors.New("epoll_ctl del: " + err.Error())
 	}
 	return nil
@@ -130,20 +209,29 @@ func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 
 	var nfds int
 	var err error
-	// syscall.EpollEvent defines in $GOROOT/src/syscall/ztypes_linux_amd64.go
-	events := make([]syscall.EpollEvent, ep.evPollSize) // NOT make(x, len, cap)
+	// $GOROOT/src/syscall/ztypes_linux_amd64.go
+	events := make([]epollEvent, ep.evPollSize)
 	for {
 		if multiplePoller == true {
 			ep.multiplePollerMtx.Lock()
-			nfds, err = syscall.EpollWait(ep.efd, events, -1)
+			nfds, err = epollWait(ep.efd, events, -1)
 			ep.multiplePollerMtx.Unlock()
 		} else {
-			nfds, err = syscall.EpollWait(ep.efd, events, -1)
+			nfds, err = epollWait(ep.efd, events, -1)
 		}
 		if nfds > 0 {
 			for i := 0; i < nfds; i++ {
 				ev := &events[i]
-				ed := *(**evData)(unsafe.Pointer(&ev.Fd))
+				var ed *evData
+				if relEvHandlerUseMap {
+					ep.evDataMapMtx.Lock()
+					if ed = ep.evDataMap[int(ev.Fd)]; ed == nil {
+						panic("evDataMap not found")
+					}
+					ep.evDataMapMtx.Unlock()
+				} else {
+					ed = *(**evData)(unsafe.Pointer(&ev.Fd))
+				}
 				// EPOLLHUP refer to man 2 epoll_ctl
 				if ev.Events&(syscall.EPOLLHUP|syscall.EPOLLERR) != 0 {
 					ep.remove(ed.fd.v)

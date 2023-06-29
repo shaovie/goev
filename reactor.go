@@ -7,7 +7,7 @@ import (
 )
 
 type Reactor struct {
-	evPoll *EvPoll
+	evPoll *evPoll
 }
 
 func NewReactor(opts ...Option) (*Reactor, error) {
@@ -16,7 +16,7 @@ func NewReactor(opts ...Option) (*Reactor, error) {
 		return nil, errors.New("options: EvPollThreadNum MUST > 0 && <= cpu*2")
 	}
 	r := &Reactor{
-		evPoll: new(EvPoll),
+		evPoll: new(evPoll),
 	}
 	return r, nil
 }

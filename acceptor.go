@@ -49,7 +49,7 @@ func (a *acceptor) Open(r *Reactor, newEvHanlderFunc func() EvHandler, addr stri
 		// 必须在listen/connect之前调用
 		// must < `sysctl -a | grep net.core.rmem_max`
 		err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF, evOptions.recvBuffSize)
-        if err != nil {
+		if err != nil {
 			syscall.Close(fd)
 			return errors.New("Set SO_RCVBUF: " + err.Error())
 		}
