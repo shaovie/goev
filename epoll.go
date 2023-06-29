@@ -62,7 +62,7 @@ func (ep *EvPoll) open(pollThreadNum, evPollSize int) error {
 	return nil
 }
 func (ep *EvPoll) add(fd, events int, h EvHandler) error {
-	ed := ep.evDataPool.Get().(*evData)
+	ed := new(evData) // ep.evDataPool.Get().(*evData)
 	ed.reset(fd, h)
 
 	ev := syscall.EpollEvent{
@@ -75,7 +75,7 @@ func (ep *EvPoll) add(fd, events int, h EvHandler) error {
 	return nil
 }
 func (ep *EvPoll) modify(fd, events int, h EvHandler) error {
-	ed := ep.evDataPool.Get().(*evData)
+	ed := new(evData) // ep.evDataPool.Get().(*evData)
 	ed.reset(fd, h)
 
 	ev := syscall.EpollEvent{
@@ -127,7 +127,8 @@ func (ep *EvPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 
 	var nfds int
 	var err error
-	events := make([]syscall.EpollEvent, 0, ep.evPollSize) // $GOROOT/src/syscall/ztypes_linux_amd64.go
+    // $GOROOT/src/syscall/ztypes_linux_amd64.go
+	events := make([]syscall.EpollEvent, ep.evPollSize)
 	for {
 		if multiplePoller == true {
 			ep.multiplePollerMtx.Lock()
@@ -139,24 +140,24 @@ func (ep *EvPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 		if nfds > 0 {
 			for i := 0; i < nfds; i++ {
 				ev := &events[i]
-				evData := *(**evData)(unsafe.Pointer(&ev.Fd))
+				ed := *(**evData)(unsafe.Pointer(&ev.Fd))
 				// EPOLLHUP refer to man 2 epoll_ctl
 				if ev.Events&(syscall.EPOLLHUP|syscall.EPOLLERR) != 0 {
-					ep.remove(int(ev.Fd))
-					evData.evHandler.OnClose(&(evData.fd))
+					ep.remove(ed.fd.v)
+					ed.evHandler.OnClose(&(ed.fd))
 					continue
 				}
 				if ev.Events&(syscall.EPOLLOUT) != 0 {
-					if evData.evHandler.OnWrite(&(evData.fd)) == false {
-						ep.remove(int(ev.Fd))
-						evData.evHandler.OnClose(&(evData.fd))
+					if ed.evHandler.OnWrite(&(ed.fd)) == false {
+                        ep.remove(ed.fd.v)
+						ed.evHandler.OnClose(&(ed.fd))
 						continue
 					}
 				}
 				if ev.Events&(syscall.EPOLLIN) != 0 {
-					if evData.evHandler.OnRead(&(evData.fd)) == false {
-						ep.remove(int(ev.Fd))
-						evData.evHandler.OnClose(&(evData.fd))
+					if ed.evHandler.OnRead(&(ed.fd)) == false {
+                        ep.remove(ed.fd.v)
+						ed.evHandler.OnClose(&(ed.fd))
 						continue
 					}
 				}
