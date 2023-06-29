@@ -91,8 +91,7 @@ type evPoll struct {
 	// TODO Put回收操作还没想好一个优雅的方式
 	// evDataPool *sync.Pool
 
-	evDataMap    map[int]*evData
-	evDataMapMtx sync.Mutex
+	evDataMap    sync.Map
 
 	evPollSize int // epoll_wait一次轮询获取固定数量准备好的I/O事件, 此参数有利于多线程轮换
 }
@@ -102,7 +101,6 @@ func (ep *evPoll) open(pollThreadNum, evPollSize int) error {
 	if relEvHandlerUseMap && reflect.TypeOf(ev.Fd).Kind() != reflect.Int32 {
 		panic("epollEvent struct Fd should be int32")
 	}
-	ep.evDataMap = make(map[int]*evData) // DEUBG
 	if pollThreadNum < 1 {
 		return errors.New("EvPollThreadNum < 1")
 	}
@@ -135,9 +133,7 @@ func (ep *evPoll) add(fd, events int, h EvHandler) error {
 	}
 	if relEvHandlerUseMap {
         ev.Fd = int32(fd)
-		ep.evDataMapMtx.Lock()
-		ep.evDataMap[fd] = ed
-		ep.evDataMapMtx.Unlock()
+		ep.evDataMap.Store(fd, ed)
 	} else {
 		*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
 	}
@@ -155,9 +151,7 @@ func (ep *evPoll) modify(fd, events int, h EvHandler) error {
 	}
 	if relEvHandlerUseMap {
         ev.Fd = int32(fd)
-		ep.evDataMapMtx.Lock()
-		ep.evDataMap[fd] = ed
-		ep.evDataMapMtx.Unlock()
+		ep.evDataMap.Store(fd, ed)
 	} else {
 		*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
 	}
@@ -176,9 +170,7 @@ func (ep *evPoll) remove(fd int) error {
 	// The event argument is ignored and can be NULL (but see `man 2 epoll_ctl` BUGS)
 	// kernel versions > 2.6.9
 	if relEvHandlerUseMap {
-		ep.evDataMapMtx.Lock()
-		delete(ep.evDataMap, fd)
-		ep.evDataMapMtx.Unlock()
+		ep.evDataMap.Delete(fd)
 	}
 	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_DEL, fd, nil); err != nil {
 		return errors.New("epoll_ctl del: " + err.Error())
@@ -226,11 +218,11 @@ func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 				ev := &events[i]
 				var ed *evData
 				if relEvHandlerUseMap {
-					ep.evDataMapMtx.Lock()
-					if ed = ep.evDataMap[int(ev.Fd)]; ed == nil {
-						panic("evDataMap not found")
+                    if ted, ok := ep.evDataMap.Load(int(ev.Fd)); ok {
+                        ed = ted.(*evData)
+                    } else {
+						panic("evDataMap not found") // DEBUG
 					}
-					ep.evDataMapMtx.Unlock()
 				} else {
 					ed = *(**evData)(unsafe.Pointer(&ev.Fd))
 				}
