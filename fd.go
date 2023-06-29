@@ -68,3 +68,19 @@ func (fd *Fd) SetSendBuffSize(bytes int) error {
 	}
 	return nil
 }
+
+// 0:delay, 1:nodelay
+func (fd *Fd) SetNoDelay(v int) error {
+	if err := syscall.SetsockoptInt(fd.v, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, v); err != nil {
+		return errors.New("Set TCP_NODELAY: " + err.Error())
+	}
+	return nil
+}
+
+// 0:delay 1:quick
+func (fd *Fd) SetQuickACK(bytes int) error {
+	if err := syscall.SetsockoptInt(fd.v, syscall.IPPROTO_TCP, syscall.TCP_QUICKACK, 1); err != nil {
+		return errors.New("Set TCP_QUICKACK: " + err.Error())
+	}
+	return nil
+}

@@ -1,11 +1,10 @@
-//go:build debug
-// +build debug
+//go:build ptr
+// +build ptr
 
 package goev
 
 import (
 	"errors"
-	"reflect"
 	"runtime"
 	"sync"
 	"syscall"
@@ -14,17 +13,15 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-var relEvHandlerUseMap bool = true // DEBUG
-
 var (
 	_zero uintptr
 )
 
 type epollEvent struct {
 	Events uint32
-	// Fd    [8]byte // 2023.6.29 测试发现用[8]byte的内存方式还是会出现崩溃的问题
-	Fd  int32
-	Pad int32
+	Fd    [8]byte // 2023.6.29 测试发现用[8]byte的内存方式还是会出现崩溃的问题
+	//Fd  int32
+	//Pad int32
 }
 
 func errnoErr(e syscall.Errno) error {
@@ -97,10 +94,6 @@ type evPoll struct {
 }
 
 func (ep *evPoll) open(pollThreadNum, evPollSize int) error {
-	var ev epollEvent
-	if relEvHandlerUseMap && reflect.TypeOf(ev.Fd).Kind() != reflect.Int32 {
-		panic("epollEvent struct Fd should be int32")
-	}
 	if pollThreadNum < 1 {
 		return errors.New("EvPollThreadNum < 1")
 	}
@@ -131,12 +124,7 @@ func (ep *evPoll) add(fd, events int, h EvHandler) error {
 	ev := epollEvent{
 		Events: uint32(events),
 	}
-	if relEvHandlerUseMap {
-        ev.Fd = int32(fd)
-		ep.evDataMap.Store(fd, ed)
-	} else {
-		*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
-	}
+    *(**evData)(unsafe.Pointer(&ev.Fd)) = ed
 	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd, &ev); err != nil {
 		return errors.New("epoll_ctl add: " + err.Error())
 	}
@@ -149,12 +137,8 @@ func (ep *evPoll) modify(fd, events int, h EvHandler) error {
 	ev := epollEvent{
 		Events: uint32(events),
 	}
-	if relEvHandlerUseMap {
-        ev.Fd = int32(fd)
-		ep.evDataMap.Store(fd, ed)
-	} else {
-		*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
-	}
+    *(**evData)(unsafe.Pointer(&ev.Fd)) = ed
+	
 	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd, &ev); err != nil {
 		if errors.Is(err, syscall.ENOENT) { // refer to `man 2 epoll_ctl`
 			if err = epollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd, &ev); err != nil {
@@ -169,9 +153,6 @@ func (ep *evPoll) modify(fd, events int, h EvHandler) error {
 func (ep *evPoll) remove(fd int) error {
 	// The event argument is ignored and can be NULL (but see `man 2 epoll_ctl` BUGS)
 	// kernel versions > 2.6.9
-	if relEvHandlerUseMap {
-		ep.evDataMap.Delete(fd)
-	}
 	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_DEL, fd, nil); err != nil {
 		return errors.New("epoll_ctl del: " + err.Error())
 	}
@@ -216,16 +197,8 @@ func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 		if nfds > 0 {
 			for i := 0; i < nfds; i++ {
 				ev := &events[i]
-				var ed *evData
-				if relEvHandlerUseMap {
-                    if ted, ok := ep.evDataMap.Load(int(ev.Fd)); ok {
-                        ed = ted.(*evData)
-                    } else {
-						panic("evDataMap not found") // DEBUG
-					}
-				} else {
-					ed = *(**evData)(unsafe.Pointer(&ev.Fd))
-				}
+                ed := *(**evData)(unsafe.Pointer(&ev.Fd))
+				
 				// EPOLLHUP refer to man 2 epoll_ctl
 				if ev.Events&(syscall.EPOLLHUP|syscall.EPOLLERR) != 0 {
 					ep.remove(ed.fd.v)
