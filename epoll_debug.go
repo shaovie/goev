@@ -99,7 +99,7 @@ type evPoll struct {
 
 func (ep *evPoll) open(pollThreadNum, evPollSize int) error {
 	var ev epollEvent
-	if relEvHandlerUseMap && reflect.TypeOf(ev).Kind() != reflect.Int32 {
+	if relEvHandlerUseMap && reflect.TypeOf(ev.Fd).Kind() != reflect.Int32 {
 		panic("epollEvent struct Fd should be int32")
 	}
 	ep.evDataMap = make(map[int]*evData) // DEUBG
