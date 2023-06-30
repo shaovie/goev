@@ -76,6 +76,8 @@ func EvPollSize(n int) Option {
 // 多个线程轮流执行event poll. poll线程获取到I/O事件后, 马上唤醒空闲的线程执行event loop, 依次循环
 func EvPollThreadNum(n int) Option {
 	return func(o *Options) {
-		o.evPollThreadNum = n
+        if n > 0 {
+            o.evPollThreadNum = n
+        }
 	}
 }
