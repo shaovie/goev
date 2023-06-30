@@ -1,4 +1,4 @@
-// +build !ptr,!keepalive
+// +build keepalive
 
 package goev
 
@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"sync"
 	"syscall"
+	"unsafe"
 )
 
 // evData
@@ -64,14 +65,14 @@ func (ep *evPoll) open(pollThreadNum, evPollSize int) error {
 	return nil
 }
 func (ep *evPoll) add(fd int, events uint32, h EvHandler) error {
-    ed := ep.evDataPool.Get().(*evData)
+    ed := new(evData) // ep.evDataPool.Get().(*evData)
+    runtime.KeepAlive(ed)
 	ed.reset(fd, h)
 
 	ev := syscall.EpollEvent{
 		Events: events,
-        Fd: int32(fd),
 	}
-    ep.evDataMap.Store(fd, ed)
+    *(**evData)(unsafe.Pointer(&ev.Fd)) = ed
 
 	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd, &ev); err != nil {
 		return errors.New("epoll_ctl add: " + err.Error())
@@ -83,7 +84,8 @@ func (ep *evPoll) modify(fd *Fd, events uint32, h EvHandler) error {
     if fd.ed != nil { // There's no need to put it back `ep.evDataPool.Put(fd.ed)'
         ed = fd.ed
     } else {
-        ed = ep.evDataPool.Get().(*evData)
+        ed = new(evData) // ep.evDataPool.Get().(*evData)
+        runtime.KeepAlive(ed)
     }
 	ed.reset(fd.v, h)
 
@@ -91,7 +93,7 @@ func (ep *evPoll) modify(fd *Fd, events uint32, h EvHandler) error {
 		Events: events,
         Fd: int32(fd.v),
 	}
-    ep.evDataMap.Store(fd.v, ed)
+    *(**evData)(unsafe.Pointer(&ev.Fd)) = ed
 
 	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd.v, &ev); err != nil {
 		if err == syscall.ENOENT { // refer to `man 2 epoll_ctl`
@@ -107,7 +109,6 @@ func (ep *evPoll) modify(fd *Fd, events uint32, h EvHandler) error {
 func (ep *evPoll) remove(fd *Fd) error {
 	// The event argument is ignored and can be NULL (but see `man 2 epoll_ctl` BUGS)
 	// kernel versions > 2.6.9
-    ep.evDataMap.Delete(fd.v)
 	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_DEL, fd.v, nil); err != nil {
 		return errors.New("epoll_ctl del: " + err.Error())
 	}
@@ -152,13 +153,14 @@ func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 		if nfds > 0 {
 			for i := 0; i < nfds; i++ {
 				ev := &events[i]
-                var ed *evData
+                ed := *(**evData)(unsafe.Pointer(&ev.Fd))
+                /*var ed *evData
                 if ted, ok := ep.evDataMap.Load(int(ev.Fd)); ok {
                     ed = ted.(*evData)
                 } else {
                     panic("evDataMap not found")
                     continue // TODO add evOptions.debug? panic("evDataMap not found")
-                }
+                }*/
 				// EPOLLHUP refer to man 2 epoll_ctl
 				if ev.Events&(syscall.EPOLLHUP|syscall.EPOLLERR) != 0 {
                     ep.remove(&(ed.fd))
