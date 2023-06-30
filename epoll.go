@@ -31,7 +31,7 @@ type evPoll struct {
 
 	// L/F模型线程数量
 	pollThreadNum     int
-	multiplePollerMtx sync.Mutex
+	leaderMtx sync.Mutex
 
 	evDataPool *sync.Pool
 	evDataMap   *ArrayMapUnion[evData]
@@ -148,9 +148,9 @@ func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 	events := make([]syscall.EpollEvent, ep.evPollSize) // NOT make(x, len, cap)
 	for {
 		if multiplePoller == true {
-			ep.multiplePollerMtx.Lock()
+			ep.leaderMtx.Lock()
 			nfds, err = syscall.EpollWait(ep.efd, events, -1)
-			ep.multiplePollerMtx.Unlock()
+			ep.leaderMtx.Unlock() // change to follower, go to handle events
 		} else {
 			nfds, err = syscall.EpollWait(ep.efd, events, -1)
 		}
