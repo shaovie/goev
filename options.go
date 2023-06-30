@@ -8,6 +8,10 @@ type Options struct {
 	// acceptor options
 	reuseAddr     bool // SO_REUSEADDR
 	listenBacklog int  //
+
+	// connector options
+
+	// acceptor and connector options
 	recvBuffSize  int  // ignore equal 0
 
 	// reactor options
@@ -27,9 +31,13 @@ func setOptions(optL ...Option) {
 			evPollSize:    512,
 			listenBacklog: 1024, // go default 128
 		}
-		if evOptions.evPollThreadNum = runtime.NumCPU() / 2; evOptions.evPollThreadNum < 1 {
-			evOptions.evPollThreadNum = 1
-		}
+        cpuN := runtime.NumCPU()
+        evOptions.evPollThreadNum = 1
+        if cpuN > 15 {
+			evOptions.evPollThreadNum = cpuN - 4
+        } else if cpuN > 3 {
+			evOptions.evPollThreadNum = cpuN - 2
+        }
 	}
 
 	for _, opt := range optL {

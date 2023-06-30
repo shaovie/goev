@@ -1,7 +1,7 @@
 package main
 
 import (
-	"errors"
+    "fmt"
 	"sync"
 	"syscall"
 
@@ -12,31 +12,45 @@ var (
 	buffPool *sync.Pool
 )
 
-const httpResp = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Length: 5\r\n\r\nhello"
+const httpResp = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 5\r\n\r\nhello"
 
 type Http struct {
 	goev.NullEvHandler
+    m [4096]byte // test memory leak
 }
 
 func (h *Http) OnOpen(fd *goev.Fd) bool {
 	return true
 }
 func (h *Http) OnRead(fd *goev.Fd) bool {
+	buf := buffPool.Get().([]byte) // just read
+    defer buffPool.Put(buf)
+
+    readN := 0
 	for {
-		buf := buffPool.Get().([]byte) // just read
-		n, err := fd.Read(buf)
-		buffPool.Put(buf)
+        if readN >= cap(buf) { // alloc new buff to read
+            break
+        }
+        n, err := fd.Read(buf[readN:])
 		if err != nil {
-			if errors.Is(err, syscall.EAGAIN) { // epoll ET mode
+			if err == syscall.EAGAIN { // epoll ET mode
 				break
-			}
+			} else if err == syscall.EINTR { // MUST
+                continue
+            }
+            fmt.Println("read: ", err.Error())
 			return false
 		}
-		if n == 0 { // connection closed
+		if n > 0 { // n > 0
+            readN += n
+        } else { // n == 0 connection closed,  will not < 0
+            if readN == 0 {
+                fmt.Println("peer closed. ", n)
+            }
 			return false
-		}
+        }
 	}
-	fd.Write([]byte(httpResp))
+	fd.Write([]byte(httpResp)) // Connection: close
 	return false // will goto OnClose
 }
 func (h *Http) OnClose(fd *goev.Fd) {
@@ -48,6 +62,7 @@ type Https struct {
 }
 
 func main() {
+    fmt.Println("hello boy")
 	buffPool = &sync.Pool{
 		New: func() any {
 			return make([]byte, 4096)
@@ -55,7 +70,7 @@ func main() {
 	}
 	r, err := goev.NewReactor(
 		goev.EvPollSize(1024),
-		goev.EvPollThreadNum(1),
+		goev.EvPollThreadNum(0), // auto calc
 	)
 	if err != nil {
 		panic(err.Error())

@@ -31,3 +31,4 @@ evpool
        疑问, 调整msec是对下次事件轮询的预判, 主动让出CPU不就延缓了下次轮询的时机吗?
        我觉得它可能只是单纯测试了epoll_wait的执行时间, 并没有实际放fd进去
 
+       persistentalloc

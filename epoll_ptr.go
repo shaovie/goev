@@ -1,4 +1,3 @@
-//go:build ptr
 // +build ptr
 
 package goev
@@ -70,6 +69,7 @@ type evData struct {
 
 func (ed *evData) reset(fd int, h EvHandler) {
 	ed.fd.v = fd
+	ed.fd.ed = ed
 	ed.evHandler = h
 }
 
@@ -85,10 +85,7 @@ type evPoll struct {
 	pollThreadNum     int
 	multiplePollerMtx sync.Mutex
 
-	// TODO Put回收操作还没想好一个优雅的方式
-	// evDataPool *sync.Pool
-
-	evDataMap    sync.Map
+	evDataPool *sync.Pool
 
 	evPollSize int // epoll_wait一次轮询获取固定数量准备好的I/O事件, 此参数有利于多线程轮换
 }
@@ -106,23 +103,23 @@ func (ep *evPoll) open(pollThreadNum, evPollSize int) error {
 	}
 	ep.evPollSize = evPollSize
 	ep.efd = efd
-	// ep.evDataPool = &sync.Pool{
-	//     New: func() any {
-	//         return new(evData)
-	//     },
-	// }
+	ep.evDataPool = &sync.Pool{
+	    New: func() any {
+	        return new(evData)
+	    },
+	}
 	ep.pollThreadNum = pollThreadNum
 	// process max fds
 	// show using `ulimit -Hn`
 	// $GOROOT/src/os/rlimit.go Go had raise the limit to 'Max Hard Limit'
 	return nil
 }
-func (ep *evPoll) add(fd, events int, h EvHandler) error {
-	ed := &evData{} // TODO ep.evDataPool.Get().(*evData)
+func (ep *evPoll) add(fd int, events uint32, h EvHandler) error {
+    ed := ep.evDataPool.Get().(*evData)
 	ed.reset(fd, h)
 
 	ev := epollEvent{
-		Events: uint32(events),
+		Events: events,
 	}
     *(**evData)(unsafe.Pointer(&ev.data)) = ed
 	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd, &ev); err != nil {
@@ -130,18 +127,23 @@ func (ep *evPoll) add(fd, events int, h EvHandler) error {
 	}
 	return nil
 }
-func (ep *evPoll) modify(fd, events int, h EvHandler) error {
-	ed := &evData{} // TODO ep.evDataPool.Get().(*evData)
-	ed.reset(fd, h)
+func (ep *evPoll) modify(fd *Fd, events uint32, h EvHandler) error {
+    var ed *evData
+    if fd.ed != nil { // There's no need to put it back `ep.evDataPool.Put(fd.ed)'
+        ed = fd.ed
+    } else {
+        ed = ep.evDataPool.Get().(*evData)
+    }
+	ed.reset(fd.v, h)
 
 	ev := epollEvent{
-		Events: uint32(events),
+		Events: events,
 	}
     *(**evData)(unsafe.Pointer(&ev.data)) = ed
 	
-	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd, &ev); err != nil {
-		if errors.Is(err, syscall.ENOENT) { // refer to `man 2 epoll_ctl`
-			if err = epollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd, &ev); err != nil {
+	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd.v, &ev); err != nil {
+		if err == syscall.ENOENT { // refer to `man 2 epoll_ctl`
+			if err = epollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd.v, &ev); err != nil {
 				return errors.New("epoll_ctl add: " + err.Error())
 			}
 			return nil
@@ -150,10 +152,13 @@ func (ep *evPoll) modify(fd, events int, h EvHandler) error {
 	}
 	return nil
 }
-func (ep *evPoll) remove(fd int) error {
+func (ep *evPoll) remove(fd *Fd) error {
+    if fd.ed != nil {
+        ep.evDataPool.Put(fd.ed)
+    }
 	// The event argument is ignored and can be NULL (but see `man 2 epoll_ctl` BUGS)
 	// kernel versions > 2.6.9
-	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_DEL, fd, nil); err != nil {
+	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_DEL, fd.v, nil); err != nil {
 		return errors.New("epoll_ctl del: " + err.Error())
 	}
 	return nil
@@ -198,23 +203,22 @@ func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 			for i := 0; i < nfds; i++ {
 				ev := &events[i]
                 ed := *(**evData)(unsafe.Pointer(&ev.data))
-				
 				// EPOLLHUP refer to man 2 epoll_ctl
 				if ev.Events&(syscall.EPOLLHUP|syscall.EPOLLERR) != 0 {
-					ep.remove(ed.fd.v)
+                    ep.remove(&(ed.fd))
 					ed.evHandler.OnClose(&(ed.fd))
 					continue
 				}
 				if ev.Events&(syscall.EPOLLOUT) != 0 {
 					if ed.evHandler.OnWrite(&(ed.fd)) == false {
-						ep.remove(ed.fd.v)
+                        ep.remove(&(ed.fd))
 						ed.evHandler.OnClose(&(ed.fd))
 						continue
 					}
 				}
 				if ev.Events&(syscall.EPOLLIN) != 0 {
 					if ed.evHandler.OnRead(&(ed.fd)) == false {
-						ep.remove(ed.fd.v)
+                        ep.remove(&(ed.fd))
 						ed.evHandler.OnClose(&(ed.fd))
 						continue
 					}
@@ -222,7 +226,7 @@ func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 			} // end of `for i < nfds'
 		} else if nfds == 0 {
 			continue
-		} else if err != nil && !errors.Is(err, syscall.EINTR) { // nfds < 0
+		} else if err != nil && err != syscall.EINTR { // nfds < 0
 			return errors.New("syscall epoll_wait: " + err.Error())
 		}
 	}

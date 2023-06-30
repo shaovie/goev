@@ -7,10 +7,15 @@ import (
 	"syscall"
 )
 
+// Fd 不能由外边构造
 type Fd struct {
 	v int
+    ed *evData // internal var `for modify'
 }
 
+func (fd *Fd) Fd() int {
+    return fd.v
+}
 func (fd *Fd) Read(buf []byte) (int, error) {
 	return syscall.Read(fd.v, buf)
 }

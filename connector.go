@@ -7,8 +7,9 @@ import (
 
 type connnector struct {
 	NullEvHandler
+
 	fd               int
-	events           int
+	events           uint32
 	newEvHanlderFunc func() EvHandler
 	reactor          *Reactor
 }
@@ -21,7 +22,7 @@ func NewConnector(opts ...Option) (*connnector, error) {
 	return a, nil
 }
 
-func (c *connnector) Open(r *Reactor, newEvHanlderFunc func() EvHandler, events int) error {
+func (c *connnector) Open(r *Reactor, newEvHanlderFunc func() EvHandler, events uint32) error {
 	c.reactor = r
 	c.events = events
 	c.newEvHanlderFunc = newEvHanlderFunc

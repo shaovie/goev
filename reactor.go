@@ -25,11 +25,23 @@ func (r *Reactor) Open() error {
 	return r.evPoll.open(evOptions.evPollThreadNum, evOptions.evPollSize)
 }
 
-func (r *Reactor) AddEvHandler(h EvHandler, fd, events int) error {
+func (r *Reactor) AddEvHandler(h EvHandler, fd int, events uint32) error {
+    if fd < 0 || h == nil {
+        return errors.New("AddEvHandler: invalid params")
+    }
 	return r.evPoll.add(fd, events, h)
 }
-
-func (r *Reactor) RemoveEvHandler(fd int) error {
+func (r *Reactor) ModifyEvHandler(h EvHandler, fd *Fd, events uint32) error {
+    if fd == nil || fd.v < 0 || h == nil {
+        return errors.New("ModifyEvHandler: invalid params")
+    }
+	return r.evPoll.modify(fd, events, h)
+}
+// fd 一定是reactor内部构造的, 不能自己构造
+func (r *Reactor) RemoveEvHandler(fd *Fd) error {
+    if fd == nil || fd.v < 0 {
+		return errors.New("invalid fd")
+    }
 	return r.evPoll.remove(fd)
 }
 

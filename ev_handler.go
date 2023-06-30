@@ -5,13 +5,14 @@ import (
 )
 
 const (
-	EV_IN  = syscall.EPOLLIN | syscall.EPOLLET | syscall.EPOLLRDHUP
-	EV_OUT = syscall.EPOLLOUT | syscall.EPOLLET | syscall.EPOLLRDHUP
+    EPOLLET = 1 << 31
+	EV_IN  uint32 = syscall.EPOLLIN | EPOLLET | syscall.EPOLLRDHUP
+	EV_OUT uint32 = syscall.EPOLLOUT | EPOLLET | syscall.EPOLLRDHUP
 
-	EV_EVENTFD = syscall.EPOLLIN | syscall.EPOLLRDHUP
+	EV_EVENTFD uint32 = syscall.EPOLLIN | syscall.EPOLLRDHUP // Not ET mode
 
 	// 用水平触发, 循环Accept有可能会导致不可控
-	EV_ACCEPT = syscall.EPOLLIN | syscall.EPOLLRDHUP
+	EV_ACCEPT uint32 = syscall.EPOLLIN | syscall.EPOLLRDHUP
 	//EV_CONNECT  = EV_IN | EV_OUT
 )
 
@@ -31,11 +32,6 @@ type EvHandler interface {
 	// Call OnClose() when return false
 	OnWrite(fd *Fd) bool
 
-	// EvPoll catch notify event
-	//
-	// Call OnClose() when return false
-	OnNotify(fd *Fd) bool
-
 	// You need to manually release the fd resource call fd.Close()
 	// You'd better only call fd.Close() here.
 	OnClose(fd *Fd)
@@ -53,10 +49,6 @@ func (n *NullEvHandler) OnRead(fd *Fd) bool {
 }
 func (n *NullEvHandler) OnWrite(fd *Fd) bool {
 	panic("NullEvHandler OnWrite")
-	return false
-}
-func (n *NullEvHandler) OnNotify(fd *Fd) bool {
-	panic("NullEvHandler OnNotify")
 	return false
 }
 func (n *NullEvHandler) OnClose(fd *Fd) {

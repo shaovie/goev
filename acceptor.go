@@ -1,8 +1,8 @@
 package goev
 
 import (
-	"errors"
 	"net"
+	"errors"
 	"strconv"
 	"strings"
 	"syscall"
@@ -10,8 +10,9 @@ import (
 
 type acceptor struct {
 	NullEvHandler
+
 	fd               int
-	events           int
+	events           uint32
 	loopAcceptTimes  int
 	newEvHanlderFunc func() EvHandler
 	reactor          *Reactor
@@ -28,7 +29,7 @@ func NewAcceptor(opts ...Option) (*acceptor, error) {
 // Open create a listen fd
 // The addr format 192.168.0.1:8080 or :8080
 // The events list are in ev_handler.go
-func (a *acceptor) Open(r *Reactor, newEvHanlderFunc func() EvHandler, addr string, events int) error {
+func (a *acceptor) Open(r *Reactor, newEvHanlderFunc func() EvHandler, addr string, events uint32) error {
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
 	if err != nil {
 		return errors.New("Socket in acceptor.Open: " + err.Error())
