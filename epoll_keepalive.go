@@ -165,14 +165,14 @@ func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 				if ev.Events&(syscall.EPOLLHUP|syscall.EPOLLERR) != 0 {
                     ep.remove(&(ed.fd))
 					ed.evHandler.OnClose(&(ed.fd))
-                    ep.evDataPool.Put(ed)
+                    //ep.evDataPool.Put(ed)
 					continue
 				}
 				if ev.Events&(syscall.EPOLLOUT) != 0 {
 					if ed.evHandler.OnWrite(&(ed.fd)) == false {
 						ep.remove(&(ed.fd))
 						ed.evHandler.OnClose(&(ed.fd))
-                        ep.evDataPool.Put(ed)
+                        //ep.evDataPool.Put(ed)
 						continue
 					}
 				}
@@ -180,7 +180,7 @@ func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 					if ed.evHandler.OnRead(&(ed.fd)) == false {
                         ep.remove(&(ed.fd))
 						ed.evHandler.OnClose(&(ed.fd))
-                        ep.evDataPool.Put(ed)
+                        //ep.evDataPool.Put(ed)
 						continue
 					}
 				}
