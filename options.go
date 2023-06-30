@@ -17,6 +17,7 @@ type Options struct {
 	// reactor options
 	evPollSize      int //
 	evPollThreadNum int //
+    evDataArrSize  int
 }
 
 type Option func(*Options)
@@ -29,6 +30,7 @@ func setOptions(optL ...Option) {
 		evOptions = &Options{
 			reuseAddr:     true,
 			evPollSize:    512,
+			evDataArrSize: 8192,
 			listenBacklog: 1024, // go default 128
 		}
         cpuN := runtime.NumCPU()
@@ -66,10 +68,21 @@ func RecvBuffSize(n int) Option {
 	}
 }
 
+// ArrayMapUnion数据结构中array的容易, 性能不会线性增长, 主要根据自己的服务中fd并发数量(fd=0~n的范围)来定
+func EvDataArrSize(n int) Option {
+	return func(o *Options) {
+        if n > 0 {
+            o.evDataArrSize = n
+        }
+	}
+}
+
 // evpoll一次轮询获取数量n的Ready I/O事件, 此参数有利于多线程并发处理I/O事件
 func EvPollSize(n int) Option {
 	return func(o *Options) {
-		o.evPollSize = n
+        if n > 0 {
+            o.evPollSize = n
+        }
 	}
 }
 

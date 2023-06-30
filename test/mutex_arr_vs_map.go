@@ -4,34 +4,30 @@ import (
 	"fmt"
     "time"
     "sync"
+    "sync/atomic"
     "runtime"
     "math/rand"
 )
 type EpollEvent struct {
-	Events uint32
-	Fd  int32
-	Pad int32
+    fd int
+    fd2 *int64 
 }
-// 加了 LockOSThread之后,arr性能降了一个数量级, 看来随着程序运行时间长了动态增长线程后arr就不好使了,不稳定
-// LockOSThread 会强制新建一个线程
+type ArrData struct {
+    v atomic.Pointer[EpollEvent]
+}
 var (
     userLockOSThread = true
-    loopN = 200000
+    loopN = 500000
     arrSize = 8192 // 对性能影响不是线性的
-    arr []*EpollEvent
-    arrMtx sync.RWMutex
+    arr []*atomic.Pointer[EpollEvent]
 
     m sync.Map
 )
 func arrGet(i int) *EpollEvent {
-    arrMtx.RLock()
-    defer arrMtx.RUnlock()
-    return arr[i]
+    return arr[i].Load()
 }
 func arrSet(i int, v *EpollEvent) {
-    arrMtx.Lock()
-    arr[i] = v
-    arrMtx.Unlock()
+    arr[i].Store(v)
 }
 func arrMutexR(wg *sync.WaitGroup) {
     if userLockOSThread {
@@ -40,7 +36,7 @@ func arrMutexR(wg *sync.WaitGroup) {
     for i := 0; i < loopN; i++ {
         j := int(rand.Int63()) % arrSize
         if v := arrGet(j); v != nil {
-            if v.Fd == 0 {
+            if v.fd == 0 {
                 _ = rand.Int63()
             }
         }
@@ -64,7 +60,7 @@ func mapR(wg *sync.WaitGroup) {
     for i := 0; i < loopN; i++ {
         j := int(rand.Int63()) % arrSize
         if v, ok := m.Load(j); ok {
-            if v.(*EpollEvent).Fd == 0 {
+            if v.(*EpollEvent).fd == 0 {
                 _ = rand.Int63()
             }
         }
@@ -82,12 +78,15 @@ func mapW(wg *sync.WaitGroup) {
     wg.Done()
 }
 func arrTest() {
-    arr = make([]*EpollEvent, arrSize)
+    arr = make([]*atomic.Pointer[EpollEvent], arrSize)
+    for i := 0; i < arrSize; i++ {
+        arr[i] = new(atomic.Pointer[EpollEvent])
+    }
     var wg sync.WaitGroup
     wg.Add(1)
     begin := time.Now()
     go arrMutexW(&wg)
-    for i := 0; i < 5; i++ {
+    for i := 0; i < 3; i++ {
         wg.Add(1)
         go arrMutexR(&wg)
     }
@@ -100,7 +99,7 @@ func mapTest() {
     wg.Add(1)
     begin := time.Now()
     go mapW(&wg)
-    for i := 0; i < 5; i++ {
+    for i := 0; i < 3; i++ {
         wg.Add(1)
         go mapR(&wg)
     }

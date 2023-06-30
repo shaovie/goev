@@ -40,7 +40,7 @@ type evPoll struct {
 	evPollSize int // epoll_wait一次轮询获取固定数量准备好的I/O事件, 此参数有利于多线程轮换
 }
 
-func (ep *evPoll) open(pollThreadNum, evPollSize int) error {
+func (ep *evPoll) open(pollThreadNum, evPollSize, _ int) error {
 	if pollThreadNum < 1 {
 		return errors.New("EvPollThreadNum < 1")
 	}

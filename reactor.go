@@ -22,7 +22,7 @@ func NewReactor(opts ...Option) (*Reactor, error) {
 }
 
 func (r *Reactor) Open() error {
-	return r.evPoll.open(evOptions.evPollThreadNum, evOptions.evPollSize)
+	return r.evPoll.open(evOptions.evPollThreadNum, evOptions.evPollSize, evOptions.evDataArrSize)
 }
 
 func (r *Reactor) AddEvHandler(h EvHandler, fd int, events uint32) error {

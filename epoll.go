@@ -34,12 +34,12 @@ type evPoll struct {
 	multiplePollerMtx sync.Mutex
 
 	evDataPool *sync.Pool
-	evDataMap    sync.Map
+	evDataMap   *ArrayMapUnion[evData]
 
 	evPollSize int // epoll_wait一次轮询获取固定数量准备好的I/O事件, 此参数有利于多线程轮换
 }
 
-func (ep *evPoll) open(pollThreadNum, evPollSize int) error {
+func (ep *evPoll) open(pollThreadNum, evPollSize, evDataArrSize int) error {
 	if pollThreadNum < 1 {
 		return errors.New("EvPollThreadNum < 1")
 	}
@@ -57,7 +57,12 @@ func (ep *evPoll) open(pollThreadNum, evPollSize int) error {
 	        return new(evData)
 	    },
 	}
+    ep.evDataMap = NewArrayMapUnion[evData](evDataArrSize)
 	ep.pollThreadNum = pollThreadNum
+
+    for i := 0; i < pollThreadNum * 2; i++ { // warm up
+        ep.evDataPool.Put(new(evData))
+    }
 	// process max fds
 	// show using `ulimit -Hn`
 	// $GOROOT/src/os/rlimit.go Go had raise the limit to 'Max Hard Limit'
@@ -152,10 +157,8 @@ func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 		if nfds > 0 {
 			for i := 0; i < nfds; i++ {
 				ev := &events[i]
-                var ed *evData
-                if ted, ok := ep.evDataMap.Load(int(ev.Fd)); ok {
-                    ed = ted.(*evData)
-                } else {
+                ed := ep.evDataMap.Load(int(ev.Fd))
+                if ed == nil {
                     panic("evDataMap not found")
                     continue // TODO add evOptions.debug? panic("evDataMap not found")
                 }

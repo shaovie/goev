@@ -69,6 +69,7 @@ func main() {
 		},
 	}
 	r, err := goev.NewReactor(
+		goev.EvDataArrSize(0), // default val
 		goev.EvPollSize(1024),
 		goev.EvPollThreadNum(0), // auto calc
 	)
