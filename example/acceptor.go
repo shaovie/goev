@@ -15,11 +15,11 @@ var (
 const httpResp = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 5\r\n\r\nhello"
 
 type Http struct {
-	goev.NullEvHandler
+	goev.NullEvent
     m [4096]byte // test memory leak
 }
 
-func (h *Http) OnOpen(fd *goev.Fd) bool {
+func (h *Http) OnOpen(r *goev.Reactor, fd *goev.Fd) bool {
 	return true
 }
 func (h *Http) OnRead(fd *goev.Fd) bool {
@@ -76,38 +76,33 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	if err = r.Open(); err != nil {
-		panic(err.Error())
-	}
 	//= http
-	httpAcceptor, err := goev.NewAcceptor(
-		goev.ListenBacklog(256),
-		goev.RecvBuffSize(8*1024), // 短链接, 不需要很大的缓冲区
-	)
-	if err != nil {
-		panic(err.Error())
-	}
-	httpAcceptor.Open(r, func() goev.EvHandler {
-		return new(Http)
-	},
+	_, err = goev.NewAcceptor(r, func() goev.EvHandler {
+		    return new(Http)
+	    },
 		":2023",
 		goev.EV_IN,
+
+		goev.ListenBacklog(256),
+		goev.RecvBuffSize(8*1024), // 短链接, 不需要很大的缓冲区
 	)
+    if err != nil {
+        panic(err.Error())
+    }
 
 	//= https
-	httpsAcceptor, err := goev.NewAcceptor(
+	_, err = goev.NewAcceptor(r, func() goev.EvHandler {
+		    return new(Https)
+	    },
+		":2024",
+		goev.EV_IN,
+	
 		goev.ListenBacklog(256),
 		goev.RecvBuffSize(8*1024), // 短链接, 不需要很大的缓冲区
 	)
 	if err != nil {
 		panic(err.Error())
 	}
-	httpsAcceptor.Open(r, func() goev.EvHandler {
-		return new(Https)
-	},
-		":2024",
-		goev.EV_IN,
-	)
 
 	if err = r.Run(); err != nil {
 		panic(err.Error())

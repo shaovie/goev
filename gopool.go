@@ -10,7 +10,7 @@ type GoPool struct {
 //
 // M: the number of reusable goroutines,
 // N: the capacity for asynchronous task processing.
-func NewPool(sizeM, preSpawn, queueN int) *GoPool {
+func NewGoPool(sizeM, preSpawn, queueN int) *GoPool {
 	if preSpawn <= 0 && queueN > 0 {
 		panic("GoPool: dead queue")
 	}

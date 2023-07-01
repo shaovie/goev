@@ -8,48 +8,65 @@ import (
 	"syscall"
 )
 
-type acceptor struct {
-	NullEvHandler
+type Acceptor struct {
+	NullEvent
 
+	reuseAddr        bool // SO_REUSEADDR
 	fd               int
 	events           uint32
+	recvBuffSize     int  // ignore equal 0
+	listenBacklog    int
 	loopAcceptTimes  int
 	newEvHanlderFunc func() EvHandler
 	reactor          *Reactor
 }
 
-func NewAcceptor(opts ...Option) (*acceptor, error) {
+func NewAcceptor(r *Reactor, newEvHanlderFunc func() EvHandler, addr string, events uint32,
+    opts ...Option) (*Acceptor, error) {
 	setOptions(opts...)
-	a := &acceptor{
+	a := &Acceptor{
 		fd: -1,
+        reactor: r,
+        events: events,
+        newEvHanlderFunc: newEvHanlderFunc,
+        listenBacklog: evOptions.listenBacklog,
+        recvBuffSize: evOptions.recvBuffSize,
+        reuseAddr: evOptions.reuseAddr,
 	}
+	a.loopAcceptTimes = a.listenBacklog / 2
+	if a.loopAcceptTimes < 1 {
+		a.loopAcceptTimes = 1
+	}
+    if err := a.open(addr); err != nil {
+        return nil, err
+    }
 	return a, nil
 }
 
 // Open create a listen fd
 // The addr format 192.168.0.1:8080 or :8080
 // The events list are in ev_handler.go
-func (a *acceptor) Open(r *Reactor, newEvHanlderFunc func() EvHandler, addr string, events uint32) error {
+func (a *Acceptor) open(addr string) error {
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
 	if err != nil {
-		return errors.New("Socket in acceptor.Open: " + err.Error())
+		return errors.New("Socket in Acceptor.open: " + err.Error())
 	}
 
-	if evOptions.reuseAddr == true {
+	if a.reuseAddr == true {
 		if err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1); err != nil {
 			syscall.Close(fd)
-			return errors.New("Set SO_REUSEADDR in acceptor.Open: " + err.Error())
+			return errors.New("Set SO_REUSEADDR in Acceptor.open: " + err.Error())
 		}
 	}
 	syscall.SetNonblock(fd, true)
 
-	if evOptions.recvBuffSize > 0 {
+	if a.recvBuffSize > 0 {
 		// `sysctl -a | grep net.ipv4.tcp_rmem` 返回 min default max
 		// 默认 内核会在 min max 之间动态调整, default是初始值, 如果设置了SO_RCVBUF, 缓冲区大小不变成固定值,
 		// 内核也不会进行动态调整了
 		// 必须在listen/connect之前调用
 		// must < `sysctl -a | grep net.core.rmem_max`
-		err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF, evOptions.recvBuffSize)
+		err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF, a.recvBuffSize)
 		if err != nil {
 			syscall.Close(fd)
 			return errors.New("Set SO_RCVBUF: " + err.Error())
@@ -82,47 +99,40 @@ func (a *acceptor) Open(r *Reactor, newEvHanlderFunc func() EvHandler, addr stri
 		syscall.Close(fd)
 		return errors.New("syscall bind: " + err.Error())
 	}
-	if err = syscall.Listen(fd, evOptions.listenBacklog); err != nil {
+	if err = syscall.Listen(fd, a.listenBacklog); err != nil {
 		syscall.Close(fd)
 		return errors.New("syscall listen: " + err.Error())
 	}
 
-	if err = r.AddEvHandler(a, fd, EV_ACCEPT); err != nil {
+	if err = a.reactor.AddEvHandler(a, fd, EV_ACCEPT); err != nil {
 		syscall.Close(fd)
-		return errors.New("AddEvHandler in acceptor.Open: " + err.Error())
+		return errors.New("AddEvHandler in Acceptor.Open: " + err.Error())
 	}
-	a.reactor = r
 	a.fd = fd
-	a.events = events
-	a.newEvHanlderFunc = newEvHanlderFunc
-	a.loopAcceptTimes = evOptions.listenBacklog / 2
-	if a.loopAcceptTimes < 1 {
-		a.loopAcceptTimes = 1
-	}
 	return nil
 }
-func (a *acceptor) OnRead(fd *Fd) bool {
+func (a *Acceptor) OnRead(fd *Fd) bool {
 	for i := 0; i < a.loopAcceptTimes; i++ {
 		conn, _, err := syscall.Accept4(a.fd, syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC)
 		if err != nil {
-			// if !errors.Is(err, syscall.EINTR) {
-			//     return false
-			// }
+			if err == syscall.EINTR {
+                continue
+            }
 			break
 		}
 		h := a.newEvHanlderFunc()
 		newFd := Fd{v: conn}
 		if err = a.reactor.AddEvHandler(h, conn, a.events); err != nil {
-			h.OnClose(&newFd)
+            syscall.Close(fd.v) // not h.OnClose()
 			continue
 		}
-		if h.OnOpen(&newFd) == false {
+		if h.OnOpen(a.reactor, &newFd) == false {
 			h.OnClose(&newFd)
 			continue
 		}
 	}
 	return true
 }
-func (a *acceptor) OnClose(fd *Fd) {
+func (a *Acceptor) OnClose(fd *Fd) {
 	// TODO close and reopen ?
 }

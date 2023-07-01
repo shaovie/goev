@@ -18,11 +18,14 @@ func NewReactor(opts ...Option) (*Reactor, error) {
 	r := &Reactor{
 		evPoll: new(evPoll),
 	}
+    if err := r.open(evOptions.evPollThreadNum, evOptions.evPollSize, evOptions.evDataArrSize); err != nil {
+        return nil, err
+    }
 	return r, nil
 }
 
-func (r *Reactor) Open() error {
-	return r.evPoll.open(evOptions.evPollThreadNum, evOptions.evPollSize, evOptions.evDataArrSize)
+func (r *Reactor) open(evPollThreadNum, evPollSize, evDataArrSize int) error {
+	return r.evPoll.open(evPollThreadNum, evPollSize, evDataArrSize)
 }
 
 func (r *Reactor) AddEvHandler(h EvHandler, fd int, events uint32) error {

@@ -19,8 +19,8 @@ type Notifier interface {
 
 type NotifyHandler func()
 
-type notify struct {
-	NullEvHandler
+type Notify struct {
+	NullEvent
 
 	efd        int
     notifyOnce atomic.Int32 // used to avoid duplicate call evHandler
@@ -45,7 +45,7 @@ func NewNotify(r *Reactor, h NotifyHandler) (Notifier, error) {
 	if err != nil {
 		return nil, errors.New("eventfd: " + err.Error())
 	}
-    nt := &notify{
+    nt := &Notify{
         reactor: r,
         efd: fd,
         handler: h,
@@ -56,7 +56,7 @@ func NewNotify(r *Reactor, h NotifyHandler) (Notifier, error) {
 	}
 	return nt, nil
 }
-func (nt *notify) Notify() {
+func (nt *Notify) Notify() {
     if !nt.notifyOnce.CompareAndSwap(0, 1) {
         return
     }
@@ -76,7 +76,7 @@ func (nt *notify) Notify() {
         break // TODO add evOptions.debug? panic("Notify: write eventfd failed!")
     }
 }
-func (nt *notify) Close() {
+func (nt *Notify) Close() {
     if !nt.closeOnce.CompareAndSwap(0, 1) {
         return
     }
@@ -98,7 +98,7 @@ func (nt *notify) Close() {
 }
 
 // Prohibit external calls
-func (nt *notify) OnRead(fd *Fd) bool {
+func (nt *Notify) OnRead(fd *Fd) bool {
     if fd.v != nt.efd { // 防止外部调用!
         panic("Prohibit external calls")
     }
@@ -129,7 +129,7 @@ func (nt *notify) OnRead(fd *Fd) bool {
     }
     return true // 
 }
-func (nt *notify) OnClose(fd *Fd) {
+func (nt *Notify) OnClose(fd *Fd) {
     fd.Close()
 	nt.efd = -1
 }
