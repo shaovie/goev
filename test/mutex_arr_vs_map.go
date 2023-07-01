@@ -12,14 +12,11 @@ type EpollEvent struct {
     fd int
     fd2 *int64 
 }
-type ArrData struct {
-    v atomic.Pointer[EpollEvent]
-}
 var (
     userLockOSThread = true
     loopN = 500000
     arrSize = 8192 // 对性能影响不是线性的
-    arr []*atomic.Pointer[EpollEvent]
+    arr []atomic.Pointer[EpollEvent]
 
     m sync.Map
 )
@@ -36,8 +33,10 @@ func arrMutexR(wg *sync.WaitGroup) {
     for i := 0; i < loopN; i++ {
         j := int(rand.Int63()) % arrSize
         if v := arrGet(j); v != nil {
-            if v.fd == 0 {
+            if v.fd == j {
                 _ = rand.Int63()
+            } else {
+                panic("arr val")
             }
         }
     }
@@ -49,7 +48,7 @@ func arrMutexW(wg *sync.WaitGroup) {
     }
     for i := 0; i < loopN; i++ {
         j := int(rand.Int63()) % arrSize
-        arrSet(j, new(EpollEvent))
+        arrSet(j, &EpollEvent{fd:j})
     }
     wg.Done()
 }
@@ -60,8 +59,10 @@ func mapR(wg *sync.WaitGroup) {
     for i := 0; i < loopN; i++ {
         j := int(rand.Int63()) % arrSize
         if v, ok := m.Load(j); ok {
-            if v.(*EpollEvent).fd == 0 {
+            if v.(*EpollEvent).fd == j {
                 _ = rand.Int63()
+            } else {
+                panic("map val")
             }
         }
     }
@@ -73,15 +74,16 @@ func mapW(wg *sync.WaitGroup) {
     }
     for i := 0; i < loopN; i++ {
         j := int(rand.Int63()) % arrSize
-        m.Store(j, new(EpollEvent))
+        m.Store(j, &EpollEvent{fd:j})
     }
     wg.Done()
 }
 func arrTest() {
-    arr = make([]*atomic.Pointer[EpollEvent], arrSize)
+    arr = make([]atomic.Pointer[EpollEvent], arrSize)
+    /*
     for i := 0; i < arrSize; i++ {
         arr[i] = new(atomic.Pointer[EpollEvent])
-    }
+    }*/
     var wg sync.WaitGroup
     wg.Add(1)
     begin := time.Now()
@@ -108,6 +110,12 @@ func mapTest() {
     fmt.Println("map", diff)
 }
 func main() {
+    at1 := make([]atomic.Pointer[EpollEvent], 5)
+    at1[0].Store(&EpollEvent{fd:0})
+    at1[1].Store(&EpollEvent{fd:1})
+    at1[2].Store(&EpollEvent{fd:2})
+    at11 := at1[1].Load()
+    fmt.Println(at11.fd)
     mapTest()
     arrTest()
 }

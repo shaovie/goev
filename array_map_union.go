@@ -16,7 +16,7 @@ import (
 // it will also return nil.
 type ArrayMapUnion[T any] struct {
     arrSize int
-    arr []*atomic.Pointer[T]
+    arr []atomic.Pointer[T]
 
     sMap sync.Map
 }
@@ -28,10 +28,7 @@ func NewArrayMapUnion[T any](arrSize int) *ArrayMapUnion[T] {
     }
     amu := &ArrayMapUnion[T] {
         arrSize: arrSize,
-        arr: make([]*atomic.Pointer[T], arrSize),
-    }
-    for i := 0; i < arrSize; i++ {
-        amu.arr[i] = new(atomic.Pointer[T])
+        arr: make([]atomic.Pointer[T], arrSize),
     }
     return amu
 }
