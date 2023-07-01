@@ -1,28 +1,57 @@
 package goev
 
 import (
-	"errors"
 	"net"
+	"errors"
 	"strconv"
 	"syscall"
+	//"sync/atomic"
+)
+
+var (
+    EAGAIN = errors.New("EAGAIN")
 )
 
 // Fd 不能由外边构造
 type Fd struct {
 	v int
     ed *evData // internal var `for modify'
+
+    // 防止fd重复被close(如果被close一次, fd数值有可能被OS复用给新的链接)
+    // Prevent fd from being closed multiple times (if closed once,
+    // the fd value may be reused by the OS for a new connection).
+    // atomic.Int32 closed
 }
 
 func (fd *Fd) Fd() int {
     return fd.v
 }
-func (fd *Fd) Read(buf []byte) (int, error) {
-	return syscall.Read(fd.v, buf)
+// On  success, the number of bytes read is returned (zero indicates socket closed)
+// On error, -1 is returned, and err is set appropriately
+func (fd *Fd) Read(buf []byte) (n int, err error) {
+    for {
+        n, err = syscall.Read(fd.v, buf)
+        if err != nil && err == syscall.EINTR {
+            continue
+        }
+        break
+    }
+    return
 }
-func (fd *Fd) Write(buf []byte) (int, error) {
-	return syscall.Write(fd.v, buf)
+func (fd *Fd) Write(buf []byte) (n int, err error) {
+    for {
+        n, err = syscall.Write(fd.v, buf)
+        if err != nil && err == syscall.EINTR {
+            continue
+        }
+        break
+    }
+    return
 }
 func (fd *Fd) Close() {
+    // if !fd.closed.CompareAndSwap(0, 1) {
+    //     return
+    // }
 	syscall.Close(fd.v)
 	fd.v = -1
 }
