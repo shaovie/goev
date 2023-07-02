@@ -64,10 +64,10 @@ func (nt *Notify) Notify() {
         if n == 8 {
             return
         } else if err != nil {
-            if errors.Is(err, syscall.EINTR) {
+            if err == syscall.EINTR {
                 continue
             }
-            if errors.Is(err, syscall.EAGAIN) {
+            if err == syscall.EAGAIN {
                 return
             }
         }
@@ -84,12 +84,13 @@ func (nt *Notify) Close() {
             return
         }
         if err != nil {
-            if errors.Is(err, syscall.EINTR) {
+            if err == syscall.EINTR {
                 continue
             }
-            // errors.Is(err, syscall.EAGAIN)
+            if err == syscall.EAGAIN {
+                return
+            }
         }
-        nt.notifyOnce.Store(0)
         break // TODO add evOptions.debug? panic("Notify: write eventfd failed!")
     }
 }
@@ -103,10 +104,10 @@ func (nt *Notify) OnRead(fd *Fd) bool {
     for {
         n, err := syscall.Read(nt.efd, tmp[:])
         if err != nil {
-            if errors.Is(err, syscall.EINTR) {
+            if err == syscall.EINTR {
                 continue
             }
-            if errors.Is(err, syscall.EAGAIN) {
+            if err == syscall.EAGAIN {
                 nt.notifyOnce.Store(0)
                 return true
             }

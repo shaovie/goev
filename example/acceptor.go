@@ -33,7 +33,7 @@ func (h *Http) OnRead(fd *goev.Fd) bool {
         }
         n, err := fd.Read(buf[readN:])
 		if err != nil {
-			if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK { // epoll ET mode
+			if err == syscall.EAGAIN { // epoll ET mode
 				break
             }
             fmt.Println("read: ", err.Error())
