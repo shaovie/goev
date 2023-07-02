@@ -16,7 +16,7 @@ var (
     ErrConnectAddEvHandler = errors.New("add handler to reactor error!")
 )
 type Connector struct {
-	NullEvent
+	Event
 
 	recvBuffSize     int  // ignore equal 0
 	reactor          *Reactor
@@ -80,16 +80,17 @@ func (c *Connector) Connect(addr string, h EvHandler, events uint32) error {
 	copy(sa.Addr[:], ip4.To4())
 	err = syscall.Connect(fd, &sa)
     if err == nil { // success
-        if err = c.reactor.AddEvHandler(h, fd, events); err != nil {
+		newFd := Fd{v: fd}
+        h.setReactor(c.reactor)
+		if h.OnOpen(&newFd) == false {
+			h.OnClose(&newFd)
+		}
+        if err = h.GetReactor().AddEvHandler(h, fd, events); err != nil {
             syscall.Close(fd) // not h.OnClose()
             return errors.New("AddEvHandler in connector.Connect: " + err.Error())
         }
-		newFd := Fd{v: fd}
-		if h.OnOpen(c.reactor, &newFd) == false {
-			h.OnClose(&newFd)
-		}
         return nil
-    } else if err == syscall.EINPROGRESS {
+    } else if errors.Is(err, syscall.EINPROGRESS) {
         if err = c.reactor.AddEvHandler(&inProgressConnect{r:c.reactor, h:h, fd:fd, events: events},
             fd, EV_CONNECT); err != nil {
             syscall.Close(fd)
@@ -103,7 +104,7 @@ func (c *Connector) Connect(addr string, h EvHandler, events uint32) error {
 }
 // nonblocking inprogress connection
 type inProgressConnect struct {
-    NullEvent
+    Event
 
     fd int
 	events           uint32
@@ -124,14 +125,15 @@ func (p *inProgressConnect) OnWrite(fd *Fd) bool {
     if !p.progressDone.CompareAndSwap(0, 1) {
         return true
     }
-    if err := p.r.AddEvHandler(p.h, p.fd, p.events); err != nil {
+    // From here on, the `fd` resources will be managed by h.
+    p.h.setReactor(p.r)
+    newFd := Fd{v: p.fd}
+    if p.h.OnOpen(&newFd) == false {
+        p.h.OnClose(&newFd)
+    }
+    if err := p.h.GetReactor().AddEvHandler(p.h, p.fd, p.events); err != nil {
         p.h.OnConnectFail(ErrConnectAddEvHandler)
         return false // goto p.OnClose()
-    }
-    // From here on, the `fd` resources will be managed by h.
-    newFd := Fd{v: p.fd}
-    if p.h.OnOpen(p.r, &newFd) == false {
-        p.h.OnClose(&newFd)
     }
     // TODO cancel timer
 	return true

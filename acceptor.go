@@ -9,7 +9,7 @@ import (
 )
 
 type Acceptor struct {
-	NullEvent
+	Event
 
 	reuseAddr        bool // SO_REUSEADDR
 	fd               int
@@ -19,14 +19,17 @@ type Acceptor struct {
 	loopAcceptTimes  int
 	newEvHanlderFunc func() EvHandler
 	reactor          *Reactor
+	newFdBindReactor *Reactor
 }
 
-func NewAcceptor(r *Reactor, newEvHanlderFunc func() EvHandler, addr string, events uint32,
+func NewAcceptor(acceptorBindReactor *Reactor, newFdBindReactor *Reactor,
+    newEvHanlderFunc func() EvHandler, addr string, events uint32,
     opts ...Option) (*Acceptor, error) {
 	setOptions(opts...)
 	a := &Acceptor{
 		fd: -1,
-        reactor: r,
+        reactor: acceptorBindReactor,
+        newFdBindReactor: newFdBindReactor,
         events: events,
         newEvHanlderFunc: newEvHanlderFunc,
         listenBacklog: evOptions.listenBacklog,
@@ -121,13 +124,14 @@ func (a *Acceptor) OnRead(fd *Fd) bool {
 			break
 		}
 		h := a.newEvHanlderFunc()
+        h.setReactor(a.newFdBindReactor)
 		newFd := Fd{v: conn}
-		if err = a.reactor.AddEvHandler(h, conn, a.events); err != nil {
-            syscall.Close(fd.v) // not h.OnClose()
+		if h.OnOpen(&newFd) == false {
+			h.OnClose(&newFd)
 			continue
 		}
-		if h.OnOpen(a.reactor, &newFd) == false {
-			h.OnClose(&newFd)
+		if err = h.GetReactor().AddEvHandler(h, conn, a.events); err != nil {
+            syscall.Close(fd.v) // not h.OnClose()
 			continue
 		}
 	}

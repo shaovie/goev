@@ -2,6 +2,7 @@
 package goev
 
 type GoPool struct {
+    noCopy
 	sem  chan struct{}
 	work chan func()
 }

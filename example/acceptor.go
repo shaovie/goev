@@ -15,11 +15,11 @@ var (
 const httpResp = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 5\r\n\r\nhello"
 
 type Http struct {
-	goev.NullEvent
+	goev.Event
     m [4096]byte // test memory leak
 }
 
-func (h *Http) OnOpen(r *goev.Reactor, fd *goev.Fd) bool {
+func (h *Http) OnOpen(fd *goev.Fd) bool {
 	return true
 }
 func (h *Http) OnRead(fd *goev.Fd) bool {
@@ -33,7 +33,7 @@ func (h *Http) OnRead(fd *goev.Fd) bool {
         }
         n, err := fd.Read(buf[readN:])
 		if err != nil {
-			if err == goev.EAGAIN { // epoll ET mode
+			if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK { // epoll ET mode
 				break
             }
             fmt.Println("read: ", err.Error())
@@ -66,16 +66,24 @@ func main() {
 			return make([]byte, 4096)
 		},
 	}
-	r, err := goev.NewReactor(
+	forAccept, err := goev.NewReactor(
 		goev.EvDataArrSize(0), // default val
-		goev.EvPollSize(1024),
-		goev.EvPollThreadNum(0), // auto calc
+		goev.EvPollSize(1),
+		goev.EvReadySize(8), // only accept fd
+	)
+	if err != nil {
+		panic(err.Error())
+	}
+	forNewFd, err := goev.NewReactor(
+		goev.EvDataArrSize(0), // default val
+		goev.EvPollSize(1),
+		goev.EvReadySize(512), // auto calc
 	)
 	if err != nil {
 		panic(err.Error())
 	}
 	//= http
-	_, err = goev.NewAcceptor(r, func() goev.EvHandler {
+	_, err = goev.NewAcceptor(forAccept, forNewFd, func() goev.EvHandler {
 		    return new(Http)
 	    },
 		":2023",
@@ -89,7 +97,7 @@ func main() {
     }
 
 	//= https
-	_, err = goev.NewAcceptor(r, func() goev.EvHandler {
+	_, err = goev.NewAcceptor(forAccept, forNewFd, func() goev.EvHandler {
 		    return new(Https)
 	    },
 		":2024",
@@ -102,7 +110,12 @@ func main() {
 		panic(err.Error())
 	}
 
-	if err = r.Run(); err != nil {
+    go func() {
+        if err = forAccept.Run(); err != nil {
+            panic(err.Error())
+        }
+    }()
+	if err = forNewFd.Run(); err != nil {
 		panic(err.Error())
 	}
 }

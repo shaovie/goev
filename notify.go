@@ -20,14 +20,13 @@ type Notifier interface {
 type NotifyHandler func()
 
 type Notify struct {
-	NullEvent
+	Event
 
 	efd        int
     notifyOnce atomic.Int32 // used to avoid duplicate call evHandler
     closeOnce  atomic.Int32 // used to avoid duplicate close
 
 	handler NotifyHandler
-	reactor   *Reactor
 }
 var (
     notifyV int64 = 1
@@ -46,11 +45,11 @@ func NewNotify(r *Reactor, h NotifyHandler) (Notifier, error) {
 		return nil, errors.New("eventfd: " + err.Error())
 	}
     nt := &Notify{
-        reactor: r,
         efd: fd,
         handler: h,
     }
-	if err = nt.reactor.AddEvHandler(nt, nt.efd, EV_EVENTFD); err != nil {
+    nt.setReactor(r)
+	if err = nt.GetReactor().AddEvHandler(nt, nt.efd, EV_EVENTFD); err != nil {
 		syscall.Close(fd)
 		return nil, errors.New("Notify add to evpoll fail! " + err.Error())
 	}
@@ -65,10 +64,10 @@ func (nt *Notify) Notify() {
         if n == 8 {
             return
         } else if err != nil {
-            if err == syscall.EINTR {
+            if errors.Is(err, syscall.EINTR) {
                 continue
             }
-            if err == syscall.EAGAIN {
+            if errors.Is(err, syscall.EAGAIN) {
                 return
             }
         }
@@ -85,10 +84,10 @@ func (nt *Notify) Close() {
             return
         }
         if err != nil {
-            if err == syscall.EINTR {
+            if errors.Is(err, syscall.EINTR) {
                 continue
             }
-            // err == syscall.EAGAIN
+            // errors.Is(err, syscall.EAGAIN)
         }
         nt.notifyOnce.Store(0)
         break // TODO add evOptions.debug? panic("Notify: write eventfd failed!")
@@ -104,10 +103,10 @@ func (nt *Notify) OnRead(fd *Fd) bool {
     for {
         n, err := syscall.Read(nt.efd, tmp[:])
         if err != nil {
-            if err == syscall.EINTR {
+            if errors.Is(err, syscall.EINTR) {
                 continue
             }
-            if err == syscall.EAGAIN {
+            if errors.Is(err, syscall.EAGAIN) {
                 nt.notifyOnce.Store(0)
                 return true
             }

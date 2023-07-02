@@ -18,11 +18,19 @@ const (
 	EV_CONNECT uint32 = syscall.EPOLLIN | syscall.EPOLLOUT | syscall.EPOLLRDHUP
 )
 
+// Detecting illegal struct copies using `go vet`
+type noCopy struct {}
+func (*noCopy) Lock() {}
+func (*noCopy) Unlock() {}
+
 type EvHandler interface {
+    setReactor(r *Reactor)
+    GetReactor() *Reactor
+
 	// Call by acceptor on `accept` a new fd or connector on `connect` successful
 	//
 	// Call OnClose() when return false
-	OnOpen(r *Reactor, fd *Fd) bool
+	OnOpen(fd *Fd) bool
 
 	// EvPoll catch readable i/o event
 	//
@@ -52,27 +60,37 @@ type EvHandler interface {
 	OnClose(fd *Fd)
 }
 
-type NullEvent struct{}
+type Event struct{
+     noCopy
+     _r *Reactor // atomic.Pointer[Reactor]
+                // 这里不需要保护, 在set之前Get是没有任何调用机会的(除非框架之外乱搞)
+}
 
-func (n *NullEvent) OnOpen(r *Reactor, fd *Fd) bool {
-	panic("NullEvent OnOpen")
+func (e *Event) setReactor(r *Reactor) {
+    e._r = r
+}
+func (e *Event) GetReactor() *Reactor {
+    return e._r
+}
+func (*Event) OnOpen(fd *Fd) bool {
+	panic("Event OnOpen")
 	return false
 }
-func (n *NullEvent) OnRead(fd *Fd) bool {
-	panic("NullEvent OnRead")
+func (*Event) OnRead(fd *Fd) bool {
+	panic("Event OnRead")
 	return false
 }
-func (n *NullEvent) OnWrite(fd *Fd) bool {
-	panic("NullEvent OnWrite")
+func (*Event) OnWrite(fd *Fd) bool {
+	panic("Event OnWrite")
 	return false
 }
-func (n *NullEvent) OnConnectFail(err error) {
-	panic("NullEvent OnConnectFail")
+func (*Event) OnConnectFail(err error) {
+	panic("Event OnConnectFail")
 }
-func (n *NullEvent) OnTimeout(now time.Time) bool {
-	panic("NullEvent OnTimeout")
+func (*Event) OnTimeout(now time.Time) bool {
+	panic("Event OnTimeout")
 	return false
 }
-func (n *NullEvent) OnClose(fd *Fd) {
-	panic("NullEvent OnClose")
+func (*Event) OnClose(fd *Fd) {
+	panic("Event OnClose")
 }

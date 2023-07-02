@@ -1,10 +1,10 @@
 package goev
 
 import (
-	"runtime"
 )
 
 type Options struct {
+    noCopy
 	// acceptor options
 	reuseAddr     bool // SO_REUSEADDR
 	listenBacklog int  //
@@ -16,7 +16,7 @@ type Options struct {
 
 	// reactor options
 	evPollSize      int //
-	evPollThreadNum int //
+	evReadySize     int //
     evDataArrSize  int
 }
 
@@ -29,17 +29,11 @@ func setOptions(optL ...Option) {
 		//= defaut options
 		evOptions = &Options{
 			reuseAddr:     true,
-			evPollSize:    512,
+			evPollSize:    1,
+			evReadySize:   512,
 			evDataArrSize: 8192,
 			listenBacklog: 1024, // go default 128
 		}
-        cpuN := runtime.NumCPU()
-        evOptions.evPollThreadNum = 1
-        if cpuN > 15 {
-			evOptions.evPollThreadNum = cpuN - 4
-        } else if cpuN > 3 {
-			evOptions.evPollThreadNum = cpuN - 2
-        }
 	}
 
 	for _, opt := range optL {
@@ -77,7 +71,7 @@ func EvDataArrSize(n int) Option {
 	}
 }
 
-// evpoll一次轮询获取数量n的Ready I/O事件, 此参数有利于多线程并发处理I/O事件
+// evpoll数量, 每个evpoll是个独立线程在运行, 建议跟cpu个数绑定(注意留出其他goroutine的cpu)
 func EvPollSize(n int) Option {
 	return func(o *Options) {
         if n > 0 {
@@ -85,12 +79,11 @@ func EvPollSize(n int) Option {
         }
 	}
 }
-
-// 多个线程轮流执行event poll. poll线程获取到I/O事件后, 马上唤醒空闲的线程执行event loop, 依次循环
-func EvPollThreadNum(n int) Option {
+// evpoll一次轮询获取数量n的Ready I/O事件, 有利于提高批量处理能力, 太大容易影响新事件的处理
+func EvReadySize(n int) Option {
 	return func(o *Options) {
         if n > 0 {
-            o.evPollThreadNum = n
+            o.evReadySize = n
         }
 	}
 }

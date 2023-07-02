@@ -3,21 +3,21 @@
 package goev
 
 import (
+	"sync"
 	"errors"
 	"runtime"
-	"sync"
 	"syscall"
 )
 
 // evData
 type evData struct {
+    noCopy
 	fd        Fd
 	evHandler EvHandler
 }
 
 func (ed *evData) reset(fd int, h EvHandler) {
-	ed.fd.v = fd
-	ed.fd.ed = ed
+    ed.fd.reset(fd)
 	ed.evHandler = h
 }
 
@@ -29,28 +29,21 @@ func (ed *evData) reset(fd int, h EvHandler) {
 type evPoll struct {
 	efd int // epoll fd
 
-	// L/F模型线程数量
-	pollThreadNum     int
-	leaderMtx sync.Mutex
-
 	evDataPool *sync.Pool
 	evDataMap   *ArrayMapUnion[evData]
 
-	evPollSize int // epoll_wait一次轮询获取固定数量准备好的I/O事件, 此参数有利于多线程轮换
+	evReadySize int // epoll_wait一次轮询获取固定数量准备好的I/O事件, 此参数有利于多线程轮换
 }
 
-func (ep *evPoll) open(pollThreadNum, evPollSize, evDataArrSize int) error {
-	if pollThreadNum < 1 {
-		return errors.New("EvPollThreadNum < 1")
-	}
-	if evPollSize < 1 {
+func (ep *evPoll) open(evReadySize, evDataArrSize int) error {
+	if evReadySize < 1 {
 		return errors.New("EvPollSize < 1")
 	}
 	efd, err := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
 	if err != nil {
 		return errors.New("syscall epoll_create1: " + err.Error())
 	}
-	ep.evPollSize = evPollSize
+	ep.evReadySize = evReadySize
 	ep.efd = efd
 	ep.evDataPool = &sync.Pool{
 	    New: func() any {
@@ -58,9 +51,8 @@ func (ep *evPoll) open(pollThreadNum, evPollSize, evDataArrSize int) error {
 	    },
 	}
     ep.evDataMap = NewArrayMapUnion[evData](evDataArrSize)
-	ep.pollThreadNum = pollThreadNum
 
-    for i := 0; i < pollThreadNum * 2; i++ { // warm up
+    for i := 0; i < 16; i++ { // warm up
         ep.evDataPool.Put(new(evData))
     }
 	// process max fds
@@ -83,32 +75,6 @@ func (ep *evPoll) add(fd int, events uint32, h EvHandler) error {
 	}
 	return nil
 }
-func (ep *evPoll) modify(fd *Fd, events uint32, h EvHandler) error {
-    var ed *evData
-    if fd.ed != nil { // There's no need to put it back `ep.evDataPool.Put(fd.ed)'
-        ed = fd.ed
-    } else {
-        ed = ep.evDataPool.Get().(*evData)
-    }
-	ed.reset(fd.v, h)
-
-	ev := syscall.EpollEvent{
-		Events: events,
-        Fd: int32(fd.v),
-	}
-    ep.evDataMap.Store(fd.v, ed)
-
-	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd.v, &ev); err != nil {
-		if err == syscall.ENOENT { // refer to `man 2 epoll_ctl`
-			if err = syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd.v, &ev); err != nil {
-				return errors.New("epoll_ctl add: " + err.Error())
-			}
-			return nil
-		}
-		return errors.New("epoll_ctl mod: " + err.Error())
-	}
-	return nil
-}
 func (ep *evPoll) remove(fd *Fd) error {
 	// The event argument is ignored and can be NULL (but see `man 2 epoll_ctl` BUGS)
 	// kernel versions > 2.6.9
@@ -118,21 +84,7 @@ func (ep *evPoll) remove(fd *Fd) error {
 	}
 	return nil
 }
-func (ep *evPoll) run() (err error) {
-	if ep.pollThreadNum == 1 {
-		return ep.poll(false, nil)
-	}
-	var wg sync.WaitGroup
-	for i := 0; i < ep.pollThreadNum; i++ {
-		wg.Add(1)
-		go func() {
-			err = ep.poll(true, &wg)
-		}()
-	}
-	wg.Wait()
-	return err
-}
-func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
+func (ep *evPoll) run(wg *sync.WaitGroup) error {
 	if wg != nil {
 		defer wg.Done()
 	}
@@ -144,34 +96,26 @@ func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 
 	var nfds int
 	var err error
-	// syscall.EpollEvent defines in $GOROOT/src/syscall/ztypes_linux_amd64.go
-	events := make([]syscall.EpollEvent, ep.evPollSize) // NOT make(x, len, cap)
+	events := make([]syscall.EpollEvent, ep.evReadySize) // NOT make(x, len, cap)
 	for {
-		if multiplePoller == true {
-			ep.leaderMtx.Lock()
-			nfds, err = syscall.EpollWait(ep.efd, events, -1)
-			ep.leaderMtx.Unlock() // change to follower, go to handle events
-		} else {
-			nfds, err = syscall.EpollWait(ep.efd, events, -1)
-		}
+        nfds, err = syscall.EpollWait(ep.efd, events, -1)
 		if nfds > 0 {
 			for i := 0; i < nfds; i++ {
 				ev := &events[i]
                 ed := ep.evDataMap.Load(int(ev.Fd))
                 if ed == nil {
-                    panic("evDataMap not found")
                     continue // TODO add evOptions.debug? panic("evDataMap not found")
                 }
 				// EPOLLHUP refer to man 2 epoll_ctl
 				if ev.Events&(syscall.EPOLLHUP|syscall.EPOLLERR) != 0 {
-                    ep.remove(&(ed.fd))
+                    ep.remove(&(ed.fd)) // MUST before OnClose()
 					ed.evHandler.OnClose(&(ed.fd))
                     ep.evDataPool.Put(ed)
 					continue
 				}
-				if ev.Events&(syscall.EPOLLOUT) != 0 {
+				if ev.Events&(syscall.EPOLLOUT) != 0 { // MUST before EPOLLIN (e.g. connect)
 					if ed.evHandler.OnWrite(&(ed.fd)) == false {
-						ep.remove(&(ed.fd))
+                        ep.remove(&(ed.fd)) // MUST before OnClose()
 						ed.evHandler.OnClose(&(ed.fd))
                         ep.evDataPool.Put(ed)
 						continue
@@ -179,14 +123,14 @@ func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 				}
 				if ev.Events&(syscall.EPOLLIN) != 0 {
 					if ed.evHandler.OnRead(&(ed.fd)) == false {
-                        ep.remove(&(ed.fd))
+                        ep.remove(&(ed.fd)) // MUST before OnClose()
 						ed.evHandler.OnClose(&(ed.fd))
                         ep.evDataPool.Put(ed)
 						continue
 					}
 				}
 			} // end of `for i < nfds'
-		} else if nfds == 0 {
+		} else if nfds == 0 { // timeout
 			continue
 		} else if err != nil && err != syscall.EINTR { // nfds < 0
 			return errors.New("syscall epoll_wait: " + err.Error())
@@ -194,3 +138,29 @@ func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 	}
 	return nil
 }
+//func (ep *evPoll) modify(fd *Fd, events uint32, h EvHandler) error {
+//    var ed *evData
+//    if fd.ed != nil { // There's no need to put it back `ep.evDataPool.Put(fd.ed)'
+//        ed = fd.ed
+//    } else {
+//        ed = ep.evDataPool.Get().(*evData)
+//    }
+//	ed.reset(fd.v, h)
+//
+//	ev := syscall.EpollEvent{
+//		Events: events,
+//        Fd: int32(fd.v),
+//	}
+//    ep.evDataMap.Store(fd.v, ed)
+//
+//	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd.v, &ev); err != nil {
+//		if errors.Is(err, syscall.ENOENT) { // refer to `man 2 epoll_ctl`
+//			if err = syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd.v, &ev); err != nil {
+//				return errors.New("epoll_ctl add: " + err.Error())
+//			}
+//			return nil
+//		}
+//		return errors.New("epoll_ctl mod: " + err.Error())
+//	}
+//	return nil
+//}
