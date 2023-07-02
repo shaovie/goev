@@ -5,15 +5,11 @@ import (
     "sync/atomic"
 )
 
-// 经过测试, 性能不稳定, 线程增加后arr的锁带来的影响会成倍增加
-
 // Thread safe atomic array + map
 // Refer to test/mutex_arr_vs_map.go
 // Indexes with a small range use array indexing, while indexes with a large range use a map.
 // All threads are secure.
 //
-// Saving nil requires attention to semantics, as when loading fails to find a value in the map,
-// it will also return nil.
 type ArrayMapUnion[T any] struct {
     arrSize int
     arr []atomic.Pointer[T]
@@ -21,7 +17,7 @@ type ArrayMapUnion[T any] struct {
     sMap sync.Map
 }
 
-// T only Pointer
+// *T only Pointer
 func NewArrayMapUnion[T any](arrSize int) *ArrayMapUnion[T] {
     if arrSize < 1 {
         panic("NewArrayMapUnion arrSize < 1")
