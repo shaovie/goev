@@ -6,51 +6,71 @@ import (
 	"sync"
 	"errors"
 	"strings"
+	"sync/atomic"
 )
 
 type Reactor struct {
     noCopy
 
-    evPollSize int
+    evPollNum int
 	evPolls []evPoll
+    timerIdx atomic.Int64
 }
 
 func NewReactor(opts ...Option) (*Reactor, error) {
 	setOptions(opts...)
-	if evOptions.evPollSize < 1 {
-		return nil, errors.New("options: EvPollThreadNum MUST > 0")
+	if evOptions.evPollNum < 1 {
+		panic("options: EvPollThreadNum MUST > 0")
 	}
     r := &Reactor{
-        evPollSize: evOptions.evPollSize,
-        evPolls: make([]evPoll, evOptions.evPollSize),
+        evPollNum: evOptions.evPollNum,
+        evPolls: make([]evPoll, evOptions.evPollNum),
     }
-    for i := 0; i < r.evPollSize; i++ {
-        if err := r.evPolls[i].open(evOptions.evReadySize, evOptions.evDataArrSize); err != nil {
+    timer := newTimerHeap(evOptions.timerHeapInitSize)
+    for i := 0; i < r.evPollNum; i++ {
+        if err := r.evPolls[i].open(evOptions.evReadyNum, evOptions.evDataArrSize, timer); err != nil {
             return nil, err
         }
     }
 	return r, nil
 }
-func (r *Reactor) AddEvHandler(h EvHandler, fd int, events uint32) error {
-    if fd < 0 || h == nil {
+// The same EvHandler is repeatedly registered with the Reactor
+func (r *Reactor) AddEvHandler(eh EvHandler, fd int, events uint32) error {
+    if fd < 0 || eh == nil {
         return errors.New("AddEvHandler: invalid params")
     }
-    i := fd % r.evPollSize
-	return r.evPolls[i].add(fd, events, h)
+    i := 0
+    if r.evPollNum > 1 {
+        i = fd % r.evPollNum
+    }
+	return r.evPolls[i].add(fd, events, eh)
 }
 // fd 一定是reactor内部构造的, 不能自己构造
-func (r *Reactor) RemoveEvHandler(fd *Fd) error {
-    if fd == nil || fd.v < 0 {
-		return errors.New("invalid fd")
+func (r *Reactor) RemoveEvHandler(eh EvHandler) error {
+    if eh == nil {
+		return errors.New("invalid EvHandler")
     }
-    i := fd.v % r.evPollSize
-	return r.evPolls[i].remove(fd)
+    if ep := eh.getEvPoll(); ep != nil {
+        return ep.remove(eh.getFd())
+    }
+	return errors.New("ev handler not add")
+}
+func (r *Reactor) SchedueTimer(eh EvHandler, delay, interval int64) error {
+    i := 0
+    if r.evPollNum > 1 {
+        if ep := eh.getEvPoll(); ep != nil {
+            return ep.scheduleTimer(eh, delay, interval)
+        } else {
+            i = int(r.timerIdx.Add(1) % int64(r.evPollNum))
+        }
+    }
+    return r.evPolls[i].scheduleTimer(eh, delay, interval)
 }
 func (r *Reactor) Run() error {
     var wg sync.WaitGroup
     var errS []string
     var errSMtx sync.Mutex
-    for i := 0; i < r.evPollSize; i++ {
+    for i := 0; i < r.evPollNum; i++ {
         wg.Add(1)
         go func(j int) {
             err := r.evPolls[j].run(&wg)

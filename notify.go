@@ -17,16 +17,12 @@ type Notifier interface {
     Close()
 }
 
-type NotifyHandler func()
-
-type Notify struct {
+type notify struct {
 	Event
 
 	efd        int
     notifyOnce atomic.Int32 // used to avoid duplicate call evHandler
     closeOnce  atomic.Int32 // used to avoid duplicate close
-
-	handler NotifyHandler
 }
 var (
     notifyV int64 = 1
@@ -35,27 +31,22 @@ var (
     notifyCloseWriteV = (*(*[8]byte)(unsafe.Pointer(&notifyCloseV)))[:]
 )
 
-func NewNotify(r *Reactor, h NotifyHandler) (Notifier, error) {
-	if r == nil || h == nil {
-		return nil, errors.New("NewNotify invalid params")
-	}
+func newNotify(ep *evPoll) (Notifier, error) {
 	// since Linux 2.6.27
 	fd, err := unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC)
 	if err != nil {
 		return nil, errors.New("eventfd: " + err.Error())
 	}
-    nt := &Notify{
+    nt := &notify{
         efd: fd,
-        handler: h,
     }
-    nt.setReactor(r)
-	if err = nt.GetReactor().AddEvHandler(nt, nt.efd, EV_EVENTFD); err != nil {
+	if err = ep.add(nt.efd, EV_EVENTFD, nt); err != nil {
 		syscall.Close(fd)
 		return nil, errors.New("Notify add to evpoll fail! " + err.Error())
 	}
 	return nt, nil
 }
-func (nt *Notify) Notify() {
+func (nt *notify) Notify() {
     if !nt.notifyOnce.CompareAndSwap(0, 1) {
         return
     }
@@ -74,7 +65,7 @@ func (nt *Notify) Notify() {
         break // TODO add evOptions.debug? panic("Notify: write eventfd failed!")
     }
 }
-func (nt *Notify) Close() {
+func (nt *notify) Close() {
     if !nt.closeOnce.CompareAndSwap(0, 1) {
         return
     }
@@ -96,7 +87,7 @@ func (nt *Notify) Close() {
 }
 
 // Prohibit external calls
-func (nt *Notify) OnRead(fd *Fd) bool {
+func (nt *notify) OnRead(fd *Fd, now int64) bool {
     if fd.v != nt.efd { // 防止外部调用!
         panic("Prohibit external calls")
     }
@@ -116,7 +107,6 @@ func (nt *Notify) OnRead(fd *Fd) bool {
         if n == 8 {
             if *(*int64)(unsafe.Pointer(&tmp[0])) == notifyV {
                 nt.notifyOnce.Store(0)
-                nt.handler()
                 return true
             }
             if *(*int64)(unsafe.Pointer(&tmp[0])) == notifyCloseV {
@@ -128,7 +118,7 @@ func (nt *Notify) OnRead(fd *Fd) bool {
     }
     return true // 
 }
-func (nt *Notify) OnClose(fd *Fd) {
+func (nt *notify) OnClose(fd *Fd) {
     fd.Close()
 	nt.efd = -1
 }

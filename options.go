@@ -5,6 +5,7 @@ import (
 
 type Options struct {
     noCopy
+
 	// acceptor options
 	reuseAddr     bool // SO_REUSEADDR
 	listenBacklog int  //
@@ -15,9 +16,12 @@ type Options struct {
 	recvBuffSize  int  // ignore equal 0
 
 	// reactor options
-	evPollSize      int //
-	evReadySize     int //
+	evPollNum      int //
+	evReadyNum     int //
     evDataArrSize  int
+
+    // timer
+    timerHeapInitSize int //
 }
 
 type Option func(*Options)
@@ -29,10 +33,11 @@ func setOptions(optL ...Option) {
 		//= defaut options
 		evOptions = &Options{
 			reuseAddr:     true,
-			evPollSize:    1,
-			evReadySize:   512,
+			evPollNum:    1,
+			evReadyNum:   512,
 			evDataArrSize: 8192,
 			listenBacklog: 1024, // go default 128
+            timerHeapInitSize: 512,
 		}
 	}
 
@@ -72,18 +77,28 @@ func EvDataArrSize(n int) Option {
 }
 
 // evpoll数量, 每个evpoll是个独立线程在运行, 建议跟cpu个数绑定(注意留出其他goroutine的cpu)
-func EvPollSize(n int) Option {
+func EvPollNum(n int) Option {
 	return func(o *Options) {
         if n > 0 {
-            o.evPollSize = n
+            o.evPollNum = n
         }
 	}
 }
+
 // evpoll一次轮询获取数量n的Ready I/O事件, 有利于提高批量处理能力, 太大容易影响新事件的处理
-func EvReadySize(n int) Option {
+func EvReadyNum(n int) Option {
 	return func(o *Options) {
         if n > 0 {
-            o.evReadySize = n
+            o.evReadyNum = n
+        }
+	}
+}
+
+// timer
+func TimerHeapInitSize(n int) Option {
+	return func(o *Options) {
+        if n > 0 {
+            o.timerHeapInitSize = n
         }
 	}
 }

@@ -82,7 +82,7 @@ func (c *Connector) Connect(addr string, h EvHandler, events uint32) error {
     if err == nil { // success
 		newFd := Fd{v: fd}
         h.setReactor(c.reactor)
-		if h.OnOpen(&newFd) == false {
+		if h.OnOpen(&newFd, time.Now().UnixMilli()) == false {
 			h.OnClose(&newFd)
 		}
         if err = h.GetReactor().AddEvHandler(h, fd, events); err != nil {
@@ -113,7 +113,7 @@ type inProgressConnect struct {
     progressDone atomic.Int32 // Only process one I/O event or timer event
 }
 // Called by reactor when asynchronous connections fail. 
-func (p *inProgressConnect) OnRead(fd *Fd) bool {
+func (p *inProgressConnect) OnRead(fd *Fd, now int64) bool {
     if !p.progressDone.CompareAndSwap(0, 1) {
         return true
     }
@@ -121,14 +121,14 @@ func (p *inProgressConnect) OnRead(fd *Fd) bool {
 	return false // goto p.OnClose()
 }
 // Called by reactor when asynchronous connections succeed. 
-func (p *inProgressConnect) OnWrite(fd *Fd) bool {
+func (p *inProgressConnect) OnWrite(fd *Fd, now int64) bool {
     if !p.progressDone.CompareAndSwap(0, 1) {
         return true
     }
     // From here on, the `fd` resources will be managed by h.
     p.h.setReactor(p.r)
     newFd := Fd{v: p.fd}
-    if p.h.OnOpen(&newFd) == false {
+    if p.h.OnOpen(&newFd, now) == false {
         p.h.OnClose(&newFd)
     }
     if err := p.h.GetReactor().AddEvHandler(p.h, p.fd, p.events); err != nil {
@@ -139,7 +139,7 @@ func (p *inProgressConnect) OnWrite(fd *Fd) bool {
 	return true
 }
 // Called if a connection times out before completing.
-func (p *inProgressConnect) OnTimeout(now time.Time) bool {
+func (p *inProgressConnect) OnTimeout(now int64) bool {
     if !p.progressDone.CompareAndSwap(0, 1) {
         return true
     }

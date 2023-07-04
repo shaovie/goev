@@ -114,7 +114,7 @@ func (a *Acceptor) open(addr string) error {
 	a.fd = fd
 	return nil
 }
-func (a *Acceptor) OnRead(fd *Fd) bool {
+func (a *Acceptor) OnRead(fd *Fd, now int64) bool {
 	for i := 0; i < a.loopAcceptTimes; i++ {
 		conn, _, err := syscall.Accept4(a.fd, syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC)
 		if err != nil {
@@ -126,13 +126,12 @@ func (a *Acceptor) OnRead(fd *Fd) bool {
 		h := a.newEvHanlderFunc()
         h.setReactor(a.newFdBindReactor)
 		newFd := Fd{v: conn}
-		if h.OnOpen(&newFd) == false {
+		if h.OnOpen(&newFd, now) == false {
 			h.OnClose(&newFd)
 			continue
 		}
 		if err = h.GetReactor().AddEvHandler(h, conn, a.events); err != nil {
             syscall.Close(fd.v) // not h.OnClose()
-			continue
 		}
 	}
 	return true

@@ -1,7 +1,6 @@
 package goev
 
 import (
-	"time"
 	"syscall"
 )
 
@@ -23,24 +22,38 @@ type noCopy struct {}
 func (*noCopy) Lock() {}
 func (*noCopy) Unlock() {}
 
+// The same EvHandler is repeatedly registered with the Reactor
 type EvHandler interface {
+    init(ep *evPoll, fd int)
+    getEvPoll() *evPoll
+    getFd() int
+
     setReactor(r *Reactor)
     GetReactor() *Reactor
 
 	// Call by acceptor on `accept` a new fd or connector on `connect` successful
+    // The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
+    // precise time. Use it with caution (as it can reduce the frequency of obtaining the current
+    // time to some extent).
 	//
 	// Call OnClose() when return false
-	OnOpen(fd *Fd) bool
+	OnOpen(fd *Fd, millisecond int64) bool
 
 	// EvPoll catch readable i/o event
+    // The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
+    // precise time. Use it with caution (as it can reduce the frequency of obtaining the current
+    // time to some extent).
 	//
 	// Call OnClose() when return false
-	OnRead(fd *Fd) bool
+	OnRead(fd *Fd, millisecond int64) bool
 
 	// EvPoll catch writeable i/o event
+    // The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
+    // precise time. Use it with caution (as it can reduce the frequency of obtaining the current
+    // time to some extent).
 	//
 	// Call OnClose() when return false
-	OnWrite(fd *Fd) bool
+	OnWrite(fd *Fd, millisecond int64) bool
 
 	// EvPoll catch connect result
     // Only be asynchronously called after connector.Connect() returns nil
@@ -49,9 +62,13 @@ type EvHandler interface {
 	OnConnectFail(err error)
 
 	// EvPoll catch timeout event
-	// TODO
-	// Call OnClose() when return false
-	OnTimeout(now time.Time) bool
+    // The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
+    // precise time. Use it with caution (as it can reduce the frequency of obtaining the current
+    // time to some extent).
+    // Note: Don't call Reactor.SchedueTimer() or Reactor.CancelTimer() in OnTimeout, it will deadlock 
+    //
+	// Remove timer when return false
+	OnTimeout(millisecond int64) bool
 
     // Call by reactor(OnOpen must have been called before calling OnClose.)
     //
@@ -61,33 +78,46 @@ type EvHandler interface {
 }
 
 type Event struct{
-     noCopy
-     _r *Reactor // atomic.Pointer[Reactor]
+    noCopy
+    _fd int
+    _r *Reactor // atomic.Pointer[Reactor]
+                // 这里不需要保护, 在set之前Get是没有任何调用机会的(除非框架之外乱搞)
+    _ep *evPoll // atomic.Pointer[evPoll]
                 // 这里不需要保护, 在set之前Get是没有任何调用机会的(除非框架之外乱搞)
 }
 
+func (e *Event) init(ep *evPoll, fd int) {
+    e._ep = ep
+    e._fd = fd
+}
+func (e *Event) getFd() int {
+    return e._fd
+}
+func (e *Event) getEvPoll() *evPoll {
+    return e._ep
+}
 func (e *Event) setReactor(r *Reactor) {
     e._r = r
 }
 func (e *Event) GetReactor() *Reactor {
     return e._r
 }
-func (*Event) OnOpen(fd *Fd) bool {
+func (*Event) OnOpen(fd *Fd, millisecond int64) bool {
 	panic("Event OnOpen")
 	return false
 }
-func (*Event) OnRead(fd *Fd) bool {
+func (*Event) OnRead(fd *Fd, millisecond int64) bool {
 	panic("Event OnRead")
 	return false
 }
-func (*Event) OnWrite(fd *Fd) bool {
+func (*Event) OnWrite(fd *Fd, millisecond int64) bool {
 	panic("Event OnWrite")
 	return false
 }
 func (*Event) OnConnectFail(err error) {
 	panic("Event OnConnectFail")
 }
-func (*Event) OnTimeout(now time.Time) bool {
+func (*Event) OnTimeout(millisecond int64) bool {
 	panic("Event OnTimeout")
 	return false
 }

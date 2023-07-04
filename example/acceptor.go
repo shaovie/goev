@@ -19,10 +19,10 @@ type Http struct {
     m [4096]byte // test memory leak
 }
 
-func (h *Http) OnOpen(fd *goev.Fd) bool {
+func (h *Http) OnOpen(fd *goev.Fd, now int64) bool {
 	return true
 }
-func (h *Http) OnRead(fd *goev.Fd) bool {
+func (h *Http) OnRead(fd *goev.Fd, now int64) bool {
 	buf := buffPool.Get().([]byte) // just read
     defer buffPool.Put(buf)
 
@@ -68,16 +68,16 @@ func main() {
 	}
 	forAccept, err := goev.NewReactor(
 		goev.EvDataArrSize(0), // default val
-		goev.EvPollSize(1),
-		goev.EvReadySize(8), // only accept fd
+		goev.EvPollNum(1),
+		goev.EvReadyNum(8), // only accept fd
 	)
 	if err != nil {
 		panic(err.Error())
 	}
 	forNewFd, err := goev.NewReactor(
 		goev.EvDataArrSize(0), // default val
-		goev.EvPollSize(1),
-		goev.EvReadySize(512), // auto calc
+		goev.EvPollNum(1),
+		goev.EvReadyNum(512), // auto calc
 	)
 	if err != nil {
 		panic(err.Error())

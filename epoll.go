@@ -4,6 +4,7 @@ package goev
 
 import (
 	"sync"
+    "time"
 	"errors"
 	"runtime"
 	"syscall"
@@ -29,21 +30,23 @@ func (ed *evData) reset(fd int, h EvHandler) {
 type evPoll struct {
 	efd int // epoll fd
 
+	evReadyNum int // epoll_wait一次轮询获取固定数量准备好的I/O事件, 此参数有利于多线程轮换
+
 	evDataPool *sync.Pool
 	evDataMap   *ArrayMapUnion[evData]
-
-	evReadySize int // epoll_wait一次轮询获取固定数量准备好的I/O事件, 此参数有利于多线程轮换
+    timer timer
+    evPollWackup Notifier
 }
 
-func (ep *evPoll) open(evReadySize, evDataArrSize int) error {
-	if evReadySize < 1 {
-		return errors.New("EvPollSize < 1")
+func (ep *evPoll) open(evReadyNum, evDataArrSize int, timer timer) error {
+	if evReadyNum < 1 {
+		return errors.New("EvReadyNum < 1")
 	}
 	efd, err := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
 	if err != nil {
 		return errors.New("syscall epoll_create1: " + err.Error())
 	}
-	ep.evReadySize = evReadySize
+	ep.evReadyNum = evReadyNum
 	ep.efd = efd
 	ep.evDataPool = &sync.Pool{
 	    New: func() any {
@@ -51,18 +54,26 @@ func (ep *evPoll) open(evReadySize, evDataArrSize int) error {
 	    },
 	}
     ep.evDataMap = NewArrayMapUnion[evData](evDataArrSize)
+    ep.timer = timer
 
     for i := 0; i < 16; i++ { // warm up
         ep.evDataPool.Put(new(evData))
+    }
+
+    // Must be placed last
+    ep.evPollWackup, err = newNotify(ep)
+    if err != nil {
+        return err
     }
 	// process max fds
 	// show using `ulimit -Hn`
 	// $GOROOT/src/os/rlimit.go Go had raise the limit to 'Max Hard Limit'
 	return nil
 }
-func (ep *evPoll) add(fd int, events uint32, h EvHandler) error {
+func (ep *evPoll) add(fd int, events uint32, eh EvHandler) error {
+    eh.init(ep, fd)
     ed := ep.evDataPool.Get().(*evData)
-	ed.reset(fd, h)
+	ed.reset(fd, eh)
 
 	ev := syscall.EpollEvent{
 		Events: events,
@@ -75,14 +86,19 @@ func (ep *evPoll) add(fd int, events uint32, h EvHandler) error {
 	}
 	return nil
 }
-func (ep *evPoll) remove(fd *Fd) error {
+func (ep *evPoll) remove(fd int) error {
 	// The event argument is ignored and can be NULL (but see `man 2 epoll_ctl` BUGS)
 	// kernel versions > 2.6.9
-    ep.evDataMap.Delete(fd.v)
-	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_DEL, fd.v, nil); err != nil {
+    ep.evDataMap.Delete(fd)
+	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_DEL, fd, nil); err != nil {
 		return errors.New("epoll_ctl del: " + err.Error())
 	}
 	return nil
+}
+func (ep *evPoll) scheduleTimer(eh EvHandler, delay, interval int64) (err error) {
+    err = ep.timer.schedule(eh, delay, interval)
+    ep.evPollWackup.Notify()
+    return
 }
 func (ep *evPoll) run(wg *sync.WaitGroup) error {
 	if wg != nil {
@@ -96,9 +112,13 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 
 	var nfds int
 	var err error
-	events := make([]syscall.EpollEvent, ep.evReadySize) // NOT make(x, len, cap)
+    var now int64
+    msec := -1 
+	events := make([]syscall.EpollEvent, ep.evReadyNum) // NOT make(x, len, cap)
 	for {
-        nfds, err = syscall.EpollWait(ep.efd, events, -1)
+        nfds, err = syscall.EpollWait(ep.efd, events, msec)
+        now = time.Now().UnixMilli()
+        msec = int(ep.timer.handleExpired(now))
 		if nfds > 0 {
 			for i := 0; i < nfds; i++ {
 				ev := &events[i]
@@ -108,22 +128,22 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
                 }
 				// EPOLLHUP refer to man 2 epoll_ctl
 				if ev.Events&(syscall.EPOLLHUP|syscall.EPOLLERR) != 0 {
-                    ep.remove(&(ed.fd)) // MUST before OnClose()
+                    ep.remove(ed.fd.v) // MUST before OnClose()
 					ed.evHandler.OnClose(&(ed.fd))
                     ep.evDataPool.Put(ed)
 					continue
 				}
 				if ev.Events&(syscall.EPOLLOUT) != 0 { // MUST before EPOLLIN (e.g. connect)
-					if ed.evHandler.OnWrite(&(ed.fd)) == false {
-                        ep.remove(&(ed.fd)) // MUST before OnClose()
+					if ed.evHandler.OnWrite(&(ed.fd), now) == false {
+                        ep.remove(ed.fd.v) // MUST before OnClose()
 						ed.evHandler.OnClose(&(ed.fd))
                         ep.evDataPool.Put(ed)
 						continue
 					}
 				}
 				if ev.Events&(syscall.EPOLLIN) != 0 {
-					if ed.evHandler.OnRead(&(ed.fd)) == false {
-                        ep.remove(&(ed.fd)) // MUST before OnClose()
+					if ed.evHandler.OnRead(&(ed.fd), now) == false {
+                        ep.remove(ed.fd.v) // MUST before OnClose()
 						ed.evHandler.OnClose(&(ed.fd))
                         ep.evDataPool.Put(ed)
 						continue
@@ -138,29 +158,3 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 	}
 	return nil
 }
-//func (ep *evPoll) modify(fd *Fd, events uint32, h EvHandler) error {
-//    var ed *evData
-//    if fd.ed != nil { // There's no need to put it back `ep.evDataPool.Put(fd.ed)'
-//        ed = fd.ed
-//    } else {
-//        ed = ep.evDataPool.Get().(*evData)
-//    }
-//	ed.reset(fd.v, h)
-//
-//	ev := syscall.EpollEvent{
-//		Events: events,
-//        Fd: int32(fd.v),
-//	}
-//    ep.evDataMap.Store(fd.v, ed)
-//
-//	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd.v, &ev); err != nil {
-//		if errors.Is(err, syscall.ENOENT) { // refer to `man 2 epoll_ctl`
-//			if err = syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd.v, &ev); err != nil {
-//				return errors.New("epoll_ctl add: " + err.Error())
-//			}
-//			return nil
-//		}
-//		return errors.New("epoll_ctl mod: " + err.Error())
-//	}
-//	return nil
-//}
