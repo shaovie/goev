@@ -14,6 +14,7 @@ var (
     ErrConnectFail = errors.New("connect fail")
     ErrConnectTimeout = errors.New("connect timeout")
     ErrConnectAddEvHandler = errors.New("add handler to reactor error!")
+    ErrConnectInprogress = errors.New("connect EINPROGRESS")
 )
 type Connector struct {
 	Event
@@ -33,8 +34,9 @@ func NewConnector(r *Reactor, opts ...Option) (*Connector, error) {
 
 // The addr format 192.168.0.1:8080
 // The domain name format, such as qq.com:8080, is not supported.
-// You need to manually extract the IP address using gethostbyname.
-func (c *Connector) Connect(addr string, h EvHandler, events uint32) error {
+//   you need to manually extract the IP address using gethostbyname.
+// Timeout is relative time measurements with millisecond accuracy, for example, delay=5msec.
+func (c *Connector) Connect(addr string, h EvHandler, events uint32, timeout int64) error {
     panic("Not fully implemented") // TODO
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
 	if err != nil {
@@ -90,12 +92,16 @@ func (c *Connector) Connect(addr string, h EvHandler, events uint32) error {
             return errors.New("AddEvHandler in connector.Connect: " + err.Error())
         }
         return nil
-    } else if errors.Is(err, syscall.EINPROGRESS) {
-        if err = c.reactor.AddEvHandler(&inProgressConnect{r:c.reactor, h:h, fd:fd, events: events},
-            fd, EV_CONNECT); err != nil {
+    } else if err == syscall.EINPROGRESS {
+        if timeout < 1 {
+            return ErrConnectInprogress
+        }
+        inh := &inProgressConnect{r:c.reactor, h:h, fd:fd, events: events}
+        if err = c.reactor.AddEvHandler(inh, fd, EV_CONNECT); err != nil {
             syscall.Close(fd)
             return errors.New("InPorgress AddEvHandler in connector.Connect: " + err.Error())
         }
+        c.reactor.SchedueTimer(inh, timeout, 0)
     } else {
 		syscall.Close(fd)
 		return errors.New("syscall connect: " + err.Error())
@@ -135,7 +141,6 @@ func (p *inProgressConnect) OnWrite(fd *Fd, now int64) bool {
         p.h.OnConnectFail(ErrConnectAddEvHandler)
         return false // goto p.OnClose()
     }
-    // TODO cancel timer
 	return true
 }
 // Called if a connection times out before completing.
@@ -150,5 +155,4 @@ func (p *inProgressConnect) OnTimeout(now int64) bool {
 }
 func (p *inProgressConnect) OnClose(fd *Fd) {
     fd.Close()
-    // TODO cancel timer
 }

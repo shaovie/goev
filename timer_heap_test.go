@@ -3,6 +3,7 @@ package goev
 import (
     "os"
     "fmt"
+    "sync"
     "time"
 	"testing"
 	"math/rand"
@@ -58,8 +59,15 @@ func TestTimerHeap(t *testing.T) {
 		panic(err.Error())
 	}
 
+    var wg sync.WaitGroup
+    wg.Add(1)
+    go func() {
+        r.Run()
+        wg.Done()
+    }()
+
     idx := 0
-    for i := 0; i < 10000; i++ {
+    for i := 0; i < 2000; i++ {
         now := time.Now().UnixMilli()
         sec := rand.Int63() % 5
         msec := rand.Int63() % 1000
@@ -71,7 +79,7 @@ func TestTimerHeap(t *testing.T) {
         idx += 1
     }
     go func() {
-        for i := 0; i < 100; i++ {
+        for i := 0; i < 1000; i++ {
             for j := 0; j < 100; j++ {
                 now := time.Now().UnixMilli()
                 sec := rand.Int63() % 5
@@ -88,5 +96,5 @@ func TestTimerHeap(t *testing.T) {
         r.SchedueTimer(&exitTimer{t: t}, 6000, 0)
         fmt.Println("======================schedule exit timer")
     }()
-    r.Run()
+    wg.Wait()
 }
