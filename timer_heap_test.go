@@ -58,9 +58,9 @@ func TestTimerHeap(t *testing.T) {
 		panic(err.Error())
 	}
 
-    now := time.Now().UnixMilli()
     idx := 0
     for i := 0; i < 10000; i++ {
+        now := time.Now().UnixMilli()
         sec := rand.Int63() % 5
         msec := rand.Int63() % 1000
         expiredAt := now + sec * 1000 + msec
