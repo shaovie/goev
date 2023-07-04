@@ -35,7 +35,7 @@ type evPoll struct {
     timer timer
     evPollWackup Notifier
 }
-
+//
 func (ep *evPoll) open(evReadyNum, evDataArrSize int, timer timer) error {
 	if evReadyNum < 1 {
 		return errors.New("EvReadyNum < 1")

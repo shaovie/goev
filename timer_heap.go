@@ -4,33 +4,46 @@ import (
 	"time"
     "sync"
 	"errors"
+	"container/heap"
 )
 
-type timerItem struct {
-    noCopy
+type minHeap []*timerItem
 
-    expiredAt int64
-    interval  int64
+// heap Interface
+func (mh minHeap) Len() int { return len(mh) }
 
-    eh EvHandler
+// heap Interface
+func (mh minHeap) Less(i, j int) bool {
+	return mh[i].expiredAt < mh[j].expiredAt
 }
 
-//= timer item
-// opt: sync.Pool
-func newTimerItem(expiredAt, interval int64, eh EvHandler) *timerItem {
-    return &timerItem{
-        expiredAt: expiredAt,
-        interval: interval,
-        eh: eh,
-    }
+// heap Interface
+func (mh minHeap) Swap(i, j int) {
+	mh[i], mh[j] = mh[j], mh[i]
+}
+
+// heap Interface
+func (mh *minHeap) Push(x any) {
+	item := x.(*timerItem)
+	*mh = append(*mh, item)
+}
+
+// heap Interface
+func (mh *minHeap) Pop() any {
+	old := *mh
+	n := len(old)
+	item := old[n-1]
+	old[n-1] = nil  // avoid memory leak
+	*mh = old[0 : n-1]
+	return item
 }
 
 //= timer heap
 type timerHeap struct {
     noCopy
 
-    pq PriorityQueue
-    pqMtx sync.Mutex
+    heap minHeap
+    heapMtx sync.Mutex
 }
 func newTimerHeap(initCap int) *timerHeap {
     if initCap < 1 {
@@ -38,10 +51,11 @@ func newTimerHeap(initCap int) *timerHeap {
     }
 
     th := &timerHeap{
-        pq: NewPriorityQueue(initCap),
+        heap: make(minHeap, 0, initCap),
     }
     return th
 }
+
 // in msec
 func (th *timerHeap) schedule(eh EvHandler, delay, interval int64) error {
     if delay < 0 || interval < 0 {
@@ -54,33 +68,58 @@ func (th *timerHeap) schedule(eh EvHandler, delay, interval int64) error {
         interval: interval,
         eh: eh,
     }
-    th.pqMtx.Lock()
-    th.pq.PushOne(NewPriorityQueueItem(ti, ti.expiredAt))
-    th.pqMtx.Unlock()
+    th.heapMtx.Lock()
+    heap.Push(&th.heap, ti)
+    th.heapMtx.Unlock()
     return nil
 }
-func (th *timerHeap) cancel(eh EvHandler) {
-    //timerId := eh.GetTimerId()
+func (th *timerHeap) scheduleTest(eh EvHandler, delay, interval int64) error {
+    ti := &timerItem{
+        expiredAt: delay,
+        interval: interval,
+        eh: eh,
+    }
+    th.heapMtx.Lock()
+    heap.Push(&th.heap, ti)
+    th.heapMtx.Unlock()
+    return nil
 }
 func (th *timerHeap) handleExpired(now int64) int64 {
-    th.pqMtx.Lock()
-    defer th.pqMtx.Unlock()
+    th.heapMtx.Lock()
+    defer th.heapMtx.Unlock()
      
     delta := int64(-1)
-    var item *PriorityQueueItem
+    var item *timerItem
     for {
-        item, delta = th.pq.PopOne(now, 2)
+        item, delta = th.popOne(now, 2)
         if item == nil {
             if delta == 0 { // empty
                 delta = -1
             }
             break
         }
-        ti := item.Value.(*timerItem)
-        if ti.eh.OnTimeout(now) == true && ti.interval > 0 {
-            ti.expiredAt = now + ti.interval
-            th.pq.PushOne(NewPriorityQueueItem(ti, ti.expiredAt))
+        if item.eh.OnTimeout(now) == true && item.interval > 0 {
+            item.expiredAt = now + item.interval
+            heap.Push(&th.heap, item)
         }
     }
     return delta
+}
+func (th *timerHeap) size() int {
+    th.heapMtx.Lock()
+    defer th.heapMtx.Unlock()
+    return len(th.heap)
+}
+func (th *timerHeap) popOne(now, errorVal int64) (*timerItem, int64) {
+    if len(th.heap) == 0 {
+		return nil, 0
+	}
+
+	min := th.heap[0]
+    delta := min.expiredAt - now
+    if delta > errorVal { // The error is errorVal
+		return nil, delta
+	}
+	heap.Remove(&th.heap, 0)
+	return min, 0
 }

@@ -37,7 +37,7 @@ func setOptions(optL ...Option) {
 			evReadyNum:   512,
 			evDataArrSize: 8192,
 			listenBacklog: 1024, // go default 128
-            timerHeapInitSize: 512,
+            timerHeapInitSize: 1024,
 		}
 	}
 

@@ -52,11 +52,12 @@ type exitTimer struct {
 func (t *exitTimer) OnTimeout(now int64) bool {
     c := counter.Load()
     fmt.Println("-------------------exit counter=", c)
-    if c < 10 {
-        showlog.Store(1)
-    } else if c < 1 {
+    if c < 1 {
         os.Exit(0)
         return false
+    }
+    if c < 10 {
+        showlog.Store(1)
     }
     return true;
 }
@@ -113,4 +114,25 @@ func TestTimerHeap(t *testing.T) {
         fmt.Println("======================schedule exit timer")
     }()
     wg.Wait()
+}
+
+type heapTimer struct {
+    Event
+}
+func (t *heapTimer) OnTimeout(now int64) bool {
+    return false
+}
+
+func TestTimerHeap_Algo(t *testing.T) {
+    t4h := newTimerHeap(1024)
+
+    for i := 0; i < 200; i++ {
+        delay := rand.Int63() % 200
+        t4h.scheduleTest(&heapTimer{}, delay, 0)
+    }
+    for i := 0; i < 200; i++ {
+        ti, _ := t4h.popOne(0, 10000000)
+        fmt.Println(ti.expiredAt)
+    }
+    fmt.Println("len", t4h.size())
 }
