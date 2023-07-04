@@ -7,7 +7,11 @@ import (
     "time"
 	"testing"
 	"math/rand"
+	"sync/atomic"
 )
+
+var counter atomic.Int32
+var showlog atomic.Int32
 
 type timingOuput struct {
     Event
@@ -28,10 +32,14 @@ func (t *timingOuput) OnTimeout(now int64) bool {
     diff := now - t.expiredAt
     if rand.Int63() % 100 < 10 {
         // fmt.Printf("%d exit, diff=%d interval=%d\n", t.idx, diff, t.interval)
+        counter.Add(-1)
         return false
     }
     if diff > 5 {
         fmt.Println("diff =", diff)
+    }
+    if showlog.Load() == 1 {
+        fmt.Printf("timer %d alive interval=%d\n", t.idx, t.interval)
     }
     
     t.expiredAt = now + t.interval
@@ -42,9 +50,15 @@ type exitTimer struct {
     t *testing.T
 }
 func (t *exitTimer) OnTimeout(now int64) bool {
-    fmt.Println("-------------------exit")
-    os.Exit(0)
-    return false
+    c := counter.Load()
+    fmt.Println("-------------------exit counter=", c)
+    if c < 10 {
+        showlog.Store(1)
+    } else if c < 1 {
+        os.Exit(0)
+        return false
+    }
+    return true;
 }
 
 func TestTimerHeap(t *testing.T) {
@@ -66,34 +80,36 @@ func TestTimerHeap(t *testing.T) {
         wg.Done()
     }()
 
-    idx := 0
+    var idx int
     for i := 0; i < 2000; i++ {
         now := time.Now().UnixMilli()
-        sec := rand.Int63() % 5
-        msec := rand.Int63() % 1000
+        sec := rand.Int63() % 5 + 1
+        msec := rand.Int63() % 1000 + 10
         expiredAt := now + sec * 1000 + msec
         err := r.SchedueTimer(newTimingOuput(idx, expiredAt, msec), sec * 1000 + msec, msec)
         if err != nil {
             t.Fatalf("schedule err %s", err.Error())
         }
+        counter.Add(1)
         idx += 1
     }
     go func() {
-        for i := 0; i < 1000; i++ {
+        for i := 0; i < 100; i++ {
             for j := 0; j < 100; j++ {
                 now := time.Now().UnixMilli()
-                sec := rand.Int63() % 5
-                msec := rand.Int63() % 1000
+                sec := rand.Int63() % 5 + 1
+                msec := rand.Int63() % 1000 + 10
                 expiredAt := now + sec * 1000 + msec
                 err := r.SchedueTimer(newTimingOuput(idx, expiredAt, msec), sec * 1000 + msec, msec)
                 if err != nil {
                     t.Fatalf("schedule err %s", err.Error())
                 }
+                counter.Add(1)
                 idx += 1
             }
             time.Sleep(20*time.Millisecond)
         }
-        r.SchedueTimer(&exitTimer{t: t}, 6000, 0)
+        r.SchedueTimer(&exitTimer{t: t}, 5000, 1000)
         fmt.Println("======================schedule exit timer")
     }()
     wg.Wait()

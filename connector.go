@@ -37,7 +37,6 @@ func NewConnector(r *Reactor, opts ...Option) (*Connector, error) {
 //   you need to manually extract the IP address using gethostbyname.
 // Timeout is relative time measurements with millisecond accuracy, for example, delay=5msec.
 func (c *Connector) Connect(addr string, h EvHandler, events uint32, timeout int64) error {
-    panic("Not fully implemented") // TODO
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
 	if err != nil {
 		return errors.New("Socket in connector.open: " + err.Error())

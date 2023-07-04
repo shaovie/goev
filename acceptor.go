@@ -137,5 +137,5 @@ func (a *Acceptor) OnRead(fd *Fd, now int64) bool {
 	return true
 }
 func (a *Acceptor) OnClose(fd *Fd) {
-	// TODO close and reopen ?
+    fd.Close()
 }
