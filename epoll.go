@@ -1,5 +1,3 @@
-// +build !ptr,!keepalive
-
 package goev
 
 import (

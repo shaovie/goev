@@ -26,7 +26,7 @@ func newTimingOuput(idx int, expiredAt, interval int64) EvHandler {
 func (t *timingOuput) OnTimeout(now int64) bool {
     diff := now - t.expiredAt
     if rand.Int63() % 100 < 10 {
-        fmt.Printf("%d exit, diff=%d interval=%d\n", t.idx, diff, t.interval)
+        // fmt.Printf("%d exit, diff=%d interval=%d\n", t.idx, diff, t.interval)
         return false
     }
     if diff > 5 {
