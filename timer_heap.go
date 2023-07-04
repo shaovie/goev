@@ -4,7 +4,6 @@ import (
 	"time"
     "sync"
 	"errors"
-	"sync/atomic"
 )
 
 type timerItem struct {
@@ -32,7 +31,6 @@ type timerHeap struct {
 
     pq PriorityQueue
     pqMtx sync.Mutex
-    closestExpiredAt atomic.Int64
 }
 func newTimerHeap(initCap int) *timerHeap {
     if initCap < 1 {
@@ -57,7 +55,7 @@ func (th *timerHeap) schedule(eh EvHandler, delay, interval int64) error {
         eh: eh,
     }
     th.pqMtx.Lock()
-    th.add(ti)
+    th.pq.PushOne(NewPriorityQueueItem(ti, ti.expiredAt))
     th.pqMtx.Unlock()
     return nil
 }
@@ -65,18 +63,13 @@ func (th *timerHeap) cancel(eh EvHandler) {
     //timerId := eh.GetTimerId()
 }
 func (th *timerHeap) handleExpired(now int64) int64 {
-    closestExpiredAt := th.closestExpiredAt.Load()
-    if now < closestExpiredAt {
-        return closestExpiredAt - now
-    }
-
     th.pqMtx.Lock()
     defer th.pqMtx.Unlock()
      
     delta := int64(-1)
     var item *PriorityQueueItem
     for {
-        item, delta = th.pq.PopOne(now)
+        item, delta = th.pq.PopOne(now, 2)
         if item == nil {
             if delta == 0 { // empty
                 delta = -1
@@ -86,13 +79,8 @@ func (th *timerHeap) handleExpired(now int64) int64 {
         ti := item.Value.(*timerItem)
         if ti.eh.OnTimeout(now) == true && ti.interval > 0 {
             ti.expiredAt = now + ti.interval
-            th.add(ti)
+            th.pq.PushOne(NewPriorityQueueItem(ti, ti.expiredAt))
         }
     }
     return delta
-}
-func (th *timerHeap) add(ti *timerItem) {
-    th.pq.PushOne(NewPriorityQueueItem(ti, ti.expiredAt))
-    _, expiredAt := th.pq.PopOne(0)
-    th.closestExpiredAt.Store(expiredAt)
 }

@@ -55,6 +55,7 @@ func (r *Reactor) RemoveEvHandler(eh EvHandler) error {
     }
 	return errors.New("ev handler not add")
 }
+// delay, interval are both relative time measurements with millisecond accuracy, for example, delay=5msec.
 func (r *Reactor) SchedueTimer(eh EvHandler, delay, interval int64) error {
     i := 0
     if r.evPollNum > 1 {

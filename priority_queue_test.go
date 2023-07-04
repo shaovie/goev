@@ -17,7 +17,7 @@ func TestPriorityQueue(t *testing.T) {
     }
     fmt.Printf("len:%d cap:%d\n", len(pq), cap(pq))
     for i := 0; i < 200; i++ {
-        item, _ := pq.PopOne(200)
+        item, _ := pq.PopOne(200, 0)
         fmt.Printf("#%d  %d\n", i, item.Value.(int64))
     }
     fmt.Printf("len:%d cap:%d\n", len(pq), cap(pq))

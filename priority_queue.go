@@ -61,14 +61,15 @@ func (pq *PriorityQueue) Pop() any {
 func (pq *PriorityQueue) PushOne(item *PriorityQueueItem) {
     heap.Push(pq, item)
 }
-func (pq *PriorityQueue) PopOne(priority int64) (*PriorityQueueItem, int64) {
+func (pq *PriorityQueue) PopOne(priority, errorVal int64) (*PriorityQueueItem, int64) {
 	if pq.Len() == 0 {
 		return nil, 0
 	}
 
 	item := (*pq)[0]
-	if item.Priority > priority {
-		return nil, item.Priority - priority
+    delta := item.Priority - priority
+    if delta > errorVal { // The error is errorVal
+		return nil, delta
 	}
 	heap.Remove(pq, 0)
 	return item, 0
