@@ -2,33 +2,34 @@ package goev
 
 import (
 	"errors"
-	"unsafe"
-	"syscall"
 	"sync/atomic"
+	"syscall"
+	"unsafe"
 
 	"golang.org/x/sys/unix"
 )
 
 type Notifier interface {
-    // Tread-safe
-    Notify()
+	// Tread-safe
+	Notify()
 
-    // Tread-safe close the notifier
-    Close()
+	// Tread-safe close the notifier
+	Close()
 }
 
 type notify struct {
 	Event
 
 	efd        int
-    notifyOnce atomic.Int32 // used to avoid duplicate call evHandler
-    closeOnce  atomic.Int32 // used to avoid duplicate close
+	notifyOnce atomic.Int32 // used to avoid duplicate call evHandler
+	closeOnce  atomic.Int32 // used to avoid duplicate close
 }
+
 var (
-    notifyV int64 = 1
-    notifyWriteV = (*(*[8]byte)(unsafe.Pointer(&notifyV)))[:]
-    notifyCloseV int64 = 31415927
-    notifyCloseWriteV = (*(*[8]byte)(unsafe.Pointer(&notifyCloseV)))[:]
+	notifyV           int64 = 1
+	notifyWriteV            = (*(*[8]byte)(unsafe.Pointer(&notifyV)))[:]
+	notifyCloseV      int64 = 31415927
+	notifyCloseWriteV       = (*(*[8]byte)(unsafe.Pointer(&notifyCloseV)))[:]
 )
 
 func newNotify(ep *evPoll) (Notifier, error) {
@@ -37,9 +38,9 @@ func newNotify(ep *evPoll) (Notifier, error) {
 	if err != nil {
 		return nil, errors.New("eventfd: " + err.Error())
 	}
-    nt := &notify{
-        efd: fd,
-    }
+	nt := &notify{
+		efd: fd,
+	}
 	if err = ep.add(nt.efd, EV_EVENTFD, nt); err != nil {
 		syscall.Close(fd)
 		return nil, errors.New("Notify add to evpoll fail! " + err.Error())
@@ -47,78 +48,78 @@ func newNotify(ep *evPoll) (Notifier, error) {
 	return nt, nil
 }
 func (nt *notify) Notify() {
-    if !nt.notifyOnce.CompareAndSwap(0, 1) {
-        return
-    }
-    for {
-        n, err := syscall.Write(nt.efd, notifyWriteV) // man 2 eventfd
-        if n == 8 {
-            return
-        } else if err != nil {
-            if err == syscall.EINTR {
-                continue
-            }
-            if err == syscall.EAGAIN {
-                return
-            }
-        }
-        break // TODO add evOptions.debug? panic("Notify: write eventfd failed!")
-    }
+	if !nt.notifyOnce.CompareAndSwap(0, 1) {
+		return
+	}
+	for {
+		n, err := syscall.Write(nt.efd, notifyWriteV) // man 2 eventfd
+		if n == 8 {
+			return
+		} else if err != nil {
+			if err == syscall.EINTR {
+				continue
+			}
+			if err == syscall.EAGAIN {
+				return
+			}
+		}
+		break // TODO add evOptions.debug? panic("Notify: write eventfd failed!")
+	}
 }
 func (nt *notify) Close() {
-    if !nt.closeOnce.CompareAndSwap(0, 1) {
-        return
-    }
-    for {
-        n, err := syscall.Write(nt.efd, notifyCloseWriteV) // man 2 eventfd
-        if n == 8 {
-            return
-        }
-        if err != nil {
-            if err == syscall.EINTR {
-                continue
-            }
-            if err == syscall.EAGAIN {
-                return
-            }
-        }
-        break // TODO add evOptions.debug? panic("Notify: write eventfd failed!")
-    }
+	if !nt.closeOnce.CompareAndSwap(0, 1) {
+		return
+	}
+	for {
+		n, err := syscall.Write(nt.efd, notifyCloseWriteV) // man 2 eventfd
+		if n == 8 {
+			return
+		}
+		if err != nil {
+			if err == syscall.EINTR {
+				continue
+			}
+			if err == syscall.EAGAIN {
+				return
+			}
+		}
+		break // TODO add evOptions.debug? panic("Notify: write eventfd failed!")
+	}
 }
 
 // Prohibit external calls
 func (nt *notify) OnRead(fd *Fd, now int64) bool {
-    if fd.v != nt.efd { // 防止外部调用!
-        panic("Prohibit external calls")
-    }
-    var tmp[8]byte
-    for {
-        n, err := syscall.Read(nt.efd, tmp[:])
-        if err != nil {
-            if err == syscall.EINTR {
-                continue
-            }
-            if err == syscall.EAGAIN {
-                nt.notifyOnce.Store(0)
-                return true
-            }
-            return false // TODO add evOptions.debug? panic("Notify: read eventfd failed!")
-        }
-        if n == 8 {
-            if *(*int64)(unsafe.Pointer(&tmp[0])) == notifyV {
-                nt.notifyOnce.Store(0)
-                return true
-            }
-            if *(*int64)(unsafe.Pointer(&tmp[0])) == notifyCloseV {
-                nt.closeOnce.Store(0) // optional
-                return false // goto OnClose
-            }
-            return false // TODO add evOptions.debug? panic("Notify: read unknown value!")
-        }
-    }
-    return true // 
+	if fd.v != nt.efd { // 防止外部调用!
+		panic("Prohibit external calls")
+	}
+	var tmp [8]byte
+	for {
+		n, err := syscall.Read(nt.efd, tmp[:])
+		if err != nil {
+			if err == syscall.EINTR {
+				continue
+			}
+			if err == syscall.EAGAIN {
+				nt.notifyOnce.Store(0)
+				return true
+			}
+			return false // TODO add evOptions.debug? panic("Notify: read eventfd failed!")
+		}
+		if n == 8 {
+			if *(*int64)(unsafe.Pointer(&tmp[0])) == notifyV {
+				nt.notifyOnce.Store(0)
+				return true
+			}
+			if *(*int64)(unsafe.Pointer(&tmp[0])) == notifyCloseV {
+				nt.closeOnce.Store(0) // optional
+				return false          // goto OnClose
+			}
+			return false // TODO add evOptions.debug? panic("Notify: read unknown value!")
+		}
+	}
+	return true //
 }
 func (nt *notify) OnClose(fd *Fd) {
-    fd.Close()
+	fd.Close()
 	nt.efd = -1
 }

@@ -1,3 +1,4 @@
+//go:build ptr
 // +build ptr
 
 package goev
@@ -18,7 +19,7 @@ var (
 
 type epollEvent struct {
 	Events uint32
-	data    [8]byte // 2023.6.29 测试发现用[8]byte的内存方式还是会出现崩溃的问题
+	data   [8]byte // 2023.6.29 测试发现用[8]byte的内存方式还是会出现崩溃的问题
 	//Fd  int32
 	//Pad int32
 }
@@ -104,9 +105,9 @@ func (ep *evPoll) open(pollThreadNum, evPollSize, _ int) error {
 	ep.evPollSize = evPollSize
 	ep.efd = efd
 	ep.evDataPool = &sync.Pool{
-	    New: func() any {
-	        return new(evData)
-	    },
+		New: func() any {
+			return new(evData)
+		},
 	}
 	ep.pollThreadNum = pollThreadNum
 	// process max fds
@@ -115,32 +116,32 @@ func (ep *evPoll) open(pollThreadNum, evPollSize, _ int) error {
 	return nil
 }
 func (ep *evPoll) add(fd int, events uint32, h EvHandler) error {
-    ed := ep.evDataPool.Get().(*evData)
+	ed := ep.evDataPool.Get().(*evData)
 	ed.reset(fd, h)
 
 	ev := epollEvent{
 		Events: events,
 	}
-    *(**evData)(unsafe.Pointer(&ev.data)) = ed
+	*(**evData)(unsafe.Pointer(&ev.data)) = ed
 	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd, &ev); err != nil {
 		return errors.New("epoll_ctl add: " + err.Error())
 	}
 	return nil
 }
 func (ep *evPoll) modify(fd *Fd, events uint32, h EvHandler) error {
-    var ed *evData
-    if fd.ed != nil { // There's no need to put it back `ep.evDataPool.Put(fd.ed)'
-        ed = fd.ed
-    } else {
-        ed = ep.evDataPool.Get().(*evData)
-    }
+	var ed *evData
+	if fd.ed != nil { // There's no need to put it back `ep.evDataPool.Put(fd.ed)'
+		ed = fd.ed
+	} else {
+		ed = ep.evDataPool.Get().(*evData)
+	}
 	ed.reset(fd.v, h)
 
 	ev := epollEvent{
 		Events: events,
 	}
-    *(**evData)(unsafe.Pointer(&ev.data)) = ed
-	
+	*(**evData)(unsafe.Pointer(&ev.data)) = ed
+
 	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd.v, &ev); err != nil {
 		if err == syscall.ENOENT { // refer to `man 2 epoll_ctl`
 			if err = epollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd.v, &ev); err != nil {
@@ -153,9 +154,9 @@ func (ep *evPoll) modify(fd *Fd, events uint32, h EvHandler) error {
 	return nil
 }
 func (ep *evPoll) remove(fd *Fd) error {
-    if fd.ed != nil {
-        ep.evDataPool.Put(fd.ed)
-    }
+	if fd.ed != nil {
+		ep.evDataPool.Put(fd.ed)
+	}
 	// The event argument is ignored and can be NULL (but see `man 2 epoll_ctl` BUGS)
 	// kernel versions > 2.6.9
 	if err := epollCtl(ep.efd, syscall.EPOLL_CTL_DEL, fd.v, nil); err != nil {
@@ -202,23 +203,23 @@ func (ep *evPoll) poll(multiplePoller bool, wg *sync.WaitGroup) error {
 		if nfds > 0 {
 			for i := 0; i < nfds; i++ {
 				ev := &events[i]
-                ed := *(**evData)(unsafe.Pointer(&ev.data))
+				ed := *(**evData)(unsafe.Pointer(&ev.data))
 				// EPOLLHUP refer to man 2 epoll_ctl
 				if ev.Events&(syscall.EPOLLHUP|syscall.EPOLLERR) != 0 {
-                    ep.remove(&(ed.fd))
+					ep.remove(&(ed.fd))
 					ed.evHandler.OnClose(&(ed.fd))
 					continue
 				}
 				if ev.Events&(syscall.EPOLLOUT) != 0 {
 					if ed.evHandler.OnWrite(&(ed.fd)) == false {
-                        ep.remove(&(ed.fd))
+						ep.remove(&(ed.fd))
 						ed.evHandler.OnClose(&(ed.fd))
 						continue
 					}
 				}
 				if ev.Events&(syscall.EPOLLIN) != 0 {
 					if ed.evHandler.OnRead(&(ed.fd)) == false {
-                        ep.remove(&(ed.fd))
+						ep.remove(&(ed.fd))
 						ed.evHandler.OnClose(&(ed.fd))
 						continue
 					}

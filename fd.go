@@ -1,60 +1,61 @@
 package goev
 
 import (
-	"net"
 	"errors"
+	"net"
 	"strconv"
-	"syscall"
 	"sync/atomic"
+	"syscall"
 )
 
 type Fd struct {
-    noCopy
+	noCopy
 	v int
 
-    // 防止fd重复被close(如果被close, fd数值有可能被OS复用给新的链接, 再次调用就会出问题)
-    // 也是对Fd.v的一种保护
-    // Prevent fd from being closed multiple times (if closed once,
-    // the fd value may be reused by the OS for a new connection).
-    // It's also a form of concurrent access protection for Fd.v
-    closed atomic.Int32
+	// 防止fd重复被close(如果被close, fd数值有可能被OS复用给新的链接, 再次调用就会出问题)
+	// 也是对Fd.v的一种保护
+	// Prevent fd from being closed multiple times (if closed once,
+	// the fd value may be reused by the OS for a new connection).
+	// It's also a form of concurrent access protection for Fd.v
+	closed atomic.Int32
 }
+
 func (fd *Fd) reset(v int) {
 	fd.v = v
-    fd.closed.Store(0) // Don't forget
+	fd.closed.Store(0) // Don't forget
 }
 
 // Get file descriptor
 func (fd *Fd) Fd() int {
-    return fd.v
+	return fd.v
 }
 
 // On  success, the number of bytes read is returned (zero indicates socket closed)
 // On error, -1 is returned, and err is set appropriately
 func (fd *Fd) Read(buf []byte) (n int, err error) {
-    for {
-        n, err = syscall.Read(fd.v, buf)
-        if err != nil && err == syscall.EINTR {
-            continue
-        }
-        break
-    }
-    return
+	for {
+		n, err = syscall.Read(fd.v, buf)
+		if err != nil && err == syscall.EINTR {
+			continue
+		}
+		break
+	}
+	return
 }
 func (fd *Fd) Write(buf []byte) (n int, err error) {
-    for {
-        n, err = syscall.Write(fd.v, buf)
-        if err != nil && err == syscall.EINTR {
-            continue
-        }
-        break
-    }
-    return
+	for {
+		n, err = syscall.Write(fd.v, buf)
+		if err != nil && err == syscall.EINTR {
+			continue
+		}
+		break
+	}
+	return
 }
 func (fd *Fd) Close() {
-    if !fd.closed.CompareAndSwap(0, 1) {
-        return
-    }
+	if !fd.closed.CompareAndSwap(0, 1) {
+		return
+	}
 	syscall.Close(fd.v)
 	fd.v = -1
 }

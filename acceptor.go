@@ -1,8 +1,8 @@
 package goev
 
 import (
-	"net"
 	"errors"
+	"net"
 	"strconv"
 	"strings"
 	"syscall"
@@ -14,7 +14,7 @@ type Acceptor struct {
 	reuseAddr        bool // SO_REUSEADDR
 	fd               int
 	events           uint32
-	recvBuffSize     int  // ignore equal 0
+	recvBuffSize     int // ignore equal 0
 	listenBacklog    int
 	loopAcceptTimes  int
 	newEvHanlderFunc func() EvHandler
@@ -23,26 +23,26 @@ type Acceptor struct {
 }
 
 func NewAcceptor(acceptorBindReactor *Reactor, newFdBindReactor *Reactor,
-    newEvHanlderFunc func() EvHandler, addr string, events uint32,
-    opts ...Option) (*Acceptor, error) {
+	newEvHanlderFunc func() EvHandler, addr string, events uint32,
+	opts ...Option) (*Acceptor, error) {
 	setOptions(opts...)
 	a := &Acceptor{
-		fd: -1,
-        reactor: acceptorBindReactor,
-        newFdBindReactor: newFdBindReactor,
-        events: events,
-        newEvHanlderFunc: newEvHanlderFunc,
-        listenBacklog: evOptions.listenBacklog,
-        recvBuffSize: evOptions.recvBuffSize,
-        reuseAddr: evOptions.reuseAddr,
+		fd:               -1,
+		reactor:          acceptorBindReactor,
+		newFdBindReactor: newFdBindReactor,
+		events:           events,
+		newEvHanlderFunc: newEvHanlderFunc,
+		listenBacklog:    evOptions.listenBacklog,
+		recvBuffSize:     evOptions.recvBuffSize,
+		reuseAddr:        evOptions.reuseAddr,
 	}
 	a.loopAcceptTimes = a.listenBacklog / 2
 	if a.loopAcceptTimes < 1 {
 		a.loopAcceptTimes = 1
 	}
-    if err := a.open(addr); err != nil {
-        return nil, err
-    }
+	if err := a.open(addr); err != nil {
+		return nil, err
+	}
 	return a, nil
 }
 
@@ -119,23 +119,23 @@ func (a *Acceptor) OnRead(fd *Fd, now int64) bool {
 		conn, _, err := syscall.Accept4(a.fd, syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC)
 		if err != nil {
 			if err == syscall.EINTR {
-                continue
-            }
+				continue
+			}
 			break
 		}
 		h := a.newEvHanlderFunc()
-        h.setReactor(a.newFdBindReactor)
+		h.setReactor(a.newFdBindReactor)
 		newFd := Fd{v: conn}
 		if h.OnOpen(&newFd, now) == false {
 			h.OnClose(&newFd)
 			continue
 		}
 		if err = h.GetReactor().AddEvHandler(h, conn, a.events); err != nil {
-            syscall.Close(fd.v) // not h.OnClose()
+			syscall.Close(fd.v) // not h.OnClose()
 		}
 	}
 	return true
 }
 func (a *Acceptor) OnClose(fd *Fd) {
-    fd.Close()
+	fd.Close()
 }

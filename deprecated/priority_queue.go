@@ -6,15 +6,16 @@ import (
 
 type PriorityQueueItem struct {
 	Value    any
-	Priority int64    // The priority of the item in the queue.
+	Priority int64 // The priority of the item in the queue.
 	// The index is needed by update and is maintained by the heap.Interface methods.
 	Index int // The index of the item in the heap.
 }
+
 func NewPriorityQueueItem(value any, priority int64) *PriorityQueueItem {
-    return &PriorityQueueItem{
-        Value: value,
-        Priority: priority,
-    }
+	return &PriorityQueueItem{
+		Value:    value,
+		Priority: priority,
+	}
 }
 
 // A PriorityQueue implements heap.Interface and holds Items.
@@ -59,7 +60,7 @@ func (pq *PriorityQueue) Pop() any {
 }
 
 func (pq *PriorityQueue) PushOne(item *PriorityQueueItem) {
-    heap.Push(pq, item)
+	heap.Push(pq, item)
 }
 func (pq *PriorityQueue) PopOne(priority, errorVal int64) (*PriorityQueueItem, int64) {
 	if pq.Len() == 0 {
@@ -67,8 +68,8 @@ func (pq *PriorityQueue) PopOne(priority, errorVal int64) (*PriorityQueueItem, i
 	}
 
 	item := (*pq)[0]
-    delta := item.Priority - priority
-    if delta > errorVal { // The error is errorVal
+	delta := item.Priority - priority
+	if delta > errorVal { // The error is errorVal
 		return nil, delta
 	}
 	heap.Remove(pq, 0)

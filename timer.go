@@ -1,29 +1,28 @@
 package goev
 
 type timer interface {
+	schedule(eh EvHandler, delay, interval int64) error
 
-    schedule(eh EvHandler, delay, interval int64) error
+	handleExpired(now int64) int64
 
-    handleExpired(now int64) int64
-
-    size() int
+	size() int
 }
 
 type timerItem struct {
-    noCopy
+	noCopy
 
-    expiredAt int64
-    interval  int64
+	expiredAt int64
+	interval  int64
 
-    eh EvHandler
+	eh EvHandler
 }
 
-//= timer item
+// = timer item
 // opt: sync.Pool
 func newTimerItem(expiredAt, interval int64, eh EvHandler) *timerItem {
-    return &timerItem{
-        expiredAt: expiredAt,
-        interval: interval,
-        eh: eh,
-    }
+	return &timerItem{
+		expiredAt: expiredAt,
+		interval:  interval,
+		eh:        eh,
+	}
 }

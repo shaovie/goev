@@ -1,40 +1,43 @@
 package goev
 
 import (
-	"net"
-	"time"
 	"errors"
-	"strings"
+	"net"
 	"strconv"
-	"syscall"
+	"strings"
 	"sync/atomic"
+	"syscall"
+	"time"
 )
 
 var (
-    ErrConnectFail = errors.New("connect fail")
-    ErrConnectTimeout = errors.New("connect timeout")
-    ErrConnectAddEvHandler = errors.New("add handler to reactor error!")
-    ErrConnectInprogress = errors.New("connect EINPROGRESS")
+	ErrConnectFail         = errors.New("connect fail")
+	ErrConnectTimeout      = errors.New("connect timeout")
+	ErrConnectAddEvHandler = errors.New("add handler to reactor error!")
+	ErrConnectInprogress   = errors.New("connect EINPROGRESS")
 )
+
 type Connector struct {
 	Event
 
-	recvBuffSize     int  // ignore equal 0
-	reactor          *Reactor
+	recvBuffSize int // ignore equal 0
+	reactor      *Reactor
 }
 
 func NewConnector(r *Reactor, opts ...Option) (*Connector, error) {
 	setOptions(opts...)
 	c := &Connector{
-        reactor: r,
-        recvBuffSize: evOptions.recvBuffSize,
+		reactor:      r,
+		recvBuffSize: evOptions.recvBuffSize,
 	}
 	return c, nil
 }
 
 // The addr format 192.168.0.1:8080
 // The domain name format, such as qq.com:8080, is not supported.
-//   you need to manually extract the IP address using gethostbyname.
+//
+//	you need to manually extract the IP address using gethostbyname.
+//
 // Timeout is relative time measurements with millisecond accuracy, for example, delay=5msec.
 func (c *Connector) Connect(addr string, h EvHandler, events uint32, timeout int64) error {
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
@@ -80,78 +83,82 @@ func (c *Connector) Connect(addr string, h EvHandler, events uint32, timeout int
 	sa := syscall.SockaddrInet4{Port: int(port)}
 	copy(sa.Addr[:], ip4.To4())
 	err = syscall.Connect(fd, &sa)
-    if err == nil { // success
+	if err == nil { // success
 		newFd := Fd{v: fd}
-        h.setReactor(c.reactor)
+		h.setReactor(c.reactor)
 		if h.OnOpen(&newFd, time.Now().UnixMilli()) == false {
 			h.OnClose(&newFd)
 		}
-        if err = h.GetReactor().AddEvHandler(h, fd, events); err != nil {
-            syscall.Close(fd) // not h.OnClose()
-            return errors.New("AddEvHandler in connector.Connect: " + err.Error())
-        }
-        return nil
-    } else if err == syscall.EINPROGRESS {
-        if timeout < 1 {
-            return ErrConnectInprogress
-        }
-        inh := &inProgressConnect{r:c.reactor, h:h, fd:fd, events: events}
-        if err = c.reactor.AddEvHandler(inh, fd, EV_CONNECT); err != nil {
-            syscall.Close(fd)
-            return errors.New("InPorgress AddEvHandler in connector.Connect: " + err.Error())
-        }
-        c.reactor.SchedueTimer(inh, timeout, 0)
-    } else {
+		if err = h.GetReactor().AddEvHandler(h, fd, events); err != nil {
+			syscall.Close(fd) // not h.OnClose()
+			return errors.New("AddEvHandler in connector.Connect: " + err.Error())
+		}
+		return nil
+	} else if err == syscall.EINPROGRESS {
+		if timeout < 1 {
+			return ErrConnectInprogress
+		}
+		inh := &inProgressConnect{r: c.reactor, h: h, fd: fd, events: events}
+		if err = c.reactor.AddEvHandler(inh, fd, EV_CONNECT); err != nil {
+			syscall.Close(fd)
+			return errors.New("InPorgress AddEvHandler in connector.Connect: " + err.Error())
+		}
+		c.reactor.SchedueTimer(inh, timeout, 0)
+	} else {
 		syscall.Close(fd)
 		return errors.New("syscall connect: " + err.Error())
 	}
 	return nil
 }
+
 // nonblocking inprogress connection
 type inProgressConnect struct {
-    Event
+	Event
 
-    fd int
-	events           uint32
-    h EvHandler
-    r *Reactor
-    progressDone atomic.Int32 // Only process one I/O event or timer event
+	fd           int
+	events       uint32
+	h            EvHandler
+	r            *Reactor
+	progressDone atomic.Int32 // Only process one I/O event or timer event
 }
-// Called by reactor when asynchronous connections fail. 
+
+// Called by reactor when asynchronous connections fail.
 func (p *inProgressConnect) OnRead(fd *Fd, now int64) bool {
-    if !p.progressDone.CompareAndSwap(0, 1) {
-        return true
-    }
-    p.h.OnConnectFail(ErrConnectFail)
+	if !p.progressDone.CompareAndSwap(0, 1) {
+		return true
+	}
+	p.h.OnConnectFail(ErrConnectFail)
 	return false // goto p.OnClose()
 }
-// Called by reactor when asynchronous connections succeed. 
+
+// Called by reactor when asynchronous connections succeed.
 func (p *inProgressConnect) OnWrite(fd *Fd, now int64) bool {
-    if !p.progressDone.CompareAndSwap(0, 1) {
-        return true
-    }
-    // From here on, the `fd` resources will be managed by h.
-    p.h.setReactor(p.r)
-    newFd := Fd{v: p.fd}
-    if p.h.OnOpen(&newFd, now) == false {
-        p.h.OnClose(&newFd)
-    }
-    if err := p.h.GetReactor().AddEvHandler(p.h, p.fd, p.events); err != nil {
-        p.h.OnConnectFail(ErrConnectAddEvHandler)
-        return false // goto p.OnClose()
-    }
+	if !p.progressDone.CompareAndSwap(0, 1) {
+		return true
+	}
+	// From here on, the `fd` resources will be managed by h.
+	p.h.setReactor(p.r)
+	newFd := Fd{v: p.fd}
+	if p.h.OnOpen(&newFd, now) == false {
+		p.h.OnClose(&newFd)
+	}
+	if err := p.h.GetReactor().AddEvHandler(p.h, p.fd, p.events); err != nil {
+		p.h.OnConnectFail(ErrConnectAddEvHandler)
+		return false // goto p.OnClose()
+	}
 	return true
 }
+
 // Called if a connection times out before completing.
 func (p *inProgressConnect) OnTimeout(now int64) bool {
-    if !p.progressDone.CompareAndSwap(0, 1) {
-        return true
-    }
+	if !p.progressDone.CompareAndSwap(0, 1) {
+		return true
+	}
 
-    // i/o event not catched
-    p.h.OnConnectFail(ErrConnectTimeout)
+	// i/o event not catched
+	p.h.OnConnectFail(ErrConnectTimeout)
 	return false
 }
 func (p *inProgressConnect) OnClose(fd *Fd) {
-    fd.Close()
+	fd.Close()
 }
