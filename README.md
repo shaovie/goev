@@ -12,21 +12,22 @@
 
 #### 关于EventPoll
 ##### 线程模型
-- 起初随机选中的Leader(线程)负责epoll_wait, 当获取到I/O事件后转为Follower(不会出现数据拷贝和上下文切换),就地处理刚拿到I/O事件。
-- 同时释放Leader锁并产生一个新的Leader(根据Mutex的唤醒顺序), Follower把事件处理完后又回重新排队等待提升为Leader
-
-- L/F 模型能最大程度实现并发处理I/O事件, 减少线程切换, 消除线程间的数据切换和不必要的数据拷贝
+- 开始选择L/F模型, 但后来发现当有水平触发模式下会有问题(如果事件处理不及时, 新的Leader会又捕捉到)
+- 现在的模式就是每个evpoll单独一个线程, acceptor/connector/reactor可以随便组合,将事件注册到不同的evpoll中
 
 ##### 事件分发
 - event poll捕捉到事件后，调用EvHandler接口，实现面向接口的业务处理
 
 - 如果你的业务处理比较快, 那么直接在OnRead/OnWrite中处理业务是个不错的选择
 
-- 如果你的业务处理比较慢, 那你应该把Reactor当做一个事件派发器, 在OnRead中异步处理业务, 这样保证L/F能高效运行
+- 如果你的业务处理比较慢, 那你应该把Reactor当做一个事件派发器, 在OnRead中异步处理业务, 这样保证epoll能高效运行
 
 ##### Acceptor
 - 可以让你更优雅的创建 Listen service, 
 - 它本质上就是实现了EvHandler的接口，处理listen socket的可读事件，然后将新接收到的fd注册到Reactor.evpoll中。
+
+##### 关于Timer
+- 目前还是简单的min heap实现, 但胜在简单稳定. 当单个evpoll的定时器到了万个的规模 就会有影响了. wheel还没搞完, 抽空再研究
 
 ##### 一些零散的优化点
 - ArrayMapUnion 联合索引结构
