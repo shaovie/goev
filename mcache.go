@@ -1,6 +1,6 @@
-// Refer to github.com/patrickmn/go-cache
-
 package goev
+
+// Refer to github.com/patrickmn/go-cache
 
 import (
 	"runtime"
@@ -8,13 +8,13 @@ import (
 	"time"
 )
 
-type Item struct {
+type cacheItem struct {
 	Object     any
 	Expiration int64
 }
 
 // Returns true if the item has expired.
-func (item Item) Expired() bool {
+func (item cacheItem) Expired() bool {
 	if item.Expiration == 0 {
 		return false
 	}
@@ -38,7 +38,7 @@ type Cache struct {
 
 type cache struct {
 	defaultExpiration time.Duration
-	items             map[string]Item
+	items             map[string]cacheItem
 	mu                sync.RWMutex
 	onEvicted         func(string, any)
 	janitor           *janitor
@@ -50,7 +50,7 @@ type cache struct {
 // manually. If the cleanup interval is less than one, expired items are not
 // deleted from the cache before calling c.DeleteExpired().
 func New(defaultExpiration, cleanupInterval time.Duration) *Cache {
-	items := make(map[string]Item)
+	items := make(map[string]cacheItem)
 	return newCacheWithJanitor(defaultExpiration, cleanupInterval, items)
 }
 
@@ -67,7 +67,7 @@ func (c *cache) Set(k string, x any, d time.Duration) {
 		e = time.Now().Add(d).UnixNano()
 	}
 	c.mu.Lock()
-	c.items[k] = Item{
+	c.items[k] = cacheItem{
 		Object:     x,
 		Expiration: e,
 	}
@@ -84,7 +84,7 @@ func (c *cache) set(k string, x any, d time.Duration) {
 	if d > 0 {
 		e = time.Now().Add(d).UnixNano()
 	}
-	c.items[k] = Item{
+	c.items[k] = cacheItem{
 		Object:     x,
 		Expiration: e,
 	}
@@ -434,10 +434,10 @@ func (c *cache) OnEvicted(f func(string, any)) {
 }
 
 // Copies all unexpired items in the cache into a new map and returns it.
-func (c *cache) Items() map[string]Item {
+func (c *cache) Items() map[string]cacheItem {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	m := make(map[string]Item, len(c.items))
+	m := make(map[string]cacheItem, len(c.items))
 	now := time.Now().UnixNano()
 	for k, v := range c.items {
 		// "Inlining" of Expired
@@ -463,7 +463,7 @@ func (c *cache) ItemCount() int {
 // Delete all items from the cache.
 func (c *cache) Flush() {
 	c.mu.Lock()
-	c.items = map[string]Item{}
+	c.items = map[string]cacheItem{}
 	c.mu.Unlock()
 }
 
@@ -498,7 +498,7 @@ func runJanitor(c *cache, ci time.Duration) {
 	go j.Run(c)
 }
 
-func newCache(de time.Duration, m map[string]Item) *cache {
+func newCache(de time.Duration, m map[string]cacheItem) *cache {
 	if de == 0 {
 		de = -1
 	}
@@ -509,7 +509,7 @@ func newCache(de time.Duration, m map[string]Item) *cache {
 	return c
 }
 
-func newCacheWithJanitor(de time.Duration, ci time.Duration, m map[string]Item) *Cache {
+func newCacheWithJanitor(de time.Duration, ci time.Duration, m map[string]cacheItem) *Cache {
 	c := newCache(de, m)
 	// This trick ensures that the janitor goroutine (which--granted it
 	// was enabled--is running DeleteExpired on c forever) does not keep

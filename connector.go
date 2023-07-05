@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	ErrConnectFail         = errors.New("connect fail")
-	ErrConnectTimeout      = errors.New("connect timeout")
-	ErrConnectInprogress   = errors.New("connect EINPROGRESS")
+	ErrConnectFail       = errors.New("connect fail")
+	ErrConnectTimeout    = errors.New("connect timeout")
+	ErrConnectInprogress = errors.New("connect EINPROGRESS")
 )
 
 type Connector struct {

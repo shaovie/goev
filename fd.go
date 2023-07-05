@@ -43,6 +43,7 @@ func (fd *Fd) Read(buf []byte) (n int, err error) {
 	}
 	return
 }
+
 // io.Writer
 func (fd *Fd) Write(buf []byte) (n int, err error) {
 	for {
@@ -54,6 +55,7 @@ func (fd *Fd) Write(buf []byte) (n int, err error) {
 	}
 	return
 }
+
 // Just for io.Closer return 'error'
 func (fd *Fd) Close() error {
 	if !fd.closed.CompareAndSwap(0, 1) {
@@ -61,7 +63,7 @@ func (fd *Fd) Close() error {
 	}
 	syscall.Close(fd.v)
 	fd.v = -1
-    return nil
+	return nil
 }
 
 // Return format 192.168.0.1:8080
@@ -118,15 +120,16 @@ func (fd *Fd) SetNoDelay(v int) error {
 	}
 	return nil
 }
+
 // The all params are in second
 //
 // idle: After establishing a connection, if there is no data transmission during the "idle" time, a keep-alive packet will be sent
 // interval: The interval period after the start of probing
 // times: If there is no response after "times" attempts, the connection will be closed.
 func (fd *Fd) SetKeepAlive(idle, interval, times int) error {
-    if interval < 1 {
-        return errors.New("keepalive interval invalid")
-    }
+	if interval < 1 {
+		return errors.New("keepalive interval invalid")
+	}
 	if err := syscall.SetsockoptInt(fd.v, syscall.SOL_SOCKET, syscall.SO_KEEPALIVE, 1); err != nil {
 		return errors.New("Set SO_KEEPALIVE: " + err.Error())
 	}
