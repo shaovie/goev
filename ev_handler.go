@@ -60,6 +60,7 @@ type EvHandler interface {
 	// Only be asynchronously called after connector.Connect() returns nil
 	//
 	// Don't call OnClose() after OnConnectFail() be called
+    // The param err Refer to ev_handler.go: ErrConnect*
 	OnConnectFail(err error)
 
 	// EvPoll catch timeout event

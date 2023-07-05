@@ -43,7 +43,7 @@ func TestConnector(t *testing.T) {
 	}()
 	c, err := NewConnector(r, RecvBuffSize(8*1024))
 	for i := 80; i < 65535; i++ {
-		c.Connect("108.138.105.100:"+strconv.FormatInt(int64(i), 10), &Scanner{port: i}, EV_IN, 3000)
+		c.Connect("108.138.105.100:"+strconv.FormatInt(int64(i), 10), &Scanner{port: i}, 3000)
 	}
 
 	wg.Wait()

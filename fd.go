@@ -30,7 +30,8 @@ func (fd *Fd) Fd() int {
 	return fd.v
 }
 
-// On  success, the number of bytes read is returned (zero indicates socket closed)
+// io.Reader
+// On success, the number of bytes read is returned (zero indicates socket closed)
 // On error, -1 is returned, and err is set appropriately
 func (fd *Fd) Read(buf []byte) (n int, err error) {
 	for {
@@ -42,6 +43,7 @@ func (fd *Fd) Read(buf []byte) (n int, err error) {
 	}
 	return
 }
+// io.Writer
 func (fd *Fd) Write(buf []byte) (n int, err error) {
 	for {
 		n, err = syscall.Write(fd.v, buf)
@@ -52,17 +54,19 @@ func (fd *Fd) Write(buf []byte) (n int, err error) {
 	}
 	return
 }
-func (fd *Fd) Close() {
+// Just for io.Closer return 'error'
+func (fd *Fd) Close() error {
 	if !fd.closed.CompareAndSwap(0, 1) {
-		return
+		return nil
 	}
 	syscall.Close(fd.v)
 	fd.v = -1
+    return nil
 }
 
 // Return format 192.168.0.1:8080
 // Return "", if error
-func (fd *Fd) GetLocalAddr() string {
+func (fd *Fd) LocalAddr() string {
 	sa, _ := syscall.Getsockname(fd.v)
 	ip := net.IP{}
 	port := 0
@@ -81,7 +85,7 @@ func (fd *Fd) GetLocalAddr() string {
 
 // Return format 192.168.0.1:8080
 // Return "", if error
-func (fd *Fd) GetPeerAddr() string {
+func (fd *Fd) RemoteAddr() string {
 	sa, _ := syscall.Getpeername(fd.v)
 	ip := net.IP{}
 	port := 0
@@ -111,6 +115,29 @@ func (fd *Fd) SetSendBuffSize(bytes int) error {
 func (fd *Fd) SetNoDelay(v int) error {
 	if err := syscall.SetsockoptInt(fd.v, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, v); err != nil {
 		return errors.New("Set TCP_NODELAY: " + err.Error())
+	}
+	return nil
+}
+// The all params are in second
+//
+// idle: After establishing a connection, if there is no data transmission during the "idle" time, a keep-alive packet will be sent
+// interval: The interval period after the start of probing
+// times: If there is no response after "times" attempts, the connection will be closed.
+func (fd *Fd) SetKeepAlive(idle, interval, times int) error {
+    if interval < 1 {
+        return errors.New("keepalive interval invalid")
+    }
+	if err := syscall.SetsockoptInt(fd.v, syscall.SOL_SOCKET, syscall.SO_KEEPALIVE, 1); err != nil {
+		return errors.New("Set SO_KEEPALIVE: " + err.Error())
+	}
+	if err := syscall.SetsockoptInt(fd.v, syscall.IPPROTO_TCP, syscall.TCP_KEEPIDLE, idle); err != nil {
+		return errors.New("Set TCP_KEEPIDLE: " + err.Error())
+	}
+	if err := syscall.SetsockoptInt(fd.v, syscall.IPPROTO_TCP, syscall.TCP_KEEPINTVL, interval); err != nil {
+		return errors.New("Set TCP_KEEPINTVL: " + err.Error())
+	}
+	if err := syscall.SetsockoptInt(fd.v, syscall.IPPROTO_TCP, syscall.TCP_KEEPCNT, times); err != nil {
+		return errors.New("Set TCP_KEEPCNT: " + err.Error())
 	}
 	return nil
 }

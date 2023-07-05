@@ -20,11 +20,15 @@ type Http struct {
 }
 
 func (h *Http) OnOpen(fd *goev.Fd, now int64) bool {
+    fd.SetNoDelay(1)
 	return true
 }
 func (h *Http) OnRead(fd *goev.Fd, now int64) bool {
-	buf := buffPool.Get().([]byte) // just read
-	defer buffPool.Put(buf)
+    if false {
+	    buf := buffPool.Get().([]byte) // just read
+	    defer buffPool.Put(buf)
+    }
+	buf := make([]byte, 2048)
 
 	readN := 0
 	for {

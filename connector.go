@@ -13,7 +13,6 @@ import (
 var (
 	ErrConnectFail         = errors.New("connect fail")
 	ErrConnectTimeout      = errors.New("connect timeout")
-	ErrConnectAddEvHandler = errors.New("add handler to reactor error!")
 	ErrConnectInprogress   = errors.New("connect EINPROGRESS")
 )
 
@@ -36,10 +35,10 @@ func NewConnector(r *Reactor, opts ...Option) (*Connector, error) {
 // The addr format 192.168.0.1:8080
 // The domain name format, such as qq.com:8080, is not supported.
 //
-//	you need to manually extract the IP address using gethostbyname.
+// You need to manually extract the IP address using gethostbyname.
 //
 // Timeout is relative time measurements with millisecond accuracy, for example, delay=5msec.
-func (c *Connector) Connect(addr string, h EvHandler, events uint32, timeout int64) error {
+func (c *Connector) Connect(addr string, h EvHandler, timeout int64) error {
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
 	if err != nil {
 		return errors.New("Socket in connector.open: " + err.Error())
@@ -89,16 +88,12 @@ func (c *Connector) Connect(addr string, h EvHandler, events uint32, timeout int
 		if h.OnOpen(&newFd, time.Now().UnixMilli()) == false {
 			h.OnClose(&newFd)
 		}
-		if err = h.GetReactor().AddEvHandler(h, fd, events); err != nil {
-			syscall.Close(fd) // not h.OnClose()
-			return errors.New("AddEvHandler in connector.Connect: " + err.Error())
-		}
 		return nil
 	} else if err == syscall.EINPROGRESS {
 		if timeout < 1 {
 			return ErrConnectInprogress
 		}
-		inh := &inProgressConnect{r: c.reactor, h: h, fd: fd, events: events}
+		inh := &inProgressConnect{r: c.reactor, h: h, fd: fd}
 		if err = c.reactor.AddEvHandler(inh, fd, EV_CONNECT); err != nil {
 			syscall.Close(fd)
 			return errors.New("InPorgress AddEvHandler in connector.Connect: " + err.Error())
@@ -116,7 +111,6 @@ type inProgressConnect struct {
 	Event
 
 	fd           int
-	events       uint32
 	h            EvHandler
 	r            *Reactor
 	progressDone atomic.Int32 // Only process one I/O event or timer event
@@ -141,10 +135,6 @@ func (p *inProgressConnect) OnWrite(fd *Fd, now int64) bool {
 	newFd := Fd{v: p.fd}
 	if p.h.OnOpen(&newFd, now) == false {
 		p.h.OnClose(&newFd)
-	}
-	if err := p.h.GetReactor().AddEvHandler(p.h, p.fd, p.events); err != nil {
-		p.h.OnConnectFail(ErrConnectAddEvHandler)
-		return false // goto p.OnClose()
 	}
 	return true
 }
