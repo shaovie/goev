@@ -10,6 +10,25 @@ import (
 	"time"
 )
 
+// Point to the last allocated object
+var lastLog *Log
+
+func Debug(format string, v ...any) {
+	lastLog.debugL.write(format, v...)
+}
+func Rinfo(format string, v ...any) {
+	lastLog.rinfoL.write(format, v...)
+}
+func Error(format string, v ...any) {
+	lastLog.errorL.write(format, v...)
+}
+func Fatal(format string, v ...any) {
+	lastLog.fatalL.write(format, v...)
+}
+func Warning(format string, v ...any) {
+	lastLog.warningL.write(format, v...)
+}
+
 type Log struct {
 	noCopy
 
@@ -34,6 +53,7 @@ func NewLog(dir string) (*Log, error) {
 			return nil, errors.New("NewLog mkdir fail! " + err.Error())
 		}
 	}
+	lastLog = l
 	return l, nil
 }
 func (l *Log) Debug(format string, v ...any) {

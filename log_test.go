@@ -8,12 +8,19 @@ import (
 func TestLog(t *testing.T) {
 	fmt.Println("hello boy")
 	log, _ := NewLog("logs")
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 10; i++ {
 		log.Debug("hello %s %d", "debug", i)
 		log.Rinfo("hello %s %d", "rinfo", i)
 		log.Error("hello %s %d", "error", i)
 		log.Fatal("hello %s %d", "fatal", i)
 		log.Warning("hello %s %d", "warning", i)
+	}
+	for i := 0; i < 10; i++ {
+		Debug("append %s %d", "debug", i)
+		Rinfo("append %s %d", "rinfo", i)
+		Error("append %s %d", "error", i)
+		Fatal("append %s %d", "fatal", i)
+		Warning("append %s %d", "warning", i)
 	}
 	log1, _ := NewLog("")
 	for i := 0; i < 2; i++ {
@@ -22,5 +29,12 @@ func TestLog(t *testing.T) {
 		log1.Warning("hello %s %d", "warning", i)
 		log1.Fatal("hello %s %d", "fatal", i)
 		log1.Rinfo("hello %s %d", "rinfo", i)
+	}
+	for i := 0; i < 10; i++ {
+		Debug("append %s %d", "debug", i)
+		Rinfo("append %s %d", "rinfo", i)
+		Error("append %s %d", "error", i)
+		Fatal("append %s %d", "fatal", i)
+		Warning("append %s %d", "warning", i)
 	}
 }
