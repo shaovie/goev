@@ -16,8 +16,11 @@ var lastLog *Log
 func Debug(format string, v ...any) {
 	lastLog.debugL.write(format, v...)
 }
-func Rinfo(format string, v ...any) {
-	lastLog.rinfoL.write(format, v...)
+func Info(format string, v ...any) {
+	lastLog.infoL.write(format, v...)
+}
+func Warn(format string, v ...any) {
+	lastLog.warnL.write(format, v...)
 }
 func Error(format string, v ...any) {
 	lastLog.errorL.write(format, v...)
@@ -25,28 +28,28 @@ func Error(format string, v ...any) {
 func Fatal(format string, v ...any) {
 	lastLog.fatalL.write(format, v...)
 }
-func Warning(format string, v ...any) {
-	lastLog.warningL.write(format, v...)
-}
 
 type Log struct {
 	noCopy
 
 	debugL   log
-	rinfoL   log
+	infoL    log
 	errorL   log
 	fatalL   log
-	warningL log
+	warnL    log
 }
 
+func init() {
+    lastLog, _ = NewLog("")
+}
 // output to stdout if dir == ""
 func NewLog(dir string) (*Log, error) {
 	l := &Log{
 		debugL:   log{dir: dir, name: "debug", fd: -1},
-		rinfoL:   log{dir: dir, name: "rinfo", fd: -1},
+		infoL:    log{dir: dir, name: "info", fd: -1},
 		errorL:   log{dir: dir, name: "error", fd: -1},
 		fatalL:   log{dir: dir, name: "fatal", fd: -1},
-		warningL: log{dir: dir, name: "warng", fd: -1},
+		warnL: log{dir: dir, name: "warn", fd: -1},
 	}
 	if dir != "" {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -59,17 +62,17 @@ func NewLog(dir string) (*Log, error) {
 func (l *Log) Debug(format string, v ...any) {
 	l.debugL.write(format, v...)
 }
-func (l *Log) Rinfo(format string, v ...any) {
-	l.rinfoL.write(format, v...)
+func (l *Log) Info(format string, v ...any) {
+	l.infoL.write(format, v...)
+}
+func (l *Log) Warn(format string, v ...any) {
+	l.warnL.write(format, v...)
 }
 func (l *Log) Error(format string, v ...any) {
 	l.errorL.write(format, v...)
 }
 func (l *Log) Fatal(format string, v ...any) {
 	l.fatalL.write(format, v...)
-}
-func (l *Log) Warning(format string, v ...any) {
-	l.warningL.write(format, v...)
 }
 
 // implement
@@ -78,9 +81,9 @@ type log struct {
 	newFileMonth int
 	newFileDay   int
 	fd           int
+	buff         []byte
 	dir          string
 	name         string
-	buff         []byte
 
 	mtx sync.Mutex
 }
@@ -100,10 +103,16 @@ func (l *log) open(year, month, day int) (err error) {
 	} else {
 		fname := fmt.Sprintf("%s-%d-%02d-%02d.log", l.name, year, month, day)
 		logFile := path.Join(l.dir, fname)
-		l.fd, err = syscall.Open(logFile, syscall.O_CREAT|syscall.O_WRONLY|syscall.O_APPEND, 0644)
-		if err != nil {
-			return err
-		}
+        for {
+            l.fd, err = syscall.Open(logFile, syscall.O_CREAT|syscall.O_WRONLY|syscall.O_APPEND, 0644)
+            if err != nil {
+                if err == syscall.EINTR {
+                    continue
+                }
+                return err
+            }
+            break
+        }
 	}
 	l.newFileYear, l.newFileMonth, l.newFileDay = year, month, day
 	l.buff = make([]byte, 0, 512)
@@ -159,7 +168,7 @@ func (l *log) write(format string, v ...any) {
 		}
 		break
 	}
-	l.buff = l.buff[:11 /*len("2023-07-05 ")*/]
+	l.buff = l.buff[:11] // 11 is len("2023-07-05 ")
 }
 func (l *log) itoa(i int, wid int) {
 	// Assemble decimal in reverse order.

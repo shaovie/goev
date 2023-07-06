@@ -29,6 +29,16 @@
 ##### 关于Timer
 - 目前还是简单的min heap实现, 但胜在简单稳定. 当单个evpoll的定时器到了万个的规模 就会有影响了. wheel还没搞完, 抽空再研究
 
+##### 关于Log
+- 使用syscal.Write减少了一次mutex.Lock(internal/poll/fd_unix.go:Fd.Write中有writeLock)
+- 使用固定长度的[]byte格式化日志内容, 效率高(header中日期一天只需要格式化一次)
+- 代码简单, 透明
+
+##### 惯用写法
+- 包含EINTR的场景一定要循环操作
+- struct成员, 尽量按照字节从小到大依次排列, 根据字节对齐的原则, 会节省一些内存
+- 小数据量(十几个左右)索引的时候, slice可能比map效率更高, 因为它的内存是连续的, 对cpu cache更友好, map是松散的 而且是动态创建, 内部涉及到的小对象更多
+
 ##### 一些零散的优化点
 - ArrayMapUnion 联合索引结构
   是适合用int做为key索引的数组结构，index < arraySize 就用array存取，index >= arraySize 就用sync.Map存取，内存和索引速度可以兼得。
@@ -37,6 +47,8 @@
   
   进一步优化：经过测试整个array用一把锁，性能是很差的（在真正多线程环境下参考test/mutex_arr_vs_map.go），那么我们就可用atomic保存handler，创建一个[int]*atomic.Pointer[T]的数组，这样就大大减少了碰撞机会了，经过测试,可以比sync.Map快42%
   
+- File/Socket 的读写操作尽量使用syscall以减少锁的使用, 标准库中封装都带Mutex(更合适全局空间使用)
+
 #### 疑问
 关于https://blog.51cto.com/u_15087084/2597531 中讲到的msec, 调整msec是对下次事件轮询的预判, 主动让出CPU不就延缓了下次轮询的时机吗?
 我觉得它可能只是单纯测试了epoll_wait的执行时间, 并没有实际放fd进去

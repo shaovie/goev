@@ -23,6 +23,10 @@ type ConnectPool struct {
 // The addr format 192.168.0.1:8080
 func NewConnectPool(c *Connector, addr string, minSize, maxSize int,
 	newConnHandlerFunc func() ConnectPoolConn) (*ConnectPool, error) {
+
+    if minSize < 1 || minSize >= maxSize {
+        panic("NewConnectPool min/max size invalid")
+    }
 	panic("ConnectPool has not been fully implemented yet")
 	r := c.GetReactor()
 	if r == nil {
@@ -34,7 +38,7 @@ func NewConnectPool(c *Connector, addr string, minSize, maxSize int,
 		addr:    addr,
 		conns:   list.New(),
 	}
-	if err := r.SchedueTimer(cp, 0, 500); err != nil {
+	if err := r.SchedueTimer(cp, 0, 200); err != nil {
 		return nil, errors.New("schedule timer fail. " + err.Error())
 	}
 
@@ -69,13 +73,14 @@ func (cp *ConnectPool) OnTimeout(now int64) bool {
 	nowSize := cp.Size()
 	toNewNum := 0
 	if nowSize < cp.minSize {
-		toNewNum = cp.minSize - nowSize
+        toSize := (cp.maxSize + cp.minSize) / 2 + 1 // n = (min + max) / 2
+		toNewNum = toSize - nowSize
 	}
 	if toNewNum == 0 {
 		return true
 	}
 
-	if cp.toNewNum.CompareAndSwap(0, int32(toNewNum)) {
+	if !cp.toNewNum.CompareAndSwap(0, int32(toNewNum)) {
 		return true
 	}
 	for i := 0; i < toNewNum; i++ {
@@ -97,4 +102,7 @@ func (cpc *ConnectPoolConn) OnOpen(fd *Fd, now int64) bool {
 	fd.SetKeepAlive(60, 40, 3)
 	cpc.cp.Release(cpc)
 	return true
+}
+func (cpc *ConnectPoolConn) OnConnectFail(err error) {
+	cpc.cp.toNewNum.Add(-1)
 }

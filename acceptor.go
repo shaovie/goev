@@ -13,7 +13,6 @@ type Acceptor struct {
 
 	reuseAddr        bool // SO_REUSEADDR
 	fd               int
-	events           uint32
 	recvBuffSize     int // ignore equal 0
 	listenBacklog    int
 	loopAcceptTimes  int
@@ -22,15 +21,14 @@ type Acceptor struct {
 	newFdBindReactor *Reactor
 }
 
+// New socket has been set to non-blocking
 func NewAcceptor(acceptorBindReactor *Reactor, newFdBindReactor *Reactor,
-	newEvHanlderFunc func() EvHandler, addr string, events uint32,
-	opts ...Option) (*Acceptor, error) {
+	newEvHanlderFunc func() EvHandler, addr string, opts ...Option) (*Acceptor, error) {
 	setOptions(opts...)
 	a := &Acceptor{
 		fd:               -1,
 		reactor:          acceptorBindReactor,
 		newFdBindReactor: newFdBindReactor,
-		events:           events,
 		newEvHanlderFunc: newEvHanlderFunc,
 		listenBacklog:    evOptions.listenBacklog,
 		recvBuffSize:     evOptions.recvBuffSize,
@@ -48,7 +46,6 @@ func NewAcceptor(acceptorBindReactor *Reactor, newFdBindReactor *Reactor,
 
 // Open create a listen fd
 // The addr format 192.168.0.1:8080 or :8080
-// The events list are in ev_handler.go
 func (a *Acceptor) open(addr string) error {
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
 	if err != nil {
@@ -128,10 +125,6 @@ func (a *Acceptor) OnRead(fd *Fd, now int64) bool {
 		newFd := Fd{v: conn}
 		if h.OnOpen(&newFd, now) == false {
 			h.OnClose(&newFd)
-			continue
-		}
-		if err = h.GetReactor().AddEvHandler(h, conn, a.events); err != nil {
-			syscall.Close(fd.v) // not h.OnClose()
 		}
 	}
 	return true

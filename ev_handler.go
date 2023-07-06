@@ -59,7 +59,7 @@ type EvHandler interface {
 	// EvPoll catch connect result
 	// Only be asynchronously called after connector.Connect() returns nil
 	//
-	// Don't call OnClose() after OnConnectFail() be called
+	// Will not call OnClose() after OnConnectFail() (So you don't need to manually release the fd)
 	// The param err Refer to ev_handler.go: ErrConnect*
 	OnConnectFail(err error)
 

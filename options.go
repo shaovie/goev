@@ -1,7 +1,5 @@
 package goev
 
-import ()
-
 type Options struct {
 	noCopy
 
