@@ -31,7 +31,7 @@
 
 ##### 关于Log
 - 使用syscal.Write减少了一次mutex.Lock(internal/poll/fd_unix.go:Fd.Write中有writeLock)
-- 使用固定长度的[]byte格式化日志内容, 效率高(header中日期一天只需要格式化一次)
+- 使用固定长度的[]byte格式化(fmt.Appendf)日志内容, 减少内存拷贝, 效率高(header中日期一天只需要格式化一次)
 - 代码简单, 透明
 
 ##### 惯用写法

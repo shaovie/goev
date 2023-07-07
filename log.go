@@ -14,19 +14,19 @@ import (
 var lastLog *Log
 
 func Debug(format string, v ...any) {
-	lastLog.debugL.write(format, v...)
+	lastLog.debugL.output(format, v...)
 }
 func Info(format string, v ...any) {
-	lastLog.infoL.write(format, v...)
+	lastLog.infoL.output(format, v...)
 }
 func Warn(format string, v ...any) {
-	lastLog.warnL.write(format, v...)
+	lastLog.warnL.output(format, v...)
 }
 func Error(format string, v ...any) {
-	lastLog.errorL.write(format, v...)
+	lastLog.errorL.output(format, v...)
 }
 func Fatal(format string, v ...any) {
-	lastLog.fatalL.write(format, v...)
+	lastLog.fatalL.output(format, v...)
 }
 
 type Log struct {
@@ -60,19 +60,19 @@ func NewLog(dir string) (*Log, error) {
 	return l, nil
 }
 func (l *Log) Debug(format string, v ...any) {
-	l.debugL.write(format, v...)
+	l.debugL.output(format, v...)
 }
 func (l *Log) Info(format string, v ...any) {
-	l.infoL.write(format, v...)
+	l.infoL.output(format, v...)
 }
 func (l *Log) Warn(format string, v ...any) {
-	l.warnL.write(format, v...)
+	l.warnL.output(format, v...)
 }
 func (l *Log) Error(format string, v ...any) {
-	l.errorL.write(format, v...)
+	l.errorL.output(format, v...)
 }
 func (l *Log) Fatal(format string, v ...any) {
-	l.fatalL.write(format, v...)
+	l.fatalL.output(format, v...)
 }
 
 // implement
@@ -130,7 +130,7 @@ func (l *log) close() {
 		l.fd = -1
 	}
 }
-func (l *log) write(format string, v ...any) {
+func (l *log) output(format string, v ...any) {
 	now := time.Now()
 	year, month, day := now.Date()
 

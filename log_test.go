@@ -1,7 +1,6 @@
 package goev
 
 import (
-	"fmt"
 	"testing"
 )
 
