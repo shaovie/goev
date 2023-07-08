@@ -1,9 +1,9 @@
 package goev
 
 import (
+	"errors"
 	"sync"
 	"time"
-	"errors"
 )
 
 type timer4Heap struct {

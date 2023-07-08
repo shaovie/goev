@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-    "goev/netfd"
+	"goev/netfd"
 )
 
 type Scanner struct {

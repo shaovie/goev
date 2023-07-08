@@ -32,24 +32,25 @@ func Fatal(format string, v ...any) {
 type Log struct {
 	noCopy
 
-	debugL   log
-	infoL    log
-	errorL   log
-	fatalL   log
-	warnL    log
+	debugL log
+	infoL  log
+	errorL log
+	fatalL log
+	warnL  log
 }
 
 func init() {
-    lastLog, _ = NewLog("")
+	lastLog, _ = NewLog("")
 }
+
 // output to stdout if dir == ""
 func NewLog(dir string) (*Log, error) {
 	l := &Log{
-		debugL:   log{dir: dir, name: "debug", fd: -1},
-		infoL:    log{dir: dir, name: "info", fd: -1},
-		errorL:   log{dir: dir, name: "error", fd: -1},
-		fatalL:   log{dir: dir, name: "fatal", fd: -1},
-		warnL: log{dir: dir, name: "warn", fd: -1},
+		debugL: log{dir: dir, name: "debug", fd: -1},
+		infoL:  log{dir: dir, name: "info", fd: -1},
+		errorL: log{dir: dir, name: "error", fd: -1},
+		fatalL: log{dir: dir, name: "fatal", fd: -1},
+		warnL:  log{dir: dir, name: "warn", fd: -1},
 	}
 	if dir != "" {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -103,16 +104,16 @@ func (l *log) open(year, month, day int) (err error) {
 	} else {
 		fname := fmt.Sprintf("%s-%d-%02d-%02d.log", l.name, year, month, day)
 		logFile := path.Join(l.dir, fname)
-        for {
-            l.fd, err = syscall.Open(logFile, syscall.O_CREAT|syscall.O_WRONLY|syscall.O_APPEND, 0644)
-            if err != nil {
-                if err == syscall.EINTR {
-                    continue
-                }
-                return err
-            }
-            break
-        }
+		for {
+			l.fd, err = syscall.Open(logFile, syscall.O_CREAT|syscall.O_WRONLY|syscall.O_APPEND, 0644)
+			if err != nil {
+				if err == syscall.EINTR {
+					continue
+				}
+				return err
+			}
+			break
+		}
 	}
 	l.newFileYear, l.newFileMonth, l.newFileDay = year, month, day
 	l.buff = make([]byte, 0, 512)

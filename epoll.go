@@ -1,24 +1,25 @@
 package goev
 
 import (
-	"sync"
-	"time"
 	"errors"
 	"runtime"
-	"syscall"
+	"sync"
 	"sync/atomic"
+	"syscall"
+	"time"
 )
 
 // Use arrays for low range, and use maps for high range.
 type evHandlerMap struct {
 	arrSize int
 	arr     []atomic.Pointer[EvHandler]
-	sMap sync.Map
+	sMap    sync.Map
 }
+
 func (m *evHandlerMap) Load(i int) EvHandler {
 	if i < m.arrSize {
-        e := m.arr[i].Load()
-        return *e
+		e := m.arr[i].Load()
+		return *e
 	}
 	if v, ok := m.sMap.Load(i); ok {
 		return v.(EvHandler)
@@ -127,7 +128,7 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 		if nfds > 0 {
 			for i = 0; i < nfds; i++ {
 				ev := &events[i]
-                fd := int(ev.Fd)
+				fd := int(ev.Fd)
 				eh := ep.evHandlerMap.Load(fd)
 				if eh == nil {
 					continue // TODO add evOptions.debug? panic("evHandlerMap not found")

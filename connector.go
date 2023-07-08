@@ -27,7 +27,7 @@ func NewConnector(r *Reactor, opts ...Option) (*Connector, error) {
 	c := &Connector{
 		recvBuffSize: evOptions.recvBuffSize,
 	}
-    c.setReactor(r)
+	c.setReactor(r)
 	return c, nil
 }
 
@@ -79,14 +79,14 @@ func (c *Connector) Connect(addr string, eh EvHandler, timeout int64) error {
 	}
 	sa := syscall.SockaddrInet4{Port: int(port)}
 	copy(sa.Addr[:], ip4.To4())
-    reactor := c.GetReactor()
-    for {
-        err = syscall.Connect(fd, &sa)
-        if err == syscall.EINTR {
-            continue
-        }
-        break
-    }
+	reactor := c.GetReactor()
+	for {
+		err = syscall.Connect(fd, &sa)
+		if err == syscall.EINTR {
+			continue
+		}
+		break
+	}
 	if err == syscall.EINPROGRESS {
 		if timeout < 1 {
 			return ErrConnectInprogress
@@ -97,16 +97,16 @@ func (c *Connector) Connect(addr string, eh EvHandler, timeout int64) error {
 			return errors.New("InPorgress AddEvHandler in connector.Connect: " + err.Error())
 		}
 		reactor.SchedueTimer(inh, timeout, 0)
-        return nil
-	} esel if err == nil { // success
+		return nil
+	} else if err == nil { // success
 		eh.setReactor(reactor)
 		if eh.OnOpen(fd, time.Now().UnixMilli()) == false {
 			eh.OnClose(fd)
 		}
 		return nil
-    }
-    syscall.Close(fd)
-    return errors.New("syscall connect: " + err.Error())
+	}
+	syscall.Close(fd)
+	return errors.New("syscall connect: " + err.Error())
 }
 
 // nonblocking inprogress connection
@@ -134,13 +134,13 @@ func (p *inProgressConnect) OnWrite(fd int, now int64) bool {
 		return true
 	}
 	// From here on, the `fd` resources will be managed by h.
-    p.r.RemoveEvHandler(p, fd)
-    p.fd = -1 //
+	p.r.RemoveEvHandler(p, fd)
+	p.fd = -1 //
 	p.eh.setReactor(p.r)
 	if p.eh.OnOpen(fd, now) == false {
 		p.eh.OnClose(fd)
 	}
-	return true 
+	return true
 }
 
 // Called if a connection times out before completing.
@@ -154,8 +154,8 @@ func (p *inProgressConnect) OnTimeout(now int64) bool {
 	return false
 }
 func (p *inProgressConnect) OnClose(fd int) {
-    if p.fd != -1 {
-        syscall.Close(p.fd)
-        p.fd = -1
-    }
+	if p.fd != -1 {
+		syscall.Close(p.fd)
+		p.fd = -1
+	}
 }

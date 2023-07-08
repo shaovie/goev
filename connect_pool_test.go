@@ -1,37 +1,38 @@
 package goev
 
 import (
+	"math/rand"
 	"sync"
-    "time"
-    "syscall"
-	"testing"
 	"sync/atomic"
+	"syscall"
+	"testing"
+	"time"
 
-    "goev/netfd"
+	"goev/netfd"
 )
 
 var (
-	buffPool *sync.Pool
-    pushCounter atomic.Int32
+	buffPool    *sync.Pool
+	pushCounter atomic.Int32
 )
 
 type AsyncPushLog struct {
-	Event
+	ConnectPoolItem
 
-    fd int
+	fd int
 }
 
 func (s *AsyncPushLog) OnOpen(fd int, now int64) bool {
-    if err := s.GetReactor().AddEvHandler(s, fd, EV_IN); err != nil {
-        Error("fd %d %s", fd, err.Error())
-        return false
-    }
-    s.fd = fd
-    return true
+	if err := s.GetReactor().AddEvHandler(s, fd, EV_IN); err != nil {
+		Error("fd %d %s", fd, err.Error())
+		return false
+	}
+	s.fd = fd
+	return true
 }
 func (s *AsyncPushLog) OnRead(fd int, now int64) bool {
-    buf := buffPool.Get().([]byte) // just read
-    defer buffPool.Put(buf)
+	buf := buffPool.Get().([]byte) // just read
+	defer buffPool.Put(buf)
 
 	readN := 0
 	for {
@@ -58,16 +59,19 @@ func (s *AsyncPushLog) OnRead(fd int, now int64) bool {
 	return true
 }
 func (s *AsyncPushLog) Push(log string) {
-    netfd.Write(s.fd, []byte(log))
+	netfd.Write(s.fd, []byte(log))
 }
 func (s *AsyncPushLog) OnClose(fd int) {
-    Debug("closed")
+	Debug("closed")
 	netfd.Close(fd)
+	s.Closed()
 }
-func doPush(pusher *AsyncPushLog, cp *ConnectPool) {
-    pusher.Push("hello 6379")
-    pushCounter.Add(1)
-    cp.Release(pusher)
+func doPush(pusher *AsyncPushLog) {
+	msec := rand.Int63()%50 + 1
+	time.Sleep(time.Millisecond * time.Duration(msec))
+	pusher.Push("hello 6379")
+	pushCounter.Add(1)
+	pusher.GetPool().Release(pusher)
 }
 func TestConnectPool(t *testing.T) {
 	Debug("hello boy")
@@ -76,7 +80,7 @@ func TestConnectPool(t *testing.T) {
 			return make([]byte, 4096)
 		},
 	}
-    // 1. reactor
+	// 1. reactor
 	r, err := NewReactor(
 		EvDataArrSize(0), // default val
 		EvPollNum(5),
@@ -93,38 +97,39 @@ func TestConnectPool(t *testing.T) {
 		r.Run()
 		wg.Done()
 	}()
-    // 2. connector
+	// 2. connector
 	c, err := NewConnector(r, RecvBuffSize(8*1024))
-    if err != nil {
+	if err != nil {
 		panic(err.Error())
-    }
+	}
 
-    // 3. connect_pool
-    cp, err := NewConnectPool(c, "127.0.0.1:6379", 10, 10, 50, func() ConnHandler { return new(AsyncPushLog) })
-    if err != nil {
+	// 3. connect_pool
+	cp, err := NewConnectPool(c, "127.0.0.1:6379", 40, 10, 100, func() ConnectPoolHandler { return new(AsyncPushLog) })
+	if err != nil {
 		panic(err.Error())
-    }
+	}
 
-    time.Sleep(time.Millisecond * 500)
-    Debug("conn pool size %d after 500msec", cp.Size())
+	time.Sleep(time.Millisecond * 500)
+	Debug("conn pool idel: %d after 500msec", cp.IdleNum())
 
-    for i := 0; i < 1000; {
-        conn := cp.Acquire()
-        if conn == nil {
-            time.Sleep(time.Millisecond * 1)
-            continue
-        }
-        go doPush(conn.(*AsyncPushLog), cp)
-        i += 1
-    }
+	//gp := NewGoPool(100, 100, 100)
+	for i := 0; i < 10000; {
+		conn := cp.Acquire()
+		if conn == nil {
+			time.Sleep(time.Millisecond * 1)
+			continue
+		}
+		go doPush(conn.(*AsyncPushLog))
+		i += 1
+	}
 
-    for {
-        time.Sleep(time.Millisecond * 500)
-        c := pushCounter.Load()
-        Debug("conn pool size %d end. counter=%d", cp.Size(), c)
-        if c >= 1000 {
-            break
-        }
-    }
+	for {
+		time.Sleep(time.Millisecond * 500)
+		c := pushCounter.Load()
+		Debug("conn pool idle: %d end. live: %d, push: %d", cp.IdleNum(), cp.LiveNum(), c)
+		if c >= 1000 {
+			break
+		}
+	}
 	wg.Wait()
 }

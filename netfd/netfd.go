@@ -1,8 +1,8 @@
 package netfd
 
 import (
-	"net"
 	"errors"
+	"net"
 	"strconv"
 	"syscall"
 )

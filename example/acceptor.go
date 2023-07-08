@@ -21,15 +21,15 @@ type Http struct {
 }
 
 func (h *Http) OnOpen(fd int, now int64) bool {
-    // fd.SetNoDelay(1) // New socket has been set to non-blocking
-    if err := h.GetReactor().AddEvHandler(h, fd), goev.EV_IN); err != nil {
-        return false
-    }
+	// fd.SetNoDelay(1) // New socket has been set to non-blocking
+	if err := h.GetReactor().AddEvHandler(h, fd, goev.EV_IN); err != nil {
+		return false
+	}
 	return true
 }
 func (h *Http) OnRead(fd int, now int64) bool {
-    buf := buffPool.Get().([]byte) // just read
-    defer buffPool.Put(buf)
+	buf := buffPool.Get().([]byte) // just read
+	defer buffPool.Put(buf)
 
 	readN := 0
 	for {
@@ -54,7 +54,7 @@ func (h *Http) OnRead(fd int, now int64) bool {
 		}
 	}
 	netfd.Write(fd, []byte(httpResp)) // Connection: close
-	return false               // will goto OnClose
+	return false                      // will goto OnClose
 }
 func (h *Http) OnClose(fd int) {
 	netfd.Close(fd)
@@ -88,7 +88,7 @@ func main() {
 		panic(err.Error())
 	}
 	//= http
-	_, err = goev.NewAcceptor(forAccept, forNewFd, func() goev.EvHandler {return new(Http)},
+	_, err = goev.NewAcceptor(forAccept, forNewFd, func() goev.EvHandler { return new(Http) },
 		":2023",
 		goev.ListenBacklog(256),
 		goev.RecvBuffSize(8*1024), // 短链接, 不需要很大的缓冲区
@@ -98,7 +98,7 @@ func main() {
 	}
 
 	//= https
-	_, err = goev.NewAcceptor(forAccept, forNewFd, func() goev.EvHandler {return new(Https)},
+	_, err = goev.NewAcceptor(forAccept, forNewFd, func() goev.EvHandler { return new(Https) },
 		":2024",
 		goev.ListenBacklog(256),
 		goev.RecvBuffSize(8*1024), // 短链接, 不需要很大的缓冲区
