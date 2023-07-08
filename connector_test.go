@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+
+    "goev/netfd"
 )
 
 type Scanner struct {
@@ -13,15 +15,15 @@ type Scanner struct {
 	port int
 }
 
-func (s *Scanner) OnOpen(fd *Fd, now int64) bool {
+func (s *Scanner) OnOpen(fd int, now int64) bool {
 	fmt.Printf("port %d open\n", s.port)
 	return false
 }
 func (s *Scanner) OnConnectFail(err error) {
 	//fmt.Printf("port %d close %s\n", s.port, err.Error())
 }
-func (s *Scanner) OnClose(fd *Fd) {
-	fd.Close()
+func (s *Scanner) OnClose(fd int) {
+	netfd.Close(fd)
 }
 func TestConnector(t *testing.T) {
 	fmt.Println("hello boy")

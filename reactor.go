@@ -48,12 +48,12 @@ func (r *Reactor) AddEvHandler(eh EvHandler, fd int, events uint32) error {
 }
 
 // fd 一定是reactor内部构造的, 不能自己构造
-func (r *Reactor) RemoveEvHandler(eh EvHandler) error {
-	if eh == nil {
-		return errors.New("invalid EvHandler")
+func (r *Reactor) RemoveEvHandler(eh EvHandler, fd int) error {
+	if eh == nil || fd < 0 {
+		return errors.New("invalid EvHandler or fd")
 	}
 	if ep := eh.getEvPoll(); ep != nil {
-		return ep.remove(eh.getFd())
+		return ep.remove(fd)
 	}
 	return errors.New("ev handler not add")
 }
@@ -84,5 +84,5 @@ func (r *Reactor) Run() error {
 		}(i)
 	}
 	wg.Wait()
-	return errors.New(strings.Join(errS, ";"))
+	return errors.New(strings.Join(errS, "; "))
 }

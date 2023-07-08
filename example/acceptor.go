@@ -6,6 +6,7 @@ import (
 	"syscall"
 
 	"github.com/shaovie/goev"
+	"github.com/shaovie/goev/netfd"
 )
 
 var (
@@ -19,14 +20,14 @@ type Http struct {
 	m [4096]byte // test memory leak
 }
 
-func (h *Http) OnOpen(fd *goev.Fd, now int64) bool {
+func (h *Http) OnOpen(fd int, now int64) bool {
     // fd.SetNoDelay(1) // New socket has been set to non-blocking
-    if err := h.GetReactor().AddEvHandler(h, fd.Fd(), goev.EV_IN); err != nil {
+    if err := h.GetReactor().AddEvHandler(h, fd), goev.EV_IN); err != nil {
         return false
     }
 	return true
 }
-func (h *Http) OnRead(fd *goev.Fd, now int64) bool {
+func (h *Http) OnRead(fd int, now int64) bool {
     buf := buffPool.Get().([]byte) // just read
     defer buffPool.Put(buf)
 
@@ -35,7 +36,7 @@ func (h *Http) OnRead(fd *goev.Fd, now int64) bool {
 		if readN >= cap(buf) { // alloc new buff to read
 			break
 		}
-		n, err := fd.Read(buf[readN:])
+		n, err := netfd.Read(fd, buf[readN:])
 		if err != nil {
 			if err == syscall.EAGAIN { // epoll ET mode
 				break
@@ -52,11 +53,11 @@ func (h *Http) OnRead(fd *goev.Fd, now int64) bool {
 			return false
 		}
 	}
-	fd.Write([]byte(httpResp)) // Connection: close
+	netfd.Write(fd, []byte(httpResp)) // Connection: close
 	return false               // will goto OnClose
 }
-func (h *Http) OnClose(fd *goev.Fd) {
-	fd.Close()
+func (h *Http) OnClose(fd int) {
+	netfd.Close(fd)
 }
 
 type Https struct {

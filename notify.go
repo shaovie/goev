@@ -88,8 +88,8 @@ func (nt *notify) Close() {
 }
 
 // Prohibit external calls
-func (nt *notify) OnRead(fd *Fd, now int64) bool {
-	if fd.v != nt.efd { // 防止外部调用!
+func (nt *notify) OnRead(fd int, now int64) bool {
+	if fd != nt.efd { // 防止外部调用!
 		panic("Prohibit external calls")
 	}
 	var tmp [8]byte
@@ -119,7 +119,7 @@ func (nt *notify) OnRead(fd *Fd, now int64) bool {
 	}
 	return true //
 }
-func (nt *notify) OnClose(fd *Fd) {
-	fd.Close()
+func (nt *notify) OnClose(fd int) {
+	syscall.Close(fd)
 	nt.efd = -1
 }

@@ -25,9 +25,8 @@ func (*noCopy) Unlock() {}
 
 // The same EvHandler is repeatedly registered with the Reactor
 type EvHandler interface {
-	init(ep *evPoll, fd int)
+	setEvPoll(ep *evPoll)
 	getEvPoll() *evPoll
-	getFd() int
 
 	setReactor(r *Reactor)
 	GetReactor() *Reactor
@@ -38,7 +37,7 @@ type EvHandler interface {
 	// time to some extent).
 	//
 	// Call OnClose() when return false
-	OnOpen(fd *Fd, millisecond int64) bool
+	OnOpen(fd int, millisecond int64) bool
 
 	// EvPoll catch readable i/o event
 	// The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
@@ -46,7 +45,7 @@ type EvHandler interface {
 	// time to some extent).
 	//
 	// Call OnClose() when return false
-	OnRead(fd *Fd, millisecond int64) bool
+	OnRead(fd int, millisecond int64) bool
 
 	// EvPoll catch writeable i/o event
 	// The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
@@ -54,7 +53,7 @@ type EvHandler interface {
 	// time to some extent).
 	//
 	// Call OnClose() when return false
-	OnWrite(fd *Fd, millisecond int64) bool
+	OnWrite(fd int, millisecond int64) bool
 
 	// EvPoll catch connect result
 	// Only be asynchronously called after connector.Connect() returns nil
@@ -76,24 +75,19 @@ type EvHandler interface {
 	//
 	// You need to manually release the fd resource call fd.Close()
 	// You'd better only call fd.Close() here.
-	OnClose(fd *Fd)
+	OnClose(fd int)
 }
 
 type Event struct {
 	noCopy
-	_fd int
 	_r  *Reactor // atomic.Pointer[Reactor]
 	// 这里不需要保护, 在set之前Get是没有任何调用机会的(除非框架之外乱搞)
 	_ep *evPoll // atomic.Pointer[evPoll]
 	// 这里不需要保护, 在set之前Get是没有任何调用机会的(除非框架之外乱搞)
 }
 
-func (e *Event) init(ep *evPoll, fd int) {
+func (e *Event) setEvPoll(ep *evPoll) {
 	e._ep = ep
-	e._fd = fd
-}
-func (e *Event) getFd() int {
-	return e._fd
 }
 func (e *Event) getEvPoll() *evPoll {
 	return e._ep
@@ -104,15 +98,15 @@ func (e *Event) setReactor(r *Reactor) {
 func (e *Event) GetReactor() *Reactor {
 	return e._r
 }
-func (*Event) OnOpen(fd *Fd, millisecond int64) bool {
+func (*Event) OnOpen(fd int, millisecond int64) bool {
 	panic("Event OnOpen")
 	return false
 }
-func (*Event) OnRead(fd *Fd, millisecond int64) bool {
+func (*Event) OnRead(fd int, millisecond int64) bool {
 	panic("Event OnRead")
 	return false
 }
-func (*Event) OnWrite(fd *Fd, millisecond int64) bool {
+func (*Event) OnWrite(fd int, millisecond int64) bool {
 	panic("Event OnWrite")
 	return false
 }
@@ -123,6 +117,6 @@ func (*Event) OnTimeout(millisecond int64) bool {
 	panic("Event OnTimeout")
 	return false
 }
-func (*Event) OnClose(fd *Fd) {
+func (*Event) OnClose(fd int) {
 	panic("Event OnClose")
 }

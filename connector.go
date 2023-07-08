@@ -20,25 +20,23 @@ type Connector struct {
 	Event
 
 	recvBuffSize int // ignore equal 0
-	reactor      *Reactor
 }
 
 func NewConnector(r *Reactor, opts ...Option) (*Connector, error) {
 	setOptions(opts...)
 	c := &Connector{
-		reactor:      r,
 		recvBuffSize: evOptions.recvBuffSize,
 	}
+    c.setReactor(r)
 	return c, nil
 }
 
 // The addr format 192.168.0.1:8080
 // The domain name format, such as qq.com:8080, is not supported.
-//
 // You need to manually extract the IP address using gethostbyname.
 //
 // Timeout is relative time measurements with millisecond accuracy, for example, delay=5msec.
-func (c *Connector) Connect(addr string, h EvHandler, timeout int64) error {
+func (c *Connector) Connect(addr string, eh EvHandler, timeout int64) error {
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
 	if err != nil {
 		return errors.New("Socket in connector.open: " + err.Error())
@@ -81,29 +79,34 @@ func (c *Connector) Connect(addr string, h EvHandler, timeout int64) error {
 	}
 	sa := syscall.SockaddrInet4{Port: int(port)}
 	copy(sa.Addr[:], ip4.To4())
-	err = syscall.Connect(fd, &sa)
-	if err == nil { // success
-		newFd := Fd{v: fd}
-		h.setReactor(c.reactor)
-		if h.OnOpen(&newFd, time.Now().UnixMilli()) == false {
-			h.OnClose(&newFd)
-		}
-		return nil
-	} else if err == syscall.EINPROGRESS {
+    reactor := c.GetReactor()
+    for {
+        err = syscall.Connect(fd, &sa)
+        if err == syscall.EINTR {
+            continue
+        }
+        break
+    }
+	if err == syscall.EINPROGRESS {
 		if timeout < 1 {
 			return ErrConnectInprogress
 		}
-		inh := &inProgressConnect{r: c.reactor, h: h, fd: fd}
-		if err = c.reactor.AddEvHandler(inh, fd, EV_CONNECT); err != nil {
+		inh := &inProgressConnect{r: reactor, eh: eh, fd: fd}
+		if err = reactor.AddEvHandler(inh, fd, EV_CONNECT); err != nil {
 			syscall.Close(fd)
 			return errors.New("InPorgress AddEvHandler in connector.Connect: " + err.Error())
 		}
-		c.reactor.SchedueTimer(inh, timeout, 0)
-	} else {
-		syscall.Close(fd)
-		return errors.New("syscall connect: " + err.Error())
-	}
-	return nil
+		reactor.SchedueTimer(inh, timeout, 0)
+        return nil
+	} esel if err == nil { // success
+		eh.setReactor(reactor)
+		if eh.OnOpen(fd, time.Now().UnixMilli()) == false {
+			eh.OnClose(fd)
+		}
+		return nil
+    }
+    syscall.Close(fd)
+    return errors.New("syscall connect: " + err.Error())
 }
 
 // nonblocking inprogress connection
@@ -111,32 +114,33 @@ type inProgressConnect struct {
 	Event
 
 	fd           int
-	h            EvHandler
+	eh           EvHandler
 	r            *Reactor
 	progressDone atomic.Int32 // Only process one I/O event or timer event
 }
 
 // Called by reactor when asynchronous connections fail.
-func (p *inProgressConnect) OnRead(fd *Fd, now int64) bool {
+func (p *inProgressConnect) OnRead(fd int, now int64) bool {
 	if !p.progressDone.CompareAndSwap(0, 1) {
 		return true
 	}
-	p.h.OnConnectFail(ErrConnectFail)
+	p.eh.OnConnectFail(ErrConnectFail)
 	return false // goto p.OnClose()
 }
 
 // Called by reactor when asynchronous connections succeed.
-func (p *inProgressConnect) OnWrite(fd *Fd, now int64) bool {
+func (p *inProgressConnect) OnWrite(fd int, now int64) bool {
 	if !p.progressDone.CompareAndSwap(0, 1) {
 		return true
 	}
 	// From here on, the `fd` resources will be managed by h.
-	p.h.setReactor(p.r)
-	newFd := Fd{v: p.fd}
-	if p.h.OnOpen(&newFd, now) == false {
-		p.h.OnClose(&newFd)
+    p.r.RemoveEvHandler(p, fd)
+    p.fd = -1 //
+	p.eh.setReactor(p.r)
+	if p.eh.OnOpen(fd, now) == false {
+		p.eh.OnClose(fd)
 	}
-	return true
+	return true 
 }
 
 // Called if a connection times out before completing.
@@ -146,9 +150,12 @@ func (p *inProgressConnect) OnTimeout(now int64) bool {
 	}
 
 	// i/o event not catched
-	p.h.OnConnectFail(ErrConnectTimeout)
+	p.eh.OnConnectFail(ErrConnectTimeout)
 	return false
 }
-func (p *inProgressConnect) OnClose(fd *Fd) {
-	fd.Close()
+func (p *inProgressConnect) OnClose(fd int) {
+    if p.fd != -1 {
+        syscall.Close(p.fd)
+        p.fd = -1
+    }
 }
