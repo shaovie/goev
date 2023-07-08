@@ -46,7 +46,7 @@ type evPoll struct {
 
 	evReadyNum int // epoll_wait一次轮询获取固定数量准备好的I/O事件, 此参数有利于线程处理的敏捷性
 
-	evHandlerMap *evHandlerMap
+	evHandlerMap *evHandlerMap // Refer to https://zhuanlan.zhihu.com/p/640712548
 	timer        timer
 	evPollWackup Notifier
 }
