@@ -1,14 +1,14 @@
 package goev
 
 import (
-	"container/list"
+	"time"
+	"sync"
 	"errors"
 	"runtime"
-	"sync"
 	"sync/atomic"
-	"time"
+	"container/list"
 
-	"goev/netfd"
+	"github.com/shaovie/goev/netfd"
 )
 
 type ConnectPoolHandler interface {
