@@ -102,6 +102,9 @@ func (ep *evPoll) remove(fd int) error {
 	return nil
 }
 func (ep *evPoll) scheduleTimer(eh EvHandler, delay, interval int64) (err error) {
+    if ep.timer == nil {
+        return errors.New("not create timer")
+    }
 	err = ep.timer.schedule(eh, delay, interval)
 	ep.evPollWackup.Notify()
 	return
@@ -123,8 +126,10 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 	events := make([]syscall.EpollEvent, ep.evReadyNum) // NOT make(x, len, cap)
 	for {
 		nfds, err = syscall.EpollWait(ep.efd, events, msec)
-		now = time.Now().UnixMilli()
-		msec = int(ep.timer.handleExpired(now))
+        if ep.timer != nil {
+            now = time.Now().UnixMilli()
+            msec = int(ep.timer.handleExpired(now))
+        }
 		if nfds > 0 {
 			for i = 0; i < nfds; i++ {
 				ev := &events[i]

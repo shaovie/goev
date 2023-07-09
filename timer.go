@@ -10,19 +10,7 @@ type timer interface {
 
 type timerItem struct {
 	noCopy
-
 	expiredAt int64
 	interval  int64
-
 	eh EvHandler
-}
-
-// = timer item
-// opt: sync.Pool
-func newTimerItem(expiredAt, interval int64, eh EvHandler) *timerItem {
-	return &timerItem{
-		expiredAt: expiredAt,
-		interval:  interval,
-		eh:        eh,
-	}
 }

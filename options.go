@@ -18,6 +18,7 @@ type Options struct {
 	evDataArrSize int
 
 	// timer
+    noTimer bool
 	timerHeapInitSize int //
 }
 
@@ -34,6 +35,7 @@ func setOptions(optL ...Option) {
 			evReadyNum:        512,
 			evDataArrSize:     8192,
 			listenBacklog:     1024, // go default 128
+            noTimer:           false,
 			timerHeapInitSize: 1024,
 		}
 	}
@@ -97,5 +99,10 @@ func TimerHeapInitSize(n int) Option {
 		if n > 0 {
 			o.timerHeapInitSize = n
 		}
+	}
+}
+func NoTimer(v bool) Option {
+	return func(o *Options) {
+        o.noTimer = v
 	}
 }
