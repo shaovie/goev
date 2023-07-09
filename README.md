@@ -25,6 +25,7 @@
 ##### Acceptor
 - 可以让你更优雅的创建 Listen service, 
 - 它本质上就是实现了EvHandler的接口，处理listen socket的可读事件，然后将新接收到的fd注册到Reactor.evpoll中。
+- 独立的接口可以让多个reactor开成pipeline式的处理
 
 ##### 关于Timer
 - 目前还是简单的min heap实现, 但胜在简单稳定. 当单个evpoll的定时器到了万个的规模 就会有影响了. wheel还没搞完, 抽空再研究
@@ -48,6 +49,8 @@
   进一步优化：经过测试整个array用一把锁，性能是很差的（在真正多线程环境下参考test/mutex_arr_vs_map.go），那么我们就可用atomic保存handler，创建一个[int]*atomic.Pointer[T]的数组，这样就大大减少了碰撞机会了，经过测试,可以比sync.Map快42%
   
 - File/Socket 的读写操作尽量使用syscall以减少锁的使用, 标准库中封装都带Mutex(更合适全局空间使用)
+
+- evpoll中提供一个全局的共享内存, 供各connection处理接收消息, 对CPU Cache非常友好, 能大大提升消息接收/处理过程的性能
 
 #### 疑问
 关于https://blog.51cto.com/u_15087084/2597531 中讲到的msec, 调整msec是对下次事件轮询的预判, 主动让出CPU不就延缓了下次轮询的时机吗?
