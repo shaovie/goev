@@ -1,6 +1,6 @@
 ## goev
 
-`goev` is a lightweight, concise i/o event demultiplexer implementation in Go.
+`goev` is a high-performance, lightweight, i/o event-driven network framework in Go.
 
 > Design Patterns Reference [ACE](http://www.dre.vanderbilt.edu/~schmidt/ACE-overview.html)
 
