@@ -5,9 +5,11 @@ import (
 )
 
 const (
-	EPOLLET        = 1 << 31
-	EV_IN   uint32 = syscall.EPOLLIN | EPOLLET | syscall.EPOLLRDHUP
-	EV_OUT  uint32 = syscall.EPOLLOUT | EPOLLET | syscall.EPOLLRDHUP
+	EPOLLET          = 1 << 31
+	EV_IN     uint32 = syscall.EPOLLIN | syscall.EPOLLRDHUP
+	EV_OUT    uint32 = syscall.EPOLLOUT | syscall.EPOLLRDHUP
+	EV_IN_ET  uint32 = EV_IN | EPOLLET
+	EV_OUT_ET uint32 = EV_OUT | EPOLLET
 
 	EV_EVENTFD uint32 = syscall.EPOLLIN | syscall.EPOLLRDHUP // Not ET mode
 
@@ -45,7 +47,7 @@ type EvHandler interface {
 	// time to some extent).
 	//
 	// Call OnClose() when return false
-	OnRead(fd int, millisecond int64) bool
+	OnRead(fd int, evPollSharedBuff []byte, millisecond int64) bool
 
 	// EvPoll catch writeable i/o event
 	// The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
@@ -102,7 +104,7 @@ func (*Event) OnOpen(fd int, millisecond int64) bool {
 	panic("Event OnOpen")
 	return false
 }
-func (*Event) OnRead(fd int, millisecond int64) bool {
+func (*Event) OnRead(fd int, evPollSharedBuff []byte, millisecond int64) bool {
 	panic("Event OnRead")
 	return false
 }

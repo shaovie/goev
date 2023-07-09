@@ -13,7 +13,7 @@ type Acceptor struct {
 
 	reuseAddr        bool // SO_REUSEADDR
 	fd               int
-	recvBuffSize     int // ignore equal 0
+	sockRcvBufSize   int // ignore equal 0
 	listenBacklog    int
 	loopAcceptTimes  int
 	newEvHanlderFunc func() EvHandler
@@ -31,7 +31,7 @@ func NewAcceptor(acceptorBindReactor *Reactor, newFdBindReactor *Reactor,
 		newFdBindReactor: newFdBindReactor,
 		newEvHanlderFunc: newEvHanlderFunc,
 		listenBacklog:    evOptions.listenBacklog,
-		recvBuffSize:     evOptions.recvBuffSize,
+		sockRcvBufSize:   evOptions.sockRcvBufSize,
 		reuseAddr:        evOptions.reuseAddr,
 	}
 	a.loopAcceptTimes = a.listenBacklog / 2
@@ -60,13 +60,13 @@ func (a *Acceptor) open(addr string) error {
 	}
 	syscall.SetNonblock(fd, true)
 
-	if a.recvBuffSize > 0 {
+	if a.sockRcvBufSize > 0 {
 		// `sysctl -a | grep net.ipv4.tcp_rmem` 返回 min default max
 		// 默认 内核会在 min max 之间动态调整, default是初始值, 如果设置了SO_RCVBUF, 缓冲区大小不变成固定值,
 		// 内核也不会进行动态调整了
 		// 必须在listen/connect之前调用
 		// must < `sysctl -a | grep net.core.rmem_max`
-		err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF, a.recvBuffSize)
+		err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF, a.sockRcvBufSize)
 		if err != nil {
 			syscall.Close(fd)
 			return errors.New("Set SO_RCVBUF: " + err.Error())
@@ -111,7 +111,7 @@ func (a *Acceptor) open(addr string) error {
 	a.fd = fd
 	return nil
 }
-func (a *Acceptor) OnRead(fd int, now int64) bool {
+func (a *Acceptor) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
 	for i := 0; i < a.loopAcceptTimes; i++ {
 		conn, _, err := syscall.Accept4(a.fd, syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC)
 		if err != nil {

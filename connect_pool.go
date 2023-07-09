@@ -1,12 +1,12 @@
 package goev
 
 import (
-	"time"
-	"sync"
+	"container/list"
 	"errors"
 	"runtime"
+	"sync"
 	"sync/atomic"
-	"container/list"
+	"time"
 
 	"github.com/shaovie/goev/netfd"
 )

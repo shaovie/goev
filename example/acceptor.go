@@ -27,7 +27,7 @@ func (h *Http) OnOpen(fd int, now int64) bool {
 	}
 	return true
 }
-func (h *Http) OnRead(fd int, now int64) bool {
+func (h *Http) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
 	buf := buffPool.Get().([]byte) // just read
 	defer buffPool.Put(buf)
 
@@ -91,7 +91,7 @@ func main() {
 	_, err = goev.NewAcceptor(forAccept, forNewFd, func() goev.EvHandler { return new(Http) },
 		":2023",
 		goev.ListenBacklog(256),
-		goev.RecvBuffSize(8*1024), // 短链接, 不需要很大的缓冲区
+		goev.SockRcvBufSize(8*1024), // 短链接, 不需要很大的缓冲区
 	)
 	if err != nil {
 		panic(err.Error())
@@ -101,7 +101,7 @@ func main() {
 	_, err = goev.NewAcceptor(forAccept, forNewFd, func() goev.EvHandler { return new(Https) },
 		":2024",
 		goev.ListenBacklog(256),
-		goev.RecvBuffSize(8*1024), // 短链接, 不需要很大的缓冲区
+		goev.SockRcvBufSize(8*1024), // 短链接, 不需要很大的缓冲区
 	)
 	if err != nil {
 		panic(err.Error())

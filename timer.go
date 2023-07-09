@@ -12,5 +12,5 @@ type timerItem struct {
 	noCopy
 	expiredAt int64
 	interval  int64
-	eh EvHandler
+	eh        EvHandler
 }

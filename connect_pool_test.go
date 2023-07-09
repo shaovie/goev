@@ -30,7 +30,7 @@ func (s *AsyncPushLog) OnOpen(fd int, now int64) bool {
 	s.fd = fd
 	return true
 }
-func (s *AsyncPushLog) OnRead(fd int, now int64) bool {
+func (s *AsyncPushLog) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
 	buf := buffPool.Get().([]byte) // just read
 	defer buffPool.Put(buf)
 

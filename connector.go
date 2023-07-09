@@ -19,13 +19,13 @@ var (
 type Connector struct {
 	Event
 
-	recvBuffSize int // ignore equal 0
+	sockRcvBufSize int // ignore equal 0
 }
 
 func NewConnector(r *Reactor, opts ...Option) (*Connector, error) {
 	setOptions(opts...)
 	c := &Connector{
-		recvBuffSize: evOptions.recvBuffSize,
+		sockRcvBufSize: evOptions.sockRcvBufSize,
 	}
 	c.setReactor(r)
 	return c, nil
@@ -44,13 +44,13 @@ func (c *Connector) Connect(addr string, eh EvHandler, timeout int64) error {
 
 	syscall.SetNonblock(fd, true)
 
-	if c.recvBuffSize > 0 {
+	if c.sockRcvBufSize > 0 {
 		// `sysctl -a | grep net.ipv4.tcp_rmem` 返回 min default max
 		// 默认 内核会在 min max 之间动态调整, default是初始值, 如果设置了SO_RCVBUF, 缓冲区大小不变成固定值,
 		// 内核也不会进行动态调整了
 		// 必须在listen/connect之前调用
 		// must < `sysctl -a | grep net.core.rmem_max`
-		err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF, c.recvBuffSize)
+		err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_RCVBUF, c.sockRcvBufSize)
 		if err != nil {
 			syscall.Close(fd)
 			return errors.New("Set SO_RCVBUF: " + err.Error())
@@ -120,7 +120,7 @@ type inProgressConnect struct {
 }
 
 // Called by reactor when asynchronous connections fail.
-func (p *inProgressConnect) OnRead(fd int, now int64) bool {
+func (p *inProgressConnect) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
 	if !p.progressDone.CompareAndSwap(0, 1) {
 		return true
 	}

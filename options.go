@@ -10,15 +10,17 @@ type Options struct {
 	// connector options
 
 	// acceptor and connector options
-	recvBuffSize int // ignore equal 0
+	sockRcvBufSize int // ignore equal 0
 
 	// reactor options
-	evPollNum     int //
-	evReadyNum    int //
-	evDataArrSize int
+	evPollNum            int //
+	evReadyNum           int //
+	evDataArrSize        int
+	evPollLockOSThread   bool
+	evPollSharedBuffSize int
 
 	// timer
-    noTimer bool
+	noTimer           bool
 	timerHeapInitSize int //
 }
 
@@ -30,13 +32,15 @@ func setOptions(optL ...Option) {
 	if evOptions == nil {
 		//= defaut options
 		evOptions = &Options{
-			reuseAddr:         true,
-			evPollNum:         1,
-			evReadyNum:        512,
-			evDataArrSize:     8192,
-			listenBacklog:     1024, // go default 128
-            noTimer:           false,
-			timerHeapInitSize: 1024,
+			reuseAddr:            true,
+			evPollNum:            1,
+			evReadyNum:           512,
+			evDataArrSize:        8192,
+			listenBacklog:        512, // go default 128
+			noTimer:              false,
+			timerHeapInitSize:    1024,
+			evPollLockOSThread:   false,
+			evPollSharedBuffSize: 64 * 1024,
 		}
 	}
 
@@ -60,9 +64,9 @@ func ListenBacklog(v int) Option {
 }
 
 // For SO_RCVBUF, for new sockfd in acceptor/connector
-func RecvBuffSize(n int) Option {
+func SockRcvBufSize(n int) Option {
 	return func(o *Options) {
-		o.recvBuffSize = n
+		o.sockRcvBufSize = n
 	}
 }
 
@@ -75,7 +79,15 @@ func EvDataArrSize(n int) Option {
 	}
 }
 
-// evpoll数量, 每个evpoll是个独立线程在运行, 建议跟cpu个数绑定(注意留出其他goroutine的cpu)
+// 是否绑定固定线程 请参考go doc runtime.LockOSThread (经过实测, 会降低约2%的性能)
+func EvPollLockOSThread(v bool) Option {
+	return func(o *Options) {
+		o.evPollLockOSThread = v
+	}
+}
+
+// evpoll数量, 每个evpoll就像是在独立的线程中运行, 建议用CPUx2-1(注意留出其他goroutine的cpu)
+// 网络程序I/O密集, cpu切换会比较频繁, 所以1个cpu绑定2个evpoll最好
 func EvPollNum(n int) Option {
 	return func(o *Options) {
 		if n > 0 {
@@ -93,6 +105,16 @@ func EvReadyNum(n int) Option {
 	}
 }
 
+// 单个evpoll内的全局共享内存, 对cpu cache 友好, 读取socket缓存区的数据时非常高效
+// 另: 如果是Epoll-ET模式, 就需要有足够大的内存来一次性读完缓冲区的数据
+func EvPollSharedBuffSize(n int) Option {
+	return func(o *Options) {
+		if n > 0 {
+			o.evPollSharedBuffSize = n
+		}
+	}
+}
+
 // timer
 func TimerHeapInitSize(n int) Option {
 	return func(o *Options) {
@@ -101,8 +123,10 @@ func TimerHeapInitSize(n int) Option {
 		}
 	}
 }
+
+// 不使用Timer后, OnOpen/OnRead/OnWrite中的时间值就会是0
 func NoTimer(v bool) Option {
 	return func(o *Options) {
-        o.noTimer = v
+		o.noTimer = v
 	}
 }

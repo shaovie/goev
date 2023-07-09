@@ -4,6 +4,7 @@ package goev
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -12,9 +13,10 @@ import (
 type Reactor struct {
 	noCopy
 
-	evPollNum int
-	evPolls   []evPoll
-	timerIdx  atomic.Int64
+	evPollLockOSThread bool
+	evPollNum          int
+	evPolls            []evPoll
+	timerIdx           atomic.Int64
 }
 
 func NewReactor(opts ...Option) (*Reactor, error) {
@@ -23,15 +25,17 @@ func NewReactor(opts ...Option) (*Reactor, error) {
 		panic("options: EvPollThreadNum MUST > 0")
 	}
 	r := &Reactor{
-		evPollNum: evOptions.evPollNum,
-		evPolls:   make([]evPoll, evOptions.evPollNum),
+		evPollLockOSThread: evOptions.evPollLockOSThread,
+		evPollNum:          evOptions.evPollNum,
+		evPolls:            make([]evPoll, evOptions.evPollNum),
 	}
-    var timer timer
-    if evOptions.noTimer == false {
-        timer = newTimer4Heap(evOptions.timerHeapInitSize)
-    }
+	var timer timer
+	if evOptions.noTimer == false {
+		timer = newTimer4Heap(evOptions.timerHeapInitSize)
+	}
 	for i := 0; i < r.evPollNum; i++ {
-		if err := r.evPolls[i].open(evOptions.evReadyNum, evOptions.evDataArrSize, timer); err != nil {
+		if err := r.evPolls[i].open(evOptions.evReadyNum, evOptions.evPollSharedBuffSize,
+			evOptions.evDataArrSize, timer); err != nil {
 			return nil, err
 		}
 	}
@@ -80,6 +84,12 @@ func (r *Reactor) Run() error {
 	for i := 0; i < r.evPollNum; i++ {
 		wg.Add(1)
 		go func(j int) {
+			if r.evPollLockOSThread == true {
+				// Refer to go doc runtime.LockOSThread
+				// LockOSThread will bind the current goroutine to the current OS thread T,
+				// preventing other goroutines from being scheduled onto this thread T
+				runtime.LockOSThread()
+			}
 			err := r.evPolls[j].run(&wg)
 			errSMtx.Lock()
 			errS = append(errS, fmt.Sprintf("epoll#%d err: %s", j, err.Error()))

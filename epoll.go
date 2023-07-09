@@ -2,57 +2,30 @@ package goev
 
 import (
 	"errors"
-	"runtime"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
+	"unsafe"
 )
 
-// Use arrays for low range, and use maps for high range.
-type evHandlerMap struct {
-	arrSize int
-	arr     []atomic.Pointer[EvHandler]
-	sMap    sync.Map
-}
-
-func (m *evHandlerMap) Load(i int) EvHandler {
-	if i < m.arrSize {
-		e := m.arr[i].Load()
-		return *e
-	}
-	if v, ok := m.sMap.Load(i); ok {
-		return v.(EvHandler)
-	}
-	return nil
-}
-func (m *evHandlerMap) Store(i int, v EvHandler) {
-	if i < m.arrSize {
-		m.arr[i].Store(&v)
-		return
-	}
-	m.sMap.Store(i, v)
-}
-func (m *evHandlerMap) Delete(i int) {
-	if i < m.arrSize {
-		m.arr[i].Store(nil)
-		return
-	}
-	m.sMap.Delete(i)
+type evData struct {
+	fd int
+	eh EvHandler
 }
 
 // evPoll
 type evPoll struct {
 	efd int // epoll fd
 
-	evReadyNum int // epoll_wait一次轮询获取固定数量准备好的I/O事件, 此参数有利于线程处理的敏捷性
+	evReadyNum       int // epoll_wait一次轮询获取固定数量准备好的I/O事件, 此参数有利于线程处理的敏捷性
+	evPollSharedBuff []byte
 
-	evHandlerMap *evHandlerMap // Refer to https://zhuanlan.zhihu.com/p/640712548
+	evHandlerMap *ArrayMapUnion[evData] // Refer to https://zhuanlan.zhihu.com/p/640712548
 	timer        timer
-	evPollWackup Notifier
+	evPollWakeup Notifier
 }
 
-func (ep *evPoll) open(evReadyNum, evDataArrSize int, timer timer) error {
+func (ep *evPoll) open(evReadyNum, evPollSharedBuffSize, evDataArrSize int, timer timer) error {
 	if evReadyNum < 1 {
 		return errors.New("EvReadyNum < 1")
 	}
@@ -60,16 +33,14 @@ func (ep *evPoll) open(evReadyNum, evDataArrSize int, timer timer) error {
 	if err != nil {
 		return errors.New("syscall epoll_create1: " + err.Error())
 	}
-	ep.evReadyNum = evReadyNum
 	ep.efd = efd
-	ep.evHandlerMap = &evHandlerMap{
-		arrSize: evDataArrSize,
-		arr:     make([]atomic.Pointer[EvHandler], evDataArrSize),
-	}
 	ep.timer = timer
+	ep.evReadyNum = evReadyNum
+	ep.evPollSharedBuff = make([]byte, evPollSharedBuffSize)
+	ep.evHandlerMap = NewArrayMapUnion[evData](evDataArrSize)
 
 	// Must be placed last
-	ep.evPollWackup, err = newNotify(ep)
+	ep.evPollWakeup, err = newNotify(ep)
 	if err != nil {
 		return err
 	}
@@ -81,11 +52,10 @@ func (ep *evPoll) open(evReadyNum, evDataArrSize int, timer timer) error {
 func (ep *evPoll) add(fd int, events uint32, eh EvHandler) error {
 	eh.setEvPoll(ep)
 
-	ev := syscall.EpollEvent{
-		Events: events,
-		Fd:     int32(fd),
-	}
-	ep.evHandlerMap.Store(fd, eh)
+	ev := syscall.EpollEvent{Events: events}
+	ed := &evData{fd: fd, eh: eh}
+	ep.evHandlerMap.Store(fd, ed) // 让evHandlerMap 来控制eh的生命周期, 不然会被gc回收的
+	*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
 
 	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd, &ev); err != nil {
 		return errors.New("epoll_ctl add: " + err.Error())
@@ -102,11 +72,11 @@ func (ep *evPoll) remove(fd int) error {
 	return nil
 }
 func (ep *evPoll) scheduleTimer(eh EvHandler, delay, interval int64) (err error) {
-    if ep.timer == nil {
-        return errors.New("not create timer")
-    }
+	if ep.timer == nil {
+		return errors.New("not create timer")
+	}
 	err = ep.timer.schedule(eh, delay, interval)
-	ep.evPollWackup.Notify()
+	ep.evPollWakeup.Notify()
 	return
 }
 func (ep *evPoll) run(wg *sync.WaitGroup) error {
@@ -114,47 +84,38 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 		defer wg.Done()
 	}
 
-	// Refer to go doc runtime.LockOSThread
-	// LockOSThread will bind the current goroutine to the current OS thread T,
-	// preventing other goroutines from being scheduled onto this thread T
-	runtime.LockOSThread()
-
 	var nfds, i, msec int
 	var err error
 	var now int64
 	msec = -1
-	events := make([]syscall.EpollEvent, ep.evReadyNum) // NOT make(x, len, cap)
+	events := make([]syscall.EpollEvent, ep.evReadyNum)
 	for {
 		nfds, err = syscall.EpollWait(ep.efd, events, msec)
-        if ep.timer != nil {
-            now = time.Now().UnixMilli()
-            msec = int(ep.timer.handleExpired(now))
-        }
+		if ep.timer != nil {
+			now = time.Now().UnixMilli()
+			msec = int(ep.timer.handleExpired(now))
+		}
 		if nfds > 0 {
 			for i = 0; i < nfds; i++ {
 				ev := &events[i]
-				fd := int(ev.Fd)
-				eh := ep.evHandlerMap.Load(fd)
-				if eh == nil {
-					continue // TODO add evOptions.debug? panic("evHandlerMap not found")
-				}
+				ed := *(**evData)(unsafe.Pointer(&ev.Fd))
 				// EPOLLHUP refer to man 2 epoll_ctl
 				if ev.Events&(syscall.EPOLLHUP|syscall.EPOLLERR) != 0 {
-					ep.remove(fd) // MUST before OnClose()
-					eh.OnClose(fd)
+					ep.remove(ed.fd) // MUST before OnClose()
+					ed.eh.OnClose(ed.fd)
 					continue
 				}
 				if ev.Events&(syscall.EPOLLOUT) != 0 { // MUST before EPOLLIN (e.g. connect)
-					if eh.OnWrite(fd, now) == false {
-						ep.remove(fd) // MUST before OnClose()
-						eh.OnClose(fd)
+					if ed.eh.OnWrite(ed.fd, now) == false {
+						ep.remove(ed.fd) // MUST before OnClose()
+						ed.eh.OnClose(ed.fd)
 						continue
 					}
 				}
 				if ev.Events&(syscall.EPOLLIN) != 0 {
-					if eh.OnRead(fd, now) == false {
-						ep.remove(fd) // MUST before OnClose()
-						eh.OnClose(fd)
+					if ed.eh.OnRead(ed.fd, ep.evPollSharedBuff, now) == false {
+						ep.remove(ed.fd) // MUST before OnClose()
+						ed.eh.OnClose(ed.fd)
 						continue
 					}
 				}

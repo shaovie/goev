@@ -88,7 +88,7 @@ func (nt *notify) Close() {
 }
 
 // Prohibit external calls
-func (nt *notify) OnRead(fd int, now int64) bool {
+func (nt *notify) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
 	if fd != nt.efd { // 防止外部调用!
 		panic("Prohibit external calls")
 	}
