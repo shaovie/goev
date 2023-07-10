@@ -3,9 +3,10 @@ package goev
 // Refer to github.com/patrickmn/go-cache
 
 import (
-	"runtime"
 	"sync"
 	"time"
+	"runtime"
+	"sync/atomic"
 )
 
 type cacheItem struct {
@@ -37,7 +38,9 @@ type Cache struct {
 }
 
 type cache struct {
+    timeCached         atomic.Int64
 	defaultExpiration time.Duration
+	timeAccuracy      time.Duration
 	items             map[string]cacheItem
 	mu                sync.RWMutex
 	onEvicted         func(string, any)
@@ -49,9 +52,9 @@ type cache struct {
 // the items in the cache never expire (by default), and must be deleted
 // manually. If the cleanup interval is less than one, expired items are not
 // deleted from the cache before calling c.DeleteExpired().
-func New(defaultExpiration, cleanupInterval time.Duration) *Cache {
+func New(defaultExpiration, cleanupInterval, timeAccuracy time.Duration) *Cache {
 	items := make(map[string]cacheItem)
-	return newCacheWithJanitor(defaultExpiration, cleanupInterval, items)
+	return newCacheWithJanitor(defaultExpiration, cleanupInterval, timeAccuracy, items)
 }
 
 // Add an item to the cache, replacing any existing item. If the duration is 0
@@ -64,7 +67,8 @@ func (c *cache) Set(k string, x any, d time.Duration) {
 		d = c.defaultExpiration
 	}
 	if d > 0 {
-		e = time.Now().Add(d).UnixNano()
+		//e = time.Now().Add(d).UnixNano()
+		e = time.Unix(0, c.timeCached.Load()).Add(d).UnixNano()
 	}
 	c.mu.Lock()
 	c.items[k] = cacheItem{
@@ -82,7 +86,8 @@ func (c *cache) set(k string, x any, d time.Duration) {
 		d = c.defaultExpiration
 	}
 	if d > 0 {
-		e = time.Now().Add(d).UnixNano()
+		//e = time.Now().Add(d).UnixNano()
+		e = time.Unix(0, c.timeCached.Load()).Add(d).UnixNano()
 	}
 	c.items[k] = cacheItem{
 		Object:     x,
@@ -148,11 +153,9 @@ func (c *cache) Get(k string) (any, bool) {
 		c.mu.RUnlock()
 		return nil, false
 	}
-	if item.Expiration > 0 {
-		if time.Now().UnixNano() > item.Expiration {
-			c.mu.RUnlock()
-			return nil, false
-		}
+	if item.Expiration > 0 && c.timeCached.Load() > item.Expiration {
+        c.mu.RUnlock()
+        return nil, false
 	}
 	c.mu.RUnlock()
 	return item.Object, true
@@ -172,7 +175,7 @@ func (c *cache) GetWithExpiration(k string) (any, time.Time, bool) {
 	}
 
 	if item.Expiration > 0 {
-		if time.Now().UnixNano() > item.Expiration {
+		if c.timeCached.Load() > item.Expiration {
 			c.mu.RUnlock()
 			return nil, time.Time{}, false
 		}
@@ -193,11 +196,8 @@ func (c *cache) get(k string) (any, bool) {
 	if !found {
 		return nil, false
 	}
-	// "Inlining" of Expired
-	if item.Expiration > 0 {
-		if time.Now().UnixNano() > item.Expiration {
-			return nil, false
-		}
+	if item.Expiration > 0 && c.timeCached.Load() > item.Expiration {
+        return nil, false
 	}
 	return item.Object, true
 }
@@ -213,7 +213,7 @@ func (c *cache) Pop(k string) (any, bool) {
 		c.mu.Unlock()
 		return nil, false
 	}
-	if item.Expiration > 0 && time.Now().UnixNano() > item.Expiration {
+	if item.Expiration > 0 && c.timeCached.Load() > item.Expiration {
 		c.mu.Unlock()
 		return nil, false
 	}
@@ -236,11 +236,9 @@ func (c *cache) Exist(k string) bool {
 		c.mu.RUnlock()
 		return false
 	}
-	if item.Expiration > 0 {
-		if time.Now().UnixNano() > item.Expiration {
-			c.mu.RUnlock()
-			return false
-		}
+	if item.Expiration > 0 && c.timeCached.Load() > item.Expiration {
+        c.mu.RUnlock()
+        return false
 	}
 	c.mu.RUnlock()
 	return true
@@ -251,7 +249,7 @@ func (c *cache) Exist(k string) bool {
 func (c *cache) IncrementInt(k string, n int, d time.Duration) (int, bool) {
 	c.mu.Lock()
 	v, found := c.items[k]
-	if !found || v.Expired() {
+	if !found || (v.Expiration > 0 && c.timeCached.Load() > v.Expiration) {
 		c.set(k, n, d)
 		c.mu.Unlock()
 		return n, true
@@ -273,7 +271,7 @@ func (c *cache) IncrementInt(k string, n int, d time.Duration) (int, bool) {
 func (c *cache) IncrementInt64(k string, n int64, d time.Duration) (int64, bool) {
 	c.mu.Lock()
 	v, found := c.items[k]
-	if !found || v.Expired() {
+	if !found || (v.Expiration > 0 && c.timeCached.Load() > v.Expiration) {
 		c.set(k, n, d)
 		c.mu.Unlock()
 		return n, true
@@ -295,7 +293,7 @@ func (c *cache) IncrementInt64(k string, n int64, d time.Duration) (int64, bool)
 func (c *cache) IncrementFloat64(k string, n float64, d time.Duration) (float64, bool) {
 	c.mu.Lock()
 	v, found := c.items[k]
-	if !found || v.Expired() {
+	if !found || (v.Expiration > 0 && c.timeCached.Load() > v.Expiration) {
 		c.set(k, n, d)
 		c.mu.Unlock()
 		return n, true
@@ -317,7 +315,7 @@ func (c *cache) IncrementFloat64(k string, n float64, d time.Duration) (float64,
 func (c *cache) DecrementInt(k string, n int, d time.Duration) (int, bool) {
 	c.mu.Lock()
 	v, found := c.items[k]
-	if !found || v.Expired() {
+	if !found || (v.Expiration > 0 && c.timeCached.Load() > v.Expiration) {
 		c.set(k, n, d)
 		c.mu.Unlock()
 		return n, true
@@ -339,7 +337,7 @@ func (c *cache) DecrementInt(k string, n int, d time.Duration) (int, bool) {
 func (c *cache) DecrementInt64(k string, n int64, d time.Duration) (int64, bool) {
 	c.mu.Lock()
 	v, found := c.items[k]
-	if !found || v.Expired() {
+	if !found || (v.Expiration > 0 && c.timeCached.Load() > v.Expiration) {
 		c.set(k, n, d)
 		c.mu.Unlock()
 		return n, true
@@ -361,7 +359,7 @@ func (c *cache) DecrementInt64(k string, n int64, d time.Duration) (int64, bool)
 func (c *cache) DecrementFloat64(k string, n float64, d time.Duration) (float64, bool) {
 	c.mu.Lock()
 	v, found := c.items[k]
-	if !found || v.Expired() {
+	if !found || (v.Expiration > 0 && c.timeCached.Load() > v.Expiration) {
 		c.set(k, n, d)
 		c.mu.Unlock()
 		return n, true
@@ -407,7 +405,7 @@ type keyAndValue struct {
 // Delete all expired items from the cache.
 func (c *cache) deleteExpired() {
 	var evictedItems []keyAndValue
-	now := time.Now().UnixNano()
+	now := c.timeCached.Load()
 	c.mu.Lock()
 	for k, v := range c.items {
 		// "Inlining" of expired
@@ -438,7 +436,7 @@ func (c *cache) Items() map[string]cacheItem {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	m := make(map[string]cacheItem, len(c.items))
-	now := time.Now().UnixNano()
+	now := c.timeCached.Load()
 	for k, v := range c.items {
 		// "Inlining" of Expired
 		if v.Expiration > 0 {
@@ -466,6 +464,17 @@ func (c *cache) Flush() {
 	c.items = map[string]cacheItem{}
 	c.mu.Unlock()
 }
+
+func (c *cache) syncTimeCache() {
+	ticker := time.NewTicker(c.timeAccuracy)
+	for {
+		select {
+        case now := <-ticker.C:
+			c.timeCached.Store(now.UnixNano())
+		}
+	}
+}
+
 
 type janitor struct {
 	Interval time.Duration
@@ -498,19 +507,22 @@ func runJanitor(c *cache, ci time.Duration) {
 	go j.Run(c)
 }
 
-func newCache(de time.Duration, m map[string]cacheItem) *cache {
+func newCache(de, timeAccuracy time.Duration, m map[string]cacheItem) *cache {
 	if de == 0 {
 		de = -1
 	}
 	c := &cache{
 		defaultExpiration: de,
 		items:             m,
+        timeAccuracy:      timeAccuracy,
 	}
+    c.timeCached.Store(time.Now().UnixNano())
+    go c.syncTimeCache()
 	return c
 }
 
-func newCacheWithJanitor(de time.Duration, ci time.Duration, m map[string]cacheItem) *Cache {
-	c := newCache(de, m)
+func newCacheWithJanitor(de time.Duration, ci, timeAccuracy time.Duration, m map[string]cacheItem) *Cache {
+	c := newCache(de, timeAccuracy, m)
 	// This trick ensures that the janitor goroutine (which--granted it
 	// was enabled--is running DeleteExpired on c forever) does not keep
 	// the returned C object from being garbage collected. When it is
