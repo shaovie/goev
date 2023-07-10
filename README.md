@@ -4,6 +4,10 @@
 
 > Design Patterns Reference [ACE](http://www.dre.vanderbilt.edu/~schmidt/ACE-overview.html)
 
+## 日志
+- 2023-07-09 已经提交给TechEmpower, 测评代码[https://github.com/shaovie/FrameworkBenchmarks/tree/master/frameworks/Go/goev]
+  顺便跑了一下gnet的测试程序, 同样的测试条件下, QPS goev胜过gnet 2.5%左右(2c4g的云主机环境, 仅做参考)
+
 ## Features
 
 - 模型抽象简单，reactor/acceptor/connector/notify等
@@ -58,7 +62,3 @@
 
 #### Bugs
 - 整理成文章了 [使用syscall.Epoll_* 关联内存被GC释放导致的崩溃](https://zhuanlan.zhihu.com/p/640712548)
- 
-### 笔记      
-- linux kernel version >= 2.6.28
-    for `man 2 accept4`
