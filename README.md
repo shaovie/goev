@@ -13,6 +13,9 @@
 - 模型抽象简单，reactor/acceptor/connector/notify等
 - 性能超级NB，没有任何多余的性能损耗
 
+## TODO
+- 单个evpoll还可以共享更多(就像一个独立的栈空间), 它就像goroutine一样, 是栈内线程安全的, 可以为应用层提供高效的内存/资源管理
+
 
 #### 关于EventPoll
 ##### 线程模型
