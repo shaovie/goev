@@ -91,7 +91,7 @@ func arrTest() {
 	wg.Add(1)
 	begin := time.Now()
 	go arrMutexW(&wg)
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 5; i++ {
 		wg.Add(1)
 		go arrMutexR(&wg)
 	}
@@ -104,7 +104,7 @@ func mapTest() {
 	wg.Add(1)
 	begin := time.Now()
 	go mapW(&wg)
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 5; i++ {
 		wg.Add(1)
 		go mapR(&wg)
 	}
@@ -119,6 +119,7 @@ func main() {
 	at1[2].Store(&EpollEvent{fd: 2})
 	at11 := at1[1].Load()
 	fmt.Println(at11.fd)
+
 	mapTest()
 	arrTest()
 }
