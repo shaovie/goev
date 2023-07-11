@@ -1,8 +1,8 @@
 package netfd
 
 import (
-	"errors"
 	"net"
+	"errors"
 	"strconv"
 	"syscall"
 )
@@ -80,6 +80,10 @@ func SetSendBuffSize(fd, bytes int) error {
 		return errors.New("Set SO_SNDBUF: " + err.Error())
 	}
 	return nil
+}
+
+func SetNonblock(fd int, v bool) error {
+	return syscall.SetNonblock(fd, v)
 }
 
 // 0:delay, 1:nodelay

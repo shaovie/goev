@@ -2,11 +2,11 @@ package goev
 
 import (
 	"fmt"
-	"strconv"
 	"sync"
 	"testing"
+	"strconv"
 
-	"goev/netfd"
+	"github.com/shaovie/goev/netfd"
 )
 
 type Scanner struct {
@@ -43,7 +43,7 @@ func TestConnector(t *testing.T) {
 		r.Run()
 		wg.Done()
 	}()
-	c, err := NewConnector(r, RecvBuffSize(8*1024))
+	c, err := NewConnector(r, SockRcvBufSize(8*1024))
 	for i := 80; i < 65535; i++ {
 		c.Connect("108.138.105.100:"+strconv.FormatInt(int64(i), 10), &Scanner{port: i}, 3000)
 	}

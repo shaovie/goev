@@ -29,10 +29,11 @@
 
 - 如果你的业务处理比较慢, 那你应该把Reactor当做一个事件派发器, 在OnRead中异步处理业务, 这样保证epoll能高效运行
 
-##### Acceptor
-- 可以让你更优雅的创建 Listen service, 
+##### Acceptor/Connector
+- 可以让你更优雅的创建 Listen service,(可以监听多个端口+IP, 灵活无限制) 
 - 它本质上就是实现了EvHandler的接口，处理listen socket的可读事件，然后将新接收到的fd注册到Reactor.evpoll中。
-- 独立的接口可以让多个reactor开成pipeline式的处理
+- 独立的封装可以让多个reactor开成pipeline式的处理
+- Acceptor, Connector与Reactor可以轻松组合, 任意绑定
 
 ##### 关于Timer
 - 目前还是简单的min heap实现, 但胜在简单稳定. 当单个evpoll的定时器到了万个的规模 就会有影响了. wheel还没搞完, 抽空再研究

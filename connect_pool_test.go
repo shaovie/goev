@@ -1,14 +1,14 @@
 package goev
 
 import (
-	"math/rand"
 	"sync"
-	"sync/atomic"
+	"time"
 	"syscall"
 	"testing"
-	"time"
+	"math/rand"
+	"sync/atomic"
 
-	"goev/netfd"
+	"github.com/shaovie/goev/netfd"
 )
 
 var (
@@ -98,7 +98,7 @@ func TestConnectPool(t *testing.T) {
 		wg.Done()
 	}()
 	// 2. connector
-	c, err := NewConnector(r, RecvBuffSize(8*1024))
+	c, err := NewConnector(r, SockRcvBufSize(8*1024))
 	if err != nil {
 		panic(err.Error())
 	}

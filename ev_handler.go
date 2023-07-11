@@ -82,8 +82,10 @@ type EvHandler interface {
 
 type Event struct {
 	noCopy
+
 	_r *Reactor // atomic.Pointer[Reactor]
 	// 这里不需要保护, 在set之前Get是没有任何调用机会的(除非框架之外乱搞)
+
 	_ep *evPoll // atomic.Pointer[evPoll]
 	// 这里不需要保护, 在set之前Get是没有任何调用机会的(除非框架之外乱搞)
 }
@@ -100,6 +102,7 @@ func (e *Event) setReactor(r *Reactor) {
 func (e *Event) GetReactor() *Reactor {
 	return e._r
 }
+
 func (*Event) OnOpen(fd int, millisecond int64) bool {
 	panic("Event OnOpen")
 	return false

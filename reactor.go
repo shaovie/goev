@@ -1,4 +1,4 @@
-// Autor cuisw. 2023
+// Autor cuisw. 2023.06
 package goev
 
 import (
@@ -42,19 +42,19 @@ func NewReactor(opts ...Option) (*Reactor, error) {
 	return r, nil
 }
 
-// The same EvHandler is repeatedly registered with the Reactor
+// Translate: "The same EvHandler is not allowed to be registered more than once in the Reactor."
 func (r *Reactor) AddEvHandler(eh EvHandler, fd int, events uint32) error {
 	if fd < 0 || eh == nil {
 		return errors.New("AddEvHandler: invalid params")
 	}
 	i := 0
 	if r.evPollNum > 1 {
+        // fd is a self-incrementing and cyclic integer, can be allocated through round-robin distribution.
 		i = fd % r.evPollNum
 	}
 	return r.evPolls[i].add(fd, events, eh)
 }
 
-// fd 一定是reactor内部构造的, 不能自己构造
 func (r *Reactor) RemoveEvHandler(eh EvHandler, fd int) error {
 	if eh == nil || fd < 0 {
 		return errors.New("invalid EvHandler or fd")

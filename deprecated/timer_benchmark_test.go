@@ -6,6 +6,17 @@ import (
 	"time"
 )
 
+`
+BenchmarkTimer_Heap/N-1k-2         	1000000000	         0.0005251 ns/op
+BenchmarkTimer_Heap/N-5k-2         	1000000000	         0.002146 ns/op
+BenchmarkTimer_Heap/N-10k-2        	1000000000	         0.004548 ns/op
+BenchmarkTimer_Heap/N-50k-2        	1000000000	         0.03309 ns/op
+BenchmarkTimer_FHeap/N-1k-2        	1000000000	         0.0002952 ns/op
+BenchmarkTimer_FHeap/N-5k-2        	1000000000	         0.001791 ns/op
+BenchmarkTimer_FHeap/N-10k-2       	1000000000	         0.003504 ns/op
+BenchmarkTimer_FHeap/N-50k-2       	1000000000	         0.02721 ns/op
+`
+
 type nullTimer struct {
 	Event
 }
