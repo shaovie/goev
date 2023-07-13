@@ -14,14 +14,6 @@ type cacheItem struct {
 	Expiration int64
 }
 
-// Returns true if the item has expired.
-func (item cacheItem) Expired() bool {
-	if item.Expiration == 0 {
-		return false
-	}
-	return time.Now().UnixNano() > item.Expiration
-}
-
 const (
 	// For use with functions that take an expiration time.
 	NoExpiration time.Duration = -1
