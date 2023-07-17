@@ -26,7 +26,7 @@ func newTimer4Heap(initCap int) *timer4Heap {
 
 func (th *timer4Heap) schedule(eh EvHandler, delay, interval int64) error {
 	if delay < 0 || interval < 0 {
-		return errors.New("params are invalid!")
+		return errors.New("params are invalid")
 	}
 
 	now := time.Now().UnixMilli()

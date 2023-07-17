@@ -9,6 +9,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// Notifier provides a mechanism for communication with evpool, only offering a wakeup mechanism
+// to wake epoll up from waiting.
 type Notifier interface {
 	// Tread-safe
 	Notify()
@@ -47,6 +49,8 @@ func newNotify(ep *evPoll) (Notifier, error) {
 	}
 	return nt, nil
 }
+
+// Notify send sends a notification to evpool
 func (nt *notify) Notify() {
 	if !nt.notifyOnce.CompareAndSwap(0, 1) {
 		return

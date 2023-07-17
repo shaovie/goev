@@ -11,6 +11,7 @@ import (
 	"github.com/shaovie/goev/netfd"
 )
 
+// ConnectPoolHandler is the interface that wraps the basic Conn handle method
 type ConnectPoolHandler interface {
 	EvHandler
 
@@ -20,6 +21,8 @@ type ConnectPoolHandler interface {
 
 	Closed()
 }
+
+// ConnectPoolItem is the base object
 type ConnectPoolItem struct {
 	Event
 
@@ -29,13 +32,18 @@ type ConnectPoolItem struct {
 func (cph *ConnectPoolItem) setPool(cp *ConnectPool) {
 	cph.cp = cp
 }
+
+// GetPool can retrieve the current conn object bound to which ConnectPool
 func (cph *ConnectPoolItem) GetPool() *ConnectPool {
 	return cph.cp
 }
+
+// Closed when a conn is detected as closed, it needs to notify the ConnectPool to perform resource recycling.
 func (cph *ConnectPoolItem) Closed() {
 	cph.cp.closed()
 }
 
+// ConnectPool provides a reusable connection pool that can dynamically scale and manage network connections
 type ConnectPool struct {
 	minIdleNum     int
 	addNumOnceTime int
@@ -58,6 +66,8 @@ type newConnInPool struct {
 	ch ConnectPoolHandler
 }
 
+// NewConnectPool return an instance
+//
 // The addr format 192.168.0.1:8080
 func NewConnectPool(c *Connector, addr string, minIdleNum, addNumOnceTime, maxLiveNum int,
 	newConnectPoolHandlerFunc func() ConnectPoolHandler) (*ConnectPool, error) {
@@ -86,6 +96,8 @@ func NewConnectPool(c *Connector, addr string, minIdleNum, addNumOnceTime, maxLi
 	go cp.handleNewConn()
 	return cp, nil
 }
+
+// Acquire returns a usable connection handler, and if none is available, it returns nil
 func (cp *ConnectPool) Acquire() ConnectPoolHandler {
 	cp.connsMtx.Lock()
 	item := cp.conns.Front()
@@ -98,6 +110,8 @@ func (cp *ConnectPool) Acquire() ConnectPoolHandler {
 	cp.connsMtx.Unlock()
 	return item.Value.(ConnectPoolHandler)
 }
+
+// Release accepts a reusable connection
 func (cp *ConnectPool) Release(ch ConnectPoolHandler) {
 	if ch.GetPool() != cp {
 		panic("ConnectPool.Release ch doesn't belong to this pool")
@@ -109,14 +123,19 @@ func (cp *ConnectPool) Release(ch ConnectPoolHandler) {
 	cp.conns.PushBack(ch)
 	cp.connsMtx.Unlock()
 }
+
+// IdleNum returns the number of idle connections
 func (cp *ConnectPool) IdleNum() int {
 	cp.connsMtx.Lock()
 	defer cp.connsMtx.Unlock()
 	return cp.conns.Len()
 }
+
+// LiveNum returns the number of active connections
 func (cp *ConnectPool) LiveNum() int {
 	return int(cp.liveNum.Load())
 }
+
 func (cp *ConnectPool) keepNumTiming() {
 	for {
 		select {
@@ -148,7 +167,7 @@ func (cp *ConnectPool) keepNum() {
 		return
 	}
 	for i := 0; i < toNewNum; i++ {
-		if err := cp.connector.Connect(cp.addr, &ConnectPoolConn{cp: cp}, 1000); err != nil {
+		if err := cp.connector.Connect(cp.addr, &connectPoolConn{cp: cp}, 1000); err != nil {
 			cp.toNewNum.Add(-1)
 		}
 	}
@@ -172,14 +191,13 @@ func (cp *ConnectPool) closed() {
 	cp.liveNum.Add(-1)
 }
 
-// =
-type ConnectPoolConn struct {
+type connectPoolConn struct {
 	Event
 
 	cp *ConnectPool
 }
 
-func (cpc *ConnectPoolConn) OnOpen(fd int, now int64) bool {
+func (cpc *connectPoolConn) OnOpen(fd int, now int64) bool {
 	cpc.cp.toNewNum.Add(-1)
 
 	netfd.SetKeepAlive(fd, 60, 40, 3)
@@ -191,8 +209,8 @@ func (cpc *ConnectPoolConn) OnOpen(fd int, now int64) bool {
 
 	return false
 }
-func (cpc *ConnectPoolConn) OnConnectFail(err error) {
+func (cpc *connectPoolConn) OnConnectFail(err error) {
 	cpc.cp.toNewNum.Add(-1)
 }
-func (cpc *ConnectPoolConn) OnClose(fd int) {
+func (cpc *connectPoolConn) OnClose(fd int) {
 }

@@ -1,12 +1,14 @@
 package netfd
 
 import (
-	"net"
 	"errors"
+	"net"
 	"strconv"
 	"syscall"
 )
 
+// Read safely read I/O data from the file descriptor (ignoring EINTR).
+//
 // On success, the number of bytes read is returned (zero indicates socket closed)
 // On error, -1 is returned, and err is set appropriately
 func Read(fd int, buf []byte) (n int, err error) {
@@ -20,6 +22,7 @@ func Read(fd int, buf []byte) (n int, err error) {
 	return
 }
 
+// Write safely write I/O data from the file descriptor (ignoring EINTR).
 func Write(fd int, buf []byte) (n int, err error) {
 	for {
 		n, err = syscall.Write(fd, buf)
@@ -31,10 +34,13 @@ func Write(fd int, buf []byte) (n int, err error) {
 	return
 }
 
+// Close the fd
 func Close(fd int) error {
 	return syscall.Close(fd)
 }
 
+// LocalAddr retrieves the local address of the specified socket file descriptor (fd).
+//
 // Return format 192.168.0.1:8080
 // Return "", if error
 func LocalAddr(fd int) string {
@@ -54,6 +60,8 @@ func LocalAddr(fd int) string {
 	return ip.String() + ":" + strconv.FormatInt(int64(port), 10)
 }
 
+// RemoteAddr retrieves the remote address of the specified socket file descriptor (fd).
+//
 // Return format 192.168.0.1:8080
 // Return "", if error
 func RemoteAddr(fd int) string {
@@ -73,6 +81,8 @@ func RemoteAddr(fd int) string {
 	return ip.String() + ":" + strconv.FormatInt(int64(port), 10)
 }
 
+// SetSendBuffSize set SO_SNDBUF
+//
 // 在accept/connnect之后调用
 // must < `sysctl -a | grep net.core.wmem_max`
 func SetSendBuffSize(fd, bytes int) error {
@@ -82,10 +92,13 @@ func SetSendBuffSize(fd, bytes int) error {
 	return nil
 }
 
+// SetNonblock set fd nonblocking
 func SetNonblock(fd int, v bool) error {
 	return syscall.SetNonblock(fd, v)
 }
 
+// SetNoDelay set fd TCP_NODELAY
+//
 // 0:delay, 1:nodelay
 func SetNoDelay(fd, v int) error {
 	if err := syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, v); err != nil {
@@ -94,7 +107,7 @@ func SetNoDelay(fd, v int) error {
 	return nil
 }
 
-// The all params are in second
+// SetKeepAlive the all params are in second
 //
 // idle: After establishing a connection, if there is no data transmission during the "idle" time, a keep-alive packet will be sent
 // interval: The interval period after the start of probing
@@ -118,6 +131,8 @@ func SetKeepAlive(fd, idle, interval, times int) error {
 	return nil
 }
 
+// SetQuickACK set TCP_QUICKAC
+//
 // 0:delay 1:quick
 func SetQuickACK(fd, bytes int) error {
 	if err := syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_QUICKACK, 1); err != nil {

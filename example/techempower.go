@@ -27,7 +27,7 @@ type Http struct {
 
 func (h *Http) OnOpen(fd int, now int64) bool {
 	// AddEvHandler 尽量放在最后, (OnOpen 和ORead可能不在一个线程)
-	if err := h.GetReactor().AddEvHandler(h, fd, goev.EV_IN); err != nil {
+	if err := h.GetReactor().AddEvHandler(h, fd, goev.EvIn); err != nil {
 		return false
 	}
 	return true

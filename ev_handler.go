@@ -5,18 +5,30 @@ import (
 )
 
 const (
-	EPOLLET          = 1 << 31
-	EV_IN     uint32 = syscall.EPOLLIN | syscall.EPOLLRDHUP
-	EV_OUT    uint32 = syscall.EPOLLOUT | syscall.EPOLLRDHUP
-	EV_IN_ET  uint32 = EV_IN | EPOLLET
-	EV_OUT_ET uint32 = EV_OUT | EPOLLET
+	// EPOLLET Refer to sys/epoll.h
+	EPOLLET = 1 << 31
 
-	EV_EVENTFD uint32 = syscall.EPOLLIN | syscall.EPOLLRDHUP // Not ET mode
+	// EvIn is readable event
+	EvIn uint32 = syscall.EPOLLIN | syscall.EPOLLRDHUP
 
+	// EvOut is writeable event
+	EvOut uint32 = syscall.EPOLLOUT | syscall.EPOLLRDHUP
+
+	// EvInET is readable event in EPOLLET mode
+	EvInET uint32 = EvIn | EPOLLET
+
+	// EvOutET is readable event in EPOLLET mode
+	EvOutET uint32 = EvOut | EPOLLET
+
+	// EvEventfd used for eventfd
+	EvEventfd uint32 = syscall.EPOLLIN | syscall.EPOLLRDHUP // Not ET mode
+
+	// EvAccept used for acceptor
 	// 用水平触发, 循环Accept有可能会导致不可控
-	EV_ACCEPT uint32 = syscall.EPOLLIN | syscall.EPOLLRDHUP
+	EvAccept uint32 = syscall.EPOLLIN | syscall.EPOLLRDHUP
 
-	EV_CONNECT uint32 = syscall.EPOLLIN | syscall.EPOLLOUT | syscall.EPOLLRDHUP
+	// EvConnect used for connector
+	EvConnect uint32 = syscall.EPOLLIN | syscall.EPOLLOUT | syscall.EPOLLRDHUP
 )
 
 // Detecting illegal struct copies using `go vet`
@@ -25,6 +37,8 @@ type noCopy struct{}
 func (*noCopy) Lock()   {}
 func (*noCopy) Unlock() {}
 
+// EvHandler is the event handling interface of the Reactor core
+//
 // The same EvHandler is repeatedly registered with the Reactor
 type EvHandler interface {
 	setEvPoll(ep *evPoll)
@@ -80,6 +94,7 @@ type EvHandler interface {
 	OnClose(fd int)
 }
 
+// Event is the base class of event handling objects
 type Event struct {
 	noCopy
 
@@ -99,30 +114,38 @@ func (e *Event) getEvPoll() *evPoll {
 func (e *Event) setReactor(r *Reactor) {
 	e._r = r
 }
+
+// GetReactor can retrieve the current event object bound to which Reactor
 func (e *Event) GetReactor() *Reactor {
 	return e._r
 }
 
+// OnOpen please make sure you want to reimplement it.
 func (*Event) OnOpen(fd int, millisecond int64) bool {
 	panic("Event OnOpen")
 }
 
+// OnRead please make sure you want to reimplement it.
 func (*Event) OnRead(fd int, evPollSharedBuff []byte, millisecond int64) bool {
 	panic("Event OnRead")
 }
 
+// OnWrite please make sure you want to reimplement it.
 func (*Event) OnWrite(fd int, millisecond int64) bool {
 	panic("Event OnWrite")
 }
 
+// OnConnectFail please make sure you want to reimplement it.
 func (*Event) OnConnectFail(err error) {
 	panic("Event OnConnectFail")
 }
 
+// OnTimeout please make sure you want to reimplement it.
 func (*Event) OnTimeout(millisecond int64) bool {
 	panic("Event OnTimeout")
 }
 
+// OnClose please make sure you want to reimplement it.
 func (*Event) OnClose(fd int) {
 	panic("Event OnClose")
 }

@@ -2,9 +2,9 @@ package goev
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 	"testing"
-	"strconv"
 
 	"github.com/shaovie/goev/netfd"
 )

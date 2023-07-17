@@ -9,6 +9,9 @@ import (
 	"syscall"
 )
 
+// Acceptor is a wrapper for socket listener, automatically creating a service
+// and registering it with the reactor.
+// Newly received file descriptors can be registered with the specified reactor.
 type Acceptor struct {
 	Event
 
@@ -22,6 +25,8 @@ type Acceptor struct {
 	newFdBindReactor *Reactor
 }
 
+// NewAcceptor return an acceptor
+//
 // New socket has been set to non-blocking
 func NewAcceptor(acceptorBindReactor *Reactor, newFdBindReactor *Reactor,
 	newEvHanlderFunc func() EvHandler, addr string, opts ...Option) (*Acceptor, error) {
@@ -45,12 +50,12 @@ func NewAcceptor(acceptorBindReactor *Reactor, newFdBindReactor *Reactor,
 	return a, nil
 }
 
-// Open create a listen fd
+// open create a listen fd
 // The addr format 192.168.0.1:8080 or :8080 or unix:/tmp/xxxx.sock
 func (a *Acceptor) open(addr string) error {
 	p := strings.Index(addr, ":")
 	if p < 0 || p >= (len(addr)-1) {
-		return errors.New("accetor open param:addr invalid!")
+		return errors.New("Accetor open param:addr invalid")
 	}
 	if len(addr) > 5 {
 		s := addr[0:5]
@@ -156,6 +161,7 @@ func (a *Acceptor) listen(fd int, sa syscall.Sockaddr) error {
 	return nil
 }
 
+// OnRead handle listner accept event
 func (a *Acceptor) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
 	for i := 0; i < a.loopAcceptTimes; i++ {
 		conn, _, err := syscall.Accept4(a.fd, syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC)
@@ -174,6 +180,7 @@ func (a *Acceptor) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
 	return true
 }
 
-func (a *Acceptor) OnClose(fd int) { // Will not happen
+// OnClose will not happen
+func (a *Acceptor) OnClose(fd int) {
 	syscall.Close(fd)
 }

@@ -11,17 +11,26 @@ import (
 )
 
 var (
-	ErrConnectFail       = errors.New("connect fail")
-	ErrConnectTimeout    = errors.New("connect timeout")
+	// ErrConnectFail means connection failure without a specific reason
+	ErrConnectFail = errors.New("connect fail")
+
+	// ErrConnectTimeout means connection timeout
+	ErrConnectTimeout = errors.New("connect timeout")
+
+	// ErrConnectInprogress means the process is ongoing and not immediately successful.
 	ErrConnectInprogress = errors.New("connect EINPROGRESS")
 )
 
+// Connector provides a fast asynchronous connector and can set a timeout.
+// It internally uses Reactor to achieve asynchronicity.
+// Connect success or failure will trigger specified methods for notification
 type Connector struct {
 	Event
 
 	sockRcvBufSize int // ignore equal 0
 }
 
+// NewConnector return an instance
 func NewConnector(r *Reactor, opts ...Option) (*Connector, error) {
 	setOptions(opts...)
 	c := &Connector{
@@ -31,6 +40,9 @@ func NewConnector(r *Reactor, opts ...Option) (*Connector, error) {
 	return c, nil
 }
 
+// Connect asynchronously to the specified address and there may also be an immediate result.
+// Please check the return value
+//
 // The addr format 192.168.0.1:8080 or unix:/tmp/xxxx.sock
 // The domain name format, such as qq.com:8080, is not supported.
 // You need to manually extract the IP address using gethostbyname.
@@ -39,7 +51,7 @@ func NewConnector(r *Reactor, opts ...Option) (*Connector, error) {
 func (c *Connector) Connect(addr string, eh EvHandler, timeout int64) error {
 	p := strings.Index(addr, ":")
 	if p < 0 || p >= (len(addr)-1) {
-		return errors.New("Connector:Connect param:addr invalid!")
+		return errors.New("Connector:Connect param:addr invalid")
 	}
 	if len(addr) > 5 {
 		s := addr[0:5]
