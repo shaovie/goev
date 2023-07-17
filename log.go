@@ -154,7 +154,7 @@ func (l *log) output(format string, v ...any) {
 	l.buff = append(l.buff, '.')
 	l.itoa(now.Nanosecond()/1e6, 3)
 	if l.dir != "" {
-		l.buff = append(l.buff, []byte{' ', '>', ' '}...)
+		l.buff = append(l.buff, ' ', '>', ' ')
 	} else {
 		l.buff = append(l.buff, ' ')
 		l.buff = append(l.buff, []byte(l.name+" > ")...)

@@ -97,5 +97,8 @@ func (r *Reactor) Run() error {
 		}(i)
 	}
 	wg.Wait()
+    if len(errS) == 0 {
+        return nil
+    }
 	return errors.New(strings.Join(errS, "; "))
 }
