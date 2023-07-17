@@ -43,7 +43,7 @@ func newNotify(ep *evPoll) (Notifier, error) {
 	nt := &notify{
 		efd: fd,
 	}
-	if err = ep.add(nt.efd, EV_EVENTFD, nt); err != nil {
+	if err = ep.add(nt.efd, EvEventfd, nt); err != nil {
 		syscall.Close(fd)
 		return nil, errors.New("Notify add to evpoll fail! " + err.Error())
 	}

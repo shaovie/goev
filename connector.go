@@ -135,7 +135,7 @@ func (c *Connector) connect(fd int, sa syscall.Sockaddr, eh EvHandler, timeout i
 			return ErrConnectInprogress
 		}
 		inh := &inProgressConnect{r: reactor, eh: eh, fd: fd}
-		if err = reactor.AddEvHandler(inh, fd, EV_CONNECT); err != nil {
+		if err = reactor.AddEvHandler(inh, fd, EvConnect); err != nil {
 			syscall.Close(fd)
 			return errors.New("InPorgress AddEvHandler in connector.Connect: " + err.Error())
 		}

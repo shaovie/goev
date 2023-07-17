@@ -154,7 +154,7 @@ func (a *Acceptor) listen(fd int, sa syscall.Sockaddr) error {
 		return errors.New("syscall listen: " + err.Error())
 	}
 
-	if err := a.reactor.AddEvHandler(a, fd, EV_ACCEPT); err != nil {
+	if err := a.reactor.AddEvHandler(a, fd, EvAccept); err != nil {
 		return errors.New("AddEvHandler in Acceptor.Open: " + err.Error())
 	}
 	a.fd = fd

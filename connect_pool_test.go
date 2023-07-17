@@ -24,7 +24,7 @@ type AsyncPushLog struct {
 }
 
 func (s *AsyncPushLog) OnOpen(fd int, now int64) bool {
-	if err := s.GetReactor().AddEvHandler(s, fd, EV_IN); err != nil {
+	if err := s.GetReactor().AddEvHandler(s, fd, EvIn); err != nil {
 		fmt.Printf("error: fd %d %s\n", fd, err.Error())
 		return false
 	}
