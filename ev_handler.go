@@ -105,23 +105,24 @@ func (e *Event) GetReactor() *Reactor {
 
 func (*Event) OnOpen(fd int, millisecond int64) bool {
 	panic("Event OnOpen")
-	return false
 }
+
 func (*Event) OnRead(fd int, evPollSharedBuff []byte, millisecond int64) bool {
 	panic("Event OnRead")
-	return false
 }
+
 func (*Event) OnWrite(fd int, millisecond int64) bool {
 	panic("Event OnWrite")
-	return false
 }
+
 func (*Event) OnConnectFail(err error) {
 	panic("Event OnConnectFail")
 }
+
 func (*Event) OnTimeout(millisecond int64) bool {
 	panic("Event OnTimeout")
-	return false
 }
+
 func (*Event) OnClose(fd int) {
 	panic("Event OnClose")
 }

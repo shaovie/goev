@@ -37,22 +37,23 @@ func NewConnector(r *Reactor, opts ...Option) (*Connector, error) {
 //
 // Timeout is relative time measurements with millisecond accuracy, for example, delay=5msec.
 func (c *Connector) Connect(addr string, eh EvHandler, timeout int64) error {
-    p := strings.Index(addr, ":")
-    if p < 0 || p >= (len(addr) - 1) {
-        return errors.New("Connector:Connect param:addr invalid!")
-    }
-    if len(addr) > 5 {
-        s := addr[0:5]
-        if s == "unix:" {
-            return c.udsConnect(addr[5:], eh, timeout)
-        }
-    }
-    return c.tcpConnect(addr, eh, timeout)
+	p := strings.Index(addr, ":")
+	if p < 0 || p >= (len(addr)-1) {
+		return errors.New("Connector:Connect param:addr invalid!")
+	}
+	if len(addr) > 5 {
+		s := addr[0:5]
+		if s == "unix:" {
+			return c.udsConnect(addr[5:], eh, timeout)
+		}
+	}
+	return c.tcpConnect(addr, eh, timeout)
 }
+
 // The addr format 192.168.0.1:8080
 func (c *Connector) tcpConnect(addr string, eh EvHandler, timeout int64) error {
 	fd, err := syscall.Socket(syscall.AF_INET,
-        syscall.SOCK_STREAM|syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC, 0)
+		syscall.SOCK_STREAM|syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC, 0)
 	if err != nil {
 		return errors.New("Socket in connector.open: " + err.Error())
 	}
@@ -92,24 +93,26 @@ func (c *Connector) tcpConnect(addr string, eh EvHandler, timeout int64) error {
 	}
 	sa := syscall.SockaddrInet4{Port: int(port)}
 	copy(sa.Addr[:], ip4.To4())
-    return c.connect(fd, &sa, eh, timeout)
+	return c.connect(fd, &sa, eh, timeout)
 }
+
 func (c *Connector) udsConnect(addr string, eh EvHandler, timeout int64) error {
 	fd, err := syscall.Socket(syscall.AF_UNIX,
-        syscall.SOCK_STREAM|syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC, 0)
+		syscall.SOCK_STREAM|syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC, 0)
 	if err != nil {
 		return errors.New("Socket in connector.open: " + err.Error())
 	}
 
-    // SO_RCVBUF is invalid for unix sock
+	// SO_RCVBUF is invalid for unix sock
 
-    rsu := syscall.SockaddrUnix{ Name: addr }
-    return c.connect(fd, &rsu, eh, timeout)
+	rsu := syscall.SockaddrUnix{Name: addr}
+	return c.connect(fd, &rsu, eh, timeout)
 }
+
 func (c *Connector) connect(fd int, sa syscall.Sockaddr, eh EvHandler, timeout int64) (err error) {
 	reactor := c.GetReactor()
 	for {
-        err = syscall.Connect(fd, sa)
+		err = syscall.Connect(fd, sa)
 		if err == syscall.EINTR {
 			continue
 		}
@@ -181,6 +184,7 @@ func (p *inProgressConnect) OnTimeout(now int64) bool {
 	p.eh.OnConnectFail(ErrConnectTimeout)
 	return false
 }
+
 func (p *inProgressConnect) OnClose(fd int) {
 	if p.fd != -1 {
 		syscall.Close(p.fd)

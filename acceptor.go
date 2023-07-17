@@ -1,9 +1,9 @@
 package goev
 
 import (
-    "os"
-	"net"
 	"errors"
+	"net"
+	"os"
 	"strconv"
 	"strings"
 	"syscall"
@@ -48,18 +48,19 @@ func NewAcceptor(acceptorBindReactor *Reactor, newFdBindReactor *Reactor,
 // Open create a listen fd
 // The addr format 192.168.0.1:8080 or :8080 or unix:/tmp/xxxx.sock
 func (a *Acceptor) open(addr string) error {
-    p := strings.Index(addr, ":")
-    if p < 0 || p >= (len(addr) - 1) {
-        return errors.New("accetor open param:addr invalid!")
-    }
-    if len(addr) > 5 {
-        s := addr[0:5]
-        if s == "unix:" {
-            return a.udsListen(addr[5:])
-        }
-    }
-    return a.tcpListen(addr)
+	p := strings.Index(addr, ":")
+	if p < 0 || p >= (len(addr)-1) {
+		return errors.New("accetor open param:addr invalid!")
+	}
+	if len(addr) > 5 {
+		s := addr[0:5]
+		if s == "unix:" {
+			return a.udsListen(addr[5:])
+		}
+	}
+	return a.tcpListen(addr)
 }
+
 // The addr format 192.168.0.1:8080 or :8080
 func (a *Acceptor) tcpListen(addr string) error {
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
@@ -111,15 +112,16 @@ func (a *Acceptor) tcpListen(addr string) error {
 	sa := syscall.SockaddrInet4{Port: int(port)}
 	copy(sa.Addr[:], ip4.To4())
 
-    if err := a.listen(fd, &sa); err != nil {
+	if err := a.listen(fd, &sa); err != nil {
 		syscall.Close(fd)
-        return err
-    }
-    return nil
+		return err
+	}
+	return nil
 }
+
 // The addr format /tmp/xxx.sock
 func (a *Acceptor) udsListen(addr string) error {
-    os.RemoveAll(addr)
+	os.RemoveAll(addr)
 
 	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
 	if err != nil {
@@ -128,30 +130,32 @@ func (a *Acceptor) udsListen(addr string) error {
 
 	syscall.SetNonblock(fd, true)
 
-    // SO_RCVBUF is invalid for unix sock
+	// SO_RCVBUF is invalid for unix sock
 
-    rsu := syscall.SockaddrUnix{ Name: addr }
-    if err = a.listen(fd, &rsu); err != nil {
-        os.RemoveAll(addr)
+	rsu := syscall.SockaddrUnix{Name: addr}
+	if err = a.listen(fd, &rsu); err != nil {
+		os.RemoveAll(addr)
 		syscall.Close(fd)
-        return err
-    }
-    return nil
+		return err
+	}
+	return nil
 }
+
 func (a *Acceptor) listen(fd int, sa syscall.Sockaddr) error {
-    if err := syscall.Bind(fd, sa); err != nil {
+	if err := syscall.Bind(fd, sa); err != nil {
 		return errors.New("syscall bind: " + err.Error())
 	}
-    if err := syscall.Listen(fd, a.listenBacklog); err != nil {
+	if err := syscall.Listen(fd, a.listenBacklog); err != nil {
 		return errors.New("syscall listen: " + err.Error())
 	}
 
-    if err := a.reactor.AddEvHandler(a, fd, EV_ACCEPT); err != nil {
+	if err := a.reactor.AddEvHandler(a, fd, EV_ACCEPT); err != nil {
 		return errors.New("AddEvHandler in Acceptor.Open: " + err.Error())
 	}
 	a.fd = fd
 	return nil
 }
+
 func (a *Acceptor) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
 	for i := 0; i < a.loopAcceptTimes; i++ {
 		conn, _, err := syscall.Accept4(a.fd, syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC)
@@ -169,6 +173,7 @@ func (a *Acceptor) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
 	}
 	return true
 }
+
 func (a *Acceptor) OnClose(fd int) { // Will not happen
 	syscall.Close(fd)
 }
