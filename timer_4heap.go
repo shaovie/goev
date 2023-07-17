@@ -75,6 +75,7 @@ func (th *timer4Heap) handleExpired(now int64) int64 {
 	}
 	return delta
 }
+
 func (th *timer4Heap) size() int {
 	th.fheapMtx.Lock()
 	defer th.fheapMtx.Unlock()

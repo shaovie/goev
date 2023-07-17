@@ -66,6 +66,7 @@ func (nt *notify) Notify() {
 		break // TODO add evOptions.debug? panic("Notify: write eventfd failed!")
 	}
 }
+
 func (nt *notify) Close() {
 	if !nt.closeOnce.CompareAndSwap(0, 1) {
 		return
@@ -117,8 +118,8 @@ func (nt *notify) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
 			return false // TODO add evOptions.debug? panic("Notify: read unknown value!")
 		}
 	}
-	return true //
 }
+
 func (nt *notify) OnClose(fd int) {
 	syscall.Close(fd)
 	nt.efd = -1
