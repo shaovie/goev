@@ -49,7 +49,7 @@ func (r *Reactor) AddEvHandler(eh EvHandler, fd int, events uint32) error {
 	}
 	i := 0
 	if r.evPollNum > 1 {
-        // fd is a self-incrementing and cyclic integer, can be allocated through round-robin distribution.
+		// fd is a self-incrementing and cyclic integer, can be allocated through round-robin distribution.
 		i = fd % r.evPollNum
 	}
 	return r.evPolls[i].add(fd, events, eh)
@@ -97,8 +97,9 @@ func (r *Reactor) Run() error {
 		}(i)
 	}
 	wg.Wait()
-    if len(errS) == 0 {
-        return nil
-    }
+
+	if len(errS) == 0 {
+		return nil
+	}
 	return errors.New(strings.Join(errS, "; "))
 }
