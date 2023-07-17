@@ -126,5 +126,4 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 			return errors.New("syscall epoll_wait: " + err.Error())
 		}
 	}
-	return nil
 }

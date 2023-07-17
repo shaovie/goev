@@ -16,15 +16,19 @@ var lastLog *Log
 func Debug(format string, v ...any) {
 	lastLog.debugL.output(format, v...)
 }
+
 func Info(format string, v ...any) {
 	lastLog.infoL.output(format, v...)
 }
+
 func Warn(format string, v ...any) {
 	lastLog.warnL.output(format, v...)
 }
+
 func Error(format string, v ...any) {
 	lastLog.errorL.output(format, v...)
 }
+
 func Fatal(format string, v ...any) {
 	lastLog.fatalL.output(format, v...)
 }
@@ -125,12 +129,14 @@ func (l *log) open(year, month, day int) (err error) {
 	l.buff = append(l.buff, ' ')
 	return nil
 }
+
 func (l *log) close() {
 	if l.dir != "" && l.fd != -1 {
 		syscall.Close(l.fd)
 		l.fd = -1
 	}
 }
+
 func (l *log) output(format string, v ...any) {
 	now := time.Now()
 	year, month, day := now.Date()
@@ -171,6 +177,7 @@ func (l *log) output(format string, v ...any) {
 	}
 	l.buff = l.buff[:11] // 11 is len("2023-07-05 ")
 }
+
 func (l *log) itoa(i int, wid int) {
 	// Assemble decimal in reverse order.
 	var b [8]byte
