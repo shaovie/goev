@@ -61,6 +61,10 @@ func ReuseAddr(v bool) Option {
 }
 
 // ReusePort for SO_REUSEPORT
+//
+// Requires kernel >= 3.9
+// Please make sure you have a good understanding of SO_REUSEPORT.(man 7 socket)
+// For example code, please refer to example/reuseport.go
 func ReusePort(v bool) Option {
 	return func(o *Options) {
 		o.reusePort = v
