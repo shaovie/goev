@@ -1,6 +1,7 @@
 package goev
 
 import (
+	"fmt"
 	"sync"
 	"time"
 	"syscall"
@@ -24,7 +25,7 @@ type AsyncPushLog struct {
 
 func (s *AsyncPushLog) OnOpen(fd int, now int64) bool {
 	if err := s.GetReactor().AddEvHandler(s, fd, EV_IN); err != nil {
-		Error("fd %d %s", fd, err.Error())
+        fmt.Printf("error: fd %d %s\n", fd, err.Error())
 		return false
 	}
 	s.fd = fd
@@ -44,14 +45,14 @@ func (s *AsyncPushLog) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
 			if err == syscall.EAGAIN { // epoll ET mode
 				break
 			}
-			Debug("read: %s", err.Error())
+			fmt.Printf("read: %s\n", err.Error())
 			return false
 		}
 		if n > 0 { // n > 0
 			readN += n
 		} else { // n == 0 connection closed,  will not < 0
 			if readN == 0 {
-				Debug("peer closed. %d", n)
+				fmt.Printf("peer closed. %d\n", n)
 			}
 			return false
 		}
@@ -62,7 +63,7 @@ func (s *AsyncPushLog) Push(log string) {
 	netfd.Write(s.fd, []byte(log))
 }
 func (s *AsyncPushLog) OnClose(fd int) {
-	Debug("closed")
+	fmt.Printf("closed\n")
 	netfd.Close(fd)
 	s.Closed()
 }
@@ -74,7 +75,7 @@ func doPush(pusher *AsyncPushLog) {
 	pusher.GetPool().Release(pusher)
 }
 func TestConnectPool(t *testing.T) {
-	Debug("hello boy")
+	fmt.Printf("hello boy\n")
 	buffPool = &sync.Pool{
 		New: func() any {
 			return make([]byte, 4096)
@@ -110,7 +111,7 @@ func TestConnectPool(t *testing.T) {
 	}
 
 	time.Sleep(time.Millisecond * 500)
-	Debug("conn pool idel: %d after 500msec", cp.IdleNum())
+	fmt.Printf("conn pool idel: %d after 500msec\n", cp.IdleNum())
 
 	//gp := NewGoPool(100, 100, 100)
 	for i := 0; i < 10000; {
@@ -126,7 +127,7 @@ func TestConnectPool(t *testing.T) {
 	for {
 		time.Sleep(time.Millisecond * 500)
 		c := pushCounter.Load()
-		Debug("conn pool idle: %d end. live: %d, push: %d", cp.IdleNum(), cp.LiveNum(), c)
+		fmt.Printf("conn pool idle: %d end. live: %d, push: %d\n", cp.IdleNum(), cp.LiveNum(), c)
 		if c >= 1000 {
 			break
 		}
