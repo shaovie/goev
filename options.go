@@ -60,7 +60,7 @@ func ReuseAddr(v bool) Option {
 	}
 }
 
-// ReusePort for SO_REUSEADDR
+// ReusePort for SO_REUSEPORT
 func ReusePort(v bool) Option {
 	return func(o *Options) {
 		o.reusePort = v
