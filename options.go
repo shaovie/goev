@@ -6,6 +6,7 @@ type Options struct {
 
 	// acceptor options
 	reuseAddr     bool // SO_REUSEADDR
+	reusePort     bool // SO_REUSEPORT
 	listenBacklog int  //
 
 	// connector options
@@ -35,6 +36,7 @@ func setOptions(optL ...Option) {
 		//= defaut options
 		evOptions = &Options{
 			reuseAddr:            true,
+			reusePort:            false,
 			evPollNum:            1,
 			evReadyNum:           512,
 			evDataArrSize:        8192,
@@ -58,7 +60,14 @@ func ReuseAddr(v bool) Option {
 	}
 }
 
-// ListenBacklog for syscall.listen(fd, backlog), also affect `for i < backlog/2 { syscall.accept() }`
+// ReusePort for SO_REUSEADDR
+func ReusePort(v bool) Option {
+	return func(o *Options) {
+		o.reusePort = v
+	}
+}
+
+// Listen backlog, For syscall.listen(fd, backlog), also affect `for i < backlog/2 { syscall.accept() }`
 func ListenBacklog(v int) Option {
 	return func(o *Options) {
 		o.listenBacklog = v

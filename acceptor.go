@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 // Acceptor is a wrapper for socket listener, automatically creating a service
@@ -16,6 +18,7 @@ type Acceptor struct {
 	Event
 
 	reuseAddr        bool // SO_REUSEADDR
+	reusePort        bool // SO_REUSEPORT
 	fd               int
 	sockRcvBufSize   int // ignore equal 0
 	listenBacklog    int
@@ -39,6 +42,7 @@ func NewAcceptor(acceptorBindReactor *Reactor, newFdBindReactor *Reactor,
 		listenBacklog:    evOptions.listenBacklog,
 		sockRcvBufSize:   evOptions.sockRcvBufSize,
 		reuseAddr:        evOptions.reuseAddr,
+		reusePort:        evOptions.reusePort,
 	}
 	a.loopAcceptTimes = a.listenBacklog / 2
 	if a.loopAcceptTimes < 1 {
@@ -77,6 +81,12 @@ func (a *Acceptor) tcpListen(addr string) error {
 		if err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1); err != nil {
 			syscall.Close(fd)
 			return errors.New("Set SO_REUSEADDR in Acceptor.open: " + err.Error())
+		}
+	}
+	if a.reusePort == true {
+		if err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, unix.SO_REUSEPORT, 1); err != nil {
+			syscall.Close(fd)
+			return errors.New("Set SO_REUSEPORT in Acceptor.open: " + err.Error())
 		}
 	}
 	syscall.SetNonblock(fd, true)
