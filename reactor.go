@@ -49,7 +49,7 @@ func (r *Reactor) AddEvHandler(eh EvHandler, fd int, events uint32) error {
 	}
 	i := 0
 	if r.evPollNum > 1 {
-        // fd is a self-incrementing and cyclic integer, can be allocated through round-robin distribution.
+		// fd is a self-incrementing and cyclic integer, can be allocated through round-robin distribution.
 		i = fd % r.evPollNum
 	}
 	return r.evPolls[i].add(fd, events, eh)
@@ -79,8 +79,9 @@ func (r *Reactor) SchedueTimer(eh EvHandler, delay, interval int64) error {
 }
 func (r *Reactor) Run() error {
 	var wg sync.WaitGroup
-	var errS []string
-	var errSMtx sync.Mutex
+	var errs []string
+	var errmu sync.Mutex
+
 	for i := 0; i < r.evPollNum; i++ {
 		wg.Add(1)
 		go func(j int) {
@@ -91,11 +92,16 @@ func (r *Reactor) Run() error {
 				runtime.LockOSThread()
 			}
 			err := r.evPolls[j].run(&wg)
-			errSMtx.Lock()
-			errS = append(errS, fmt.Sprintf("epoll#%d err: %s", j, err.Error()))
-			errSMtx.Unlock()
+			errmu.Lock()
+			errs = append(errs, fmt.Sprintf("epoll#%d err: %s", j, err.Error()))
+			errmu.Unlock()
 		}(i)
 	}
 	wg.Wait()
-	return errors.New(strings.Join(errS, "; "))
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return errors.New(strings.Join(errs, "; "))
 }
