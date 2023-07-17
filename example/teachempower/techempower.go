@@ -32,6 +32,7 @@ func (h *Http) OnOpen(fd int, now int64) bool {
 	}
 	return true
 }
+
 func (h *Http) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
 	buf := evPollSharedBuff[:]
 	readN := 0
