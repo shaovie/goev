@@ -1,69 +1,178 @@
-## goev
+# Event-driven network framework in Go
 
-`goev` is a high-performance, lightweight, i/o event-driven network framework in Go.
+Goev provides a high-performance, lightweight, non-blocking, I/O event-driven networking framework for the Go language. It draws inspiration from the design patterns of [ACE](http://www.dre.vanderbilt.edu/~schmidt/ACE-overview.html) and provides an elegant and concise solution for TCP network programming projects. With goev, you can seamlessly integrate your projects without worrying about the coroutine pressure introduced by the standard library (go net).
 
-> Design Patterns Reference [ACE](http://www.dre.vanderbilt.edu/~schmidt/ACE-overview.html)
-
-## 日志
-- 2023-07-09 已经提交给TechEmpower, 测评代码[https://github.com/shaovie/FrameworkBenchmarks/tree/master/frameworks/Go/goev]
-  顺便跑了一下gnet的测试程序, 同样的测试条件下, QPS goev胜过gnet 2.5%左右(2c4g的云主机环境, 仅做参考)
+Moreover, goev excels in terms of performance. In the TechEmpower benchmark tests, it has achieved first place among similar frameworks in the same environment (goev has been submitted to TechEmpower and is awaiting the next round of public evaluation).
 
 ## Features
 
-- 模型抽象简单，reactor/acceptor/connector/notify等
-- 性能超级NB，没有任何多余的性能损耗
-- 完美支持REUSEPORT模式
+* I/O event-driven architecture
+* Lightweight and easy-to-use
+* Support multi-threaded polling
+* Perfect support for REUSEPORT multi-threading mode
+* Lock-free operations in a polling stack
+* Built-in quad-heap timer, suitable for performance-demanding scenarios with a large number of timers
+* Provide multiple optimization options
+* Build-in connection pool
+* Few APIs and low learning costs
 
-## TODO
-- 单个evpoll还可以共享更多(就像一个独立的栈空间), 它就像goroutine一样, 是栈内线程安全的, 可以为应用层提供高效的内存/资源管理
+## Installation
+
+```bash
+go get -u github.com/shaovie/goev
+```
+
+## Getting Started
+
+### Simple Service Example
+
+```go
+package main
+
+import (
+    "github.com/shaovie/goev"
+)
+
+type Http struct {
+	goev.Event
+}
+
+func (h *Http) OnOpen(fd int, now int64) bool {
+	if err := h.GetReactor().AddEvHandler(h, fd, goev.EvIn); err != nil {
+		return false
+	}
+	return true
+}
+func (h *Http) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
+	buf := evPollSharedBuff[:]
+	for {
+        // recv 
+	}
+	netfd.Write(fd, []byte(httpResp)) // Connection: close
+	return false                     // will goto OnClose
+}
+func (h *Http) OnClose(fd int) {
+	netfd.Close(fd)
+}
+
+func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU()*2 - 1)
+	forAcceptReactor, err := goev.NewReactor(
+		goev.EvPollNum(1),
+		goev.NoTimer(true),
+	)
+	if err != nil {
+		panic(err.Error())
+	}
+	forNewFdReactor, err := goev.NewReactor(
+		goev.EvPollNum(runtime.NumCPU()*2-1),
+		goev.NoTimer(true),
+	)
+	if err != nil {
+		panic(err.Error())
+	}
+	_, err = goev.NewAcceptor(forAcceptReactor, forNewFdReactor, func() goev.EvHandler { return new(Http) },
+		":8080",
+		goev.ListenBacklog(256),
+		goev.SockRcvBufSize(16*1024),
+	)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	go func() {
+		if err = forAcceptReactor.Run(); err != nil {
+			panic(err.Error())
+		}
+	}()
+	if err = forNewFdReactor.Run(); err != nil {
+		panic(err.Error())
+	}
+}
+
+```
+
+### REUSEPORT Service Example
+
+```go
+package main
+
+...
+
+func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU()*2 - 1)
+    evPollNum := runtime.NumCPU()*2-1
+	forNewFdReactor, err := goev.NewReactor(
+		goev.EvPollNum(evPollNum),
+		goev.NoTimer(true),
+	)
+	if err != nil {
+		panic(err.Error())
+	}
+    for i := 0; i < evPollNum; i++ {
+        _, err = goev.NewAcceptor(forNewFdReactor, forNewFdReactor, func() goev.EvHandler { return new(Http) },
+            ":8080",
+            goev.ListenBacklog(256),
+            goev.SockRcvBufSize(16*1024),
+            goev.ReusePort(true),
+        )
+        if err != nil {
+            panic(err.Error())
+        }
+    }
+	if err = forNewFdReactor.Run(); err != nil {
+		panic(err.Error())
+	}
+}
+
+```
+> Note: The reactor will bind different acceptors (listener fd) to different epoll instances to achieve multithreaded concurrent listening on the same IP:PORT
+
+## Related Projects
+
+* [ttlcache](https://github.com/shaovie/ttlcache): An in-process object caching library designed specifically for managing the caching and automatic release of objects with lifecycles
+* [tlog](https://github.com/shaovie/tlog): A more compact zerolog
 
 
-#### 关于EventPoll
-##### 线程模型
-- 开始选择L/F模型, 但后来发现当有水平触发模式下会有问题(如果事件处理不及时, 新的Leader会又捕捉到)
-- 现在的模式就是每个evpoll单独一个线程, acceptor/connector/reactor可以随便组合,将事件注册到不同的evpoll中
+## Benchmarks
 
-##### 事件分发
-- event poll捕捉到事件后，调用EvHandler接口，实现面向接口的业务处理
+We're comparing gnet, which is ranked first on TechEmpower, using the test code from http://github.com/TechEmpower/FrameworkBenchmarks/frameworks/Go/gnet/
 
-- 如果你的业务处理比较快, 那么直接在OnRead/OnWrite中处理业务是个不错的选择
+> Test environment GCP cloud instance, 2 cores, 4GB RAM
 
-- 如果你的业务处理比较慢, 那你应该把Reactor当做一个事件派发器, 在OnRead中异步处理业务, 这样保证epoll能高效运行
+The bench results of gnet.
+```text
+wrk -c 2 -t 2 -d10s http://127.0.0.1:8080/xxx
+Running 10s test @ http://127.0.0.1:8080/xxx
+  2 threads and 2 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    47.79us  170.86us   8.95ms   99.59%
+    Req/Sec    22.92k     1.00k   24.39k    78.11%
+  458456 requests in 10.10s, 56.40MB read
+Requests/sec:  45395.26
+Transfer/sec:      5.58MB
+```
 
-##### Acceptor/Connector
-- 可以让你更优雅的创建 Listen service,(可以监听多个端口+IP, 灵活无限制) 
-- 它本质上就是实现了EvHandler的接口，处理listen socket的可读事件，然后将新接收到的fd注册到Reactor.evpoll中。
-- 独立的封装可以让多个reactor开成pipeline式的处理
-- Acceptor, Connector与Reactor可以轻松组合, 任意绑定
+The bench results of goev. [test code](https://github.com/shaovie/goev/blob/main/example/techempower.go)
+```text
+wrk -c 2 -t 2 -d10s http://127.0.0.1:8080/xxx
+Running 10s test @ http://127.0.0.1:8080/xxx
+  2 threads and 2 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    42.69us   92.32us   6.33ms   99.57%
+    Req/Sec    23.49k     1.77k   26.37k    54.95%
+  471993 requests in 10.10s, 68.87MB read
+Requests/sec:  46733.75
+Transfer/sec:      6.82MB
+```
+> Note: This is the most basic and simplest test, for reference only
 
-##### 关于Timer
-- 目前还是简单的min heap实现, 但胜在简单稳定. 当单个evpoll的定时器到了万个的规模 就会有影响了. wheel还没搞完, 抽空再研究
+## Why high-performance
 
-##### 关于Log
-- 使用syscal.Write减少了一次mutex.Lock(internal/poll/fd_unix.go:Fd.Write中有writeLock)
-- 使用固定长度的[]byte格式化(fmt.Appendf)日志内容, 减少内存拷贝, 效率高(header中日期一天只需要格式化一次)
-- 代码简单, 透明
+* Connection bind threads/coroutines, no need for mutex locks within the 'polling stack' loop, provide global shared memory within the 'polling stack' for easy data reading, saving memory, and avoiding frequent memory allocation (also unnecessary for mutex locks)
+* ArrayMapUnion is a combined indexing structure that improves the indexing speed of fd and handler. Please refer to the test code [mutex_arr_vs_map.go](https://github.com/shaovie/goev/blob/main/test/mutex_arr_vs_map.go) for more information.
+* All operations directly use syscall, avoiding the use of encapsulation in the Go standard library (with mutex locks).
+* Less is more, keep the code concise and embody the essence of network programming
 
-##### 惯用写法
-- 包含EINTR的场景一定要循环操作
-- struct成员, 尽量按照字节从小到大依次排列, 根据字节对齐的原则, 会节省一些内存
-- 小数据量(十几个左右)索引的时候, slice可能比map效率更高, 因为它的内存是连续的, 对cpu cache更友好, map是松散的 而且是动态创建, 内部涉及到的小对象更多
-
-##### 一些零散的优化点
-- ArrayMapUnion 联合索引结构
-  是适合用int做为key索引的数组结构，index < arraySize 就用array存取，index >= arraySize 就用sync.Map存取，内存和索引速度可以兼得。
-  
-  原理：fd有个特点就是从0开始自增的int，当旧的释放后还会复用，我们就可以用fd做为索引定位保存的handler，当fd很大时，就用map索引
-  
-  进一步优化：经过测试整个array用一把锁，性能是很差的（在真正多线程环境下参考test/mutex_arr_vs_map.go），那么我们就可用atomic保存handler，创建一个[int]*atomic.Pointer[T]的数组，这样就大大减少了碰撞机会了，经过测试,可以比sync.Map快42%
-  
-- File/Socket 的读写操作尽量使用syscall以减少锁的使用, 标准库中封装都带Mutex(更合适全局空间使用)
-
-- evpoll中提供一个全局的共享内存, 供各connection处理接收消息, 对CPU Cache非常友好, 能大大提升消息接收/处理过程的性能
-
-#### 疑问
-关于https://blog.51cto.com/u_15087084/2597531 中讲到的msec, 调整msec是对下次事件轮询的预判, 主动让出CPU不就延缓了下次轮询的时机吗?
-我觉得它可能只是单纯测试了epoll_wait的执行时间, 并没有实际放fd进去
-
-#### Bugs
-- 整理成文章了 [使用syscall.Epoll_* 关联内存被GC释放导致的崩溃](https://zhuanlan.zhihu.com/p/640712548)
+## Contributing
+Contributions are welcome! If you find any bugs or have suggestions for improvement, please open an issue or submit a pull request
