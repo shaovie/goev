@@ -85,6 +85,7 @@ func main() {
 			panic(err.Error())
 		}
 	}()
+    
 	if err = forNewFdReactor.Run(); err != nil {
 		panic(err.Error())
 	}
