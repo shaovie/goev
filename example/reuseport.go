@@ -112,11 +112,6 @@ func main() {
     }
 
 	go updateLiveSecond()
-	go func() {
-		if err = forAcceptReactor.Run(); err != nil {
-			panic(err.Error())
-		}
-	}()
 	if err = forNewFdReactor.Run(); err != nil {
 		panic(err.Error())
 	}
