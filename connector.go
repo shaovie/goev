@@ -32,7 +32,7 @@ type Connector struct {
 
 // NewConnector return an instance
 func NewConnector(r *Reactor, opts ...Option) (*Connector, error) {
-	setOptions(opts...)
+	evOptions := setOptions(opts...)
 	c := &Connector{
 		sockRcvBufSize: evOptions.sockRcvBufSize,
 	}

@@ -33,7 +33,7 @@ type Acceptor struct {
 // New socket has been set to non-blocking
 func NewAcceptor(acceptorBindReactor *Reactor, newFdBindReactor *Reactor,
 	newEvHanlderFunc func() EvHandler, addr string, opts ...Option) (*Acceptor, error) {
-	setOptions(opts...)
+	evOptions := setOptions(opts...)
 	a := &Acceptor{
 		fd:               -1,
 		reactor:          acceptorBindReactor,

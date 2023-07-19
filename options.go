@@ -29,28 +29,25 @@ type Options struct {
 // Option function
 type Option func(*Options)
 
-var evOptions *Options
-
-func setOptions(optL ...Option) {
-	if evOptions == nil {
-		//= defaut options
-		evOptions = &Options{
-			reuseAddr:            true,
-			reusePort:            false,
-			evPollNum:            1,
-			evReadyNum:           512,
-			evDataArrSize:        8192,
-			listenBacklog:        512, // go default 128
-			noTimer:              false,
-			timerHeapInitSize:    1024,
-			evPollLockOSThread:   false,
-			evPollSharedBuffSize: 64 * 1024,
-		}
+func setOptions(optL ...Option) *Options {
+	//= defaut options
+	opts := &Options{
+		reuseAddr:            true,
+		reusePort:            false,
+		evPollNum:            1,
+		evReadyNum:           512,
+		evDataArrSize:        8192,
+		listenBacklog:        512, // go default 128
+		noTimer:              false,
+		timerHeapInitSize:    1024,
+		evPollLockOSThread:   false,
+		evPollSharedBuffSize: 64 * 1024,
 	}
 
 	for _, opt := range optL {
-		opt(evOptions)
+		opt(opts)
 	}
+	return opts
 }
 
 // ReuseAddr for SO_REUSEADDR
@@ -71,7 +68,7 @@ func ReusePort(v bool) Option {
 	}
 }
 
-// Listen backlog, For syscall.listen(fd, backlog), also affect `for i < backlog/2 { syscall.accept() }`
+// ListenBacklog For syscall.listen(fd, backlog), also affect `for i < backlog/2 { syscall.accept() }`
 func ListenBacklog(v int) Option {
 	return func(o *Options) {
 		o.listenBacklog = v

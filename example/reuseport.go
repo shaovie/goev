@@ -86,7 +86,7 @@ func main() {
 	httpRespHeader = []byte(httpHeaderS)
 	httpRespContentLength = []byte(contentLengthS)
 
-    evPollNum := runtime.NumCPU()*2-1
+	evPollNum := runtime.NumCPU()*2 - 1
 	forNewFdReactor, err := goev.NewReactor(
 		goev.EvDataArrSize(20480), // default val
 		goev.EvPollNum(evPollNum),
@@ -96,20 +96,20 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-    // ReusePort 模式下, 创建N个相同的acceptor(listener fd), 注册不到同的evPool中,
-    // 内核会将新链接调度到不同的listener fd的全链接队列中去), 这样不会出现惊群效应
-    for i := 0; i < evPollNum; i++ {
-        _, err = goev.NewAcceptor(forNewFdReactor, forNewFdReactor,
-            func() goev.EvHandler { return new(Http) },
-            ":8080",
-            goev.ListenBacklog(128),
-            goev.ReusePort(true),
-            //goev.SockRcvBufSize(16*1024), // 短链接, 不需要很大的缓冲区
-        )
-        if err != nil {
-            panic(err.Error())
-        }
-    }
+	// ReusePort 模式下, 创建N个相同的acceptor(listener fd), 注册不到同的evPool中,
+	// 内核会将新链接调度到不同的listener fd的全链接队列中去), 这样不会出现惊群效应
+	for i := 0; i < evPollNum; i++ {
+		_, err = goev.NewAcceptor(forNewFdReactor, forNewFdReactor,
+			func() goev.EvHandler { return new(Http) },
+			":8080",
+			goev.ListenBacklog(128),
+			goev.ReusePort(true),
+			//goev.SockRcvBufSize(16*1024), // 短链接, 不需要很大的缓冲区
+		)
+		if err != nil {
+			panic(err.Error())
+		}
+	}
 
 	go updateLiveSecond()
 	if err = forNewFdReactor.Run(); err != nil {

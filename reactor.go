@@ -28,7 +28,7 @@ type Reactor struct {
 
 // NewReactor return an instance
 func NewReactor(opts ...Option) (*Reactor, error) {
-	setOptions(opts...)
+	evOptions := setOptions(opts...)
 	if evOptions.evPollNum < 1 {
 		panic("options: EvPollThreadNum MUST > 0")
 	}
