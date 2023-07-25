@@ -2,45 +2,47 @@
 
 框架核心就是OS的ev poll(epoll)机制
 
-每个evpoll 可以认为是一个独立的执行栈, 它是线程安全的, 凡是绑定到evpoll中的链接, 在该执行栈中的I/O操作都是线程安全的
+每个evpoll 可以认为是一个独立的执行栈, 它是线程安全的, 凡是绑定到evpoll中的链接, 在该执行栈中的I/O操作都是线程安全的  
+
 鼓励开发者在evpoll执行栈中进行I/O操作, 解析到具体的业务数据后, 可以push到其他线程或协程异步处理, 但是跟I/O相关的, 最好是在evpoll执行栈中操作(也就是OnRead/OnWrite中)
 
 **Reactor 是对evpoll的简单的管理对象, 对外提供统一接口**  
 使用方法:  
 ```go
-	reactor, err := goev.NewReactor(
-		goev.EvDataArrSize(0),     // evpoll内部数据结构需要, 可以实际需要微调提升性能
-		goev.EvReadyNum(512),      // evpoll(epoll)单次轮询处理的事件个数, 适当调整可以批量处理能力
-		goev.EvPollNum(evPollNum), // 指定有多少个线程/协程来执行evpoll工作,
+    reactor, err := goev.NewReactor(
+        goev.EvDataArrSize(0),     // evpoll内部数据结构需要, 可以实际需要微调提升性能
+        goev.EvReadyNum(512),      // evpoll(epoll)单次轮询处理的事件个数, 适当调整可以批量处理能力
+        goev.EvPollNum(evPollNum), // 指定有多少个线程/协程来执行evpoll工作,
                                    // 每个evpoll独立绑定一个线程/协程, 所以不存在单个链接不存在并发处理
-		goev.NoTimer(true),        // 如果没有定时器或connector的使用需求, 可以设置此参数,
+        goev.NoTimer(true),        // 如果没有定时器或connector的使用需求, 可以设置此参数,
                                    // 可以稍微减少一些不必要的开销
 
         goev.SetIOReadWriter(goev.NewIOReadWriter(32*1024, 1024*1024)),
                                    // 框架提供的默认I/O操作接口
-	)
-	if err != nil {
-		panic(err.Error())
-	}
+    )
+    if err != nil {
+        panic(err.Error())
+    }
 ```
 
-goev 面向对象的设计思想, 每个链接为一个对象(实现EvHandler接口), 链接有两种来源  
+
+**goev 面向对象的设计思想, 每个链接为一个对象(实现EvHandler接口), 链接有两种来源**  
 
 **一种是acceptor接收到的**  
 acceptor会指定一个 NewEvHandler的方法, 这样每接受到一个新链接, 就会通过此方法分配一个新的对象  
 acceptor的使用方法:  
 ```go
-	_, err = goev.NewAcceptor(
+    _, err = goev.NewAcceptor(
         forAcceptReactor,  // 第1个参数负责轮询listener fd的I/O事件
         forNewFdReactor,   // 第2个参数负责轮询listener fd接受到的新链接的I/O事件
                            // 前2个参数 也可以是同一值, 即所有I/O事件混在一个Reactor中处理
         func() goev.EvHandler { return new(Http) }, // 负责给新链接分配对象
-		":8080",           // 通常服务监听的地址格式 ipv4
-		goev.ListenBacklog(256), // 后边是可选参数
+        ":8080",           // 通常服务监听的地址格式 ipv4
+        goev.ListenBacklog(256), // 后边是可选参数
         goev.ReuseAddr(true), // 一般服务器的标配参数(避免在TIME_WAIT状态下)
         goev.ReusePort(true), // 可以多进程/线程同时监听一个地址(ip:port)
-		goev.SockRcvBufSize(16*1024), // 此参数是必须在listen 之前设定的, 对控制socket缓冲区的内存有帮助
-	)
+        goev.SockRcvBufSize(16*1024), // 此参数是必须在listen 之前设定的, 对控制socket缓冲区的内存有帮助
+    )
 
 ```
 
@@ -48,13 +50,13 @@ acceptor的使用方法:
 connector.Connect 方法会指定一个链接对象, 连接成功后此对象就会绑定新的链接  
 connector的使用方法:  
 ```go
-	c, err := NewConnector(
+    c, err := NewConnector(
         r, // 非阻塞链接使用到的Reactor
         SockRcvBufSize(8*1024) // 新链接指定的接收缓冲区参数, 必须在connect之前设置
     )
-	if err != nil {
-		panic(err.Error())
-	}
+    if err != nil {
+        panic(err.Error())
+    }
     err = c.Connect("127.0.0.1:9999", &Conn{}, 1000)
 ```
 
@@ -64,7 +66,7 @@ connector的使用方法:
 开发者要继承(内嵌)Event对象  
 ```go
 type Http struct {
-	goev.Event
+    goev.Event
 }
 // 根据自己的需要, 实现具体的I/O事件处理方法
 // OnOpen 是当acceptor/connector得到链接后首先调用的方法
@@ -76,35 +78,35 @@ func (h *Http) OnOpen(fd int, now int64) bool {
     //
     // 比如我们要初始化一个buff, 那么如果该buff是在 AddEvHandler 之后初始化的, 
     // 很有可能OnRead方法在buff还没初始化完成就已经调用了
-	if err := h.GetReactor().AddEvHandler(h, fd, goev.EvIn); err != nil {
-		return false // 返回false 会直接回调OnClose方法
-	}
-	return true
+    if err := h.GetReactor().AddEvHandler(h, fd, goev.EvIn); err != nil {
+        return false // 返回false 会直接回调OnClose方法
+    }
+    return true
 }
 // 处理可读事件(即: 链接有数据可以接收)
 func (h *Http) OnRead(fd int, nio goev.IOReadWriter, now int64) bool {
 
     // goev.IOReadWriter 是框架内置的I/O操作方法, 使用一个全局的buf, 单个evpoll内所有链接共享,
     // 这样减少了临时内存分配和二次拷贝
-	recvedData, err := nio.InitRead().Read(fd)
-	if err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
-		return false
-	}
+    recvedData, err := nio.InitRead().Read(fd)
+    if err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
+        return false
+    }
 
     // handle recvedData
     // ...
     // build response
 
     // 构建响应数据, 同样是使用goev.IOReadWriter 内置的共享buf, 进行数据拼装, 减少临时内存分配和二次拷贝
-	nio.InitWrite().Append(httpRespHeader).
-		Append([]byte(liveDate.Load().(string))).
-		Append(httpRespContentLength).
-		Write(fd)
+    nio.InitWrite().Append(httpRespHeader).
+        Append([]byte(liveDate.Load().(string))).
+        Append(httpRespContentLength).
+        Write(fd)
     return true
 }
 func (h *Http) OnClose(fd int) {
     // 释放资源, Http对象也会被gc回收的(前提是开发都没有单独将Http对象另外保存起来)
-	netfd.Close(fd)
+    netfd.Close(fd)
 }
 ```
 
@@ -113,9 +115,9 @@ func (h *Http) OnClose(fd int) {
 比如我们需要定时向对端发送Ping/Pong  
 ```go
 func (h *Http) OnOpen(fd int, now int64) bool {
-	if err := h.GetReactor().AddEvHandler(h, fd, goev.EvIn); err != nil {
-		return false // 返回false 会直接回调OnClose方法
-	}
+    if err := h.GetReactor().AddEvHandler(h, fd, goev.EvIn); err != nil {
+        return false // 返回false 会直接回调OnClose方法
+    }
 
     // 特别注意:
     // 1. 注册定时器是线程安全的, 内部有mutex保护
@@ -123,7 +125,7 @@ func (h *Http) OnOpen(fd int, now int64) bool {
     //    I/O和Timer事件都是并发安全的
     if err := h.GetReactor().SchedueTimer(h, 1000, 20*000); err != nil { 
         h.GetReactor().RemoveEvHandler(eh, fd) // 要将刚才添加成功的操作, 撤销掉
-		return false // 返回false 会直接回调OnClose方法
+        return false // 返回false 会直接回调OnClose方法
     }
 
 
@@ -141,7 +143,7 @@ func (h *Http) OnTimeout(millisecond int64) bool {
 }
 func (h *Http) OnClose(fd int) {
     // 释放资源, Http对象也会被gc回收的(前提是开发都没有单独将Http对象另外保存起来)
-	netfd.Close(fd)
+    netfd.Close(fd)
     h.closed = true
     h.GetReactor().CancelTimer(h)
 }
