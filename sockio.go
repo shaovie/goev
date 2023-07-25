@@ -18,6 +18,8 @@ type IOReadWriter interface {
 
 	Append(v []byte) IOReadWriter
 
+    Buff() []byte
+
 	Read(fd int) ([]byte, error)
 
 	Write(fd int) (n int, err error)
@@ -76,6 +78,11 @@ func (rw *IOReadWrite) InitWrite() IOReadWriter {
 func (rw *IOReadWrite) Append(v []byte) IOReadWriter {
 	rw.buf = append(rw.buf, v...)
 	return rw
+}
+
+// Buff return buf
+func (rw *IOReadWrite) Buff() []byte {
+    return rw.buf[:0]
 }
 
 // Closed return true if connection closed
