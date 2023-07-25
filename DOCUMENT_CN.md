@@ -5,8 +5,8 @@
 每个evpoll 可以认为是一个独立的执行栈, 它是线程安全的, 凡是绑定到evpoll中的链接, 在该执行栈中的I/O操作都是线程安全的
 鼓励开发者在evpoll执行栈中进行I/O操作, 解析到具体的业务数据后, 可以push到其他线程或协程异步处理, 但是跟I/O相关的, 最好是在evpoll执行栈中操作(也就是OnRead/OnWrite中)
 
-**Reactor 是对evpoll的简单的管理对象, 对外提供统一接口**
-使用方法:
+**Reactor 是对evpoll的简单的管理对象, 对外提供统一接口**  
+使用方法:  
 ```go
 	reactor, err := goev.NewReactor(
 		goev.EvDataArrSize(0),     // evpoll内部数据结构需要, 可以实际需要微调提升性能
@@ -24,11 +24,11 @@
 	}
 ```
 
-goev 面向对象的设计思想, 每个链接为一个对象(实现EvHandler接口), 链接有两种来源
+goev 面向对象的设计思想, 每个链接为一个对象(实现EvHandler接口), 链接有两种来源  
 
-**一种是acceptor接收到的**
-acceptor会指定一个 NewEvHandler的方法, 这样每接受到一个新链接, 就会通过此方法分配一个新的对象
-acceptor的使用方法:
+**一种是acceptor接收到的**  
+acceptor会指定一个 NewEvHandler的方法, 这样每接受到一个新链接, 就会通过此方法分配一个新的对象  
+acceptor的使用方法:  
 ```go
 	_, err = goev.NewAcceptor(
         forAcceptReactor,  // 第1个参数负责轮询listener fd的I/O事件
@@ -44,9 +44,9 @@ acceptor的使用方法:
 
 ```
 
-**一种是connector主动连接的**
-connector.Connect 方法会指定一个链接对象, 连接成功后此对象就会绑定新的链接
-connector的使用方法:
+**一种是connector主动连接的**  
+connector.Connect 方法会指定一个链接对象, 连接成功后此对象就会绑定新的链接  
+connector的使用方法:  
 ```go
 	c, err := NewConnector(
         r, // 非阻塞链接使用到的Reactor
@@ -58,10 +58,10 @@ connector的使用方法:
     err = c.Connect("127.0.0.1:9999", &Conn{}, 1000)
 ```
 
-通过Reactor/Acceptor/Connector就可以组合出一个完全非阻塞/异步化的网络事件处理框架
+通过Reactor/Acceptor/Connector就可以组合出一个完全非阻塞/异步化的网络事件处理框架  
 
-具体的网络事件处理逻辑在EvHandler的接口实现
-开发者要继承(内嵌)Event对象
+具体的网络事件处理逻辑在EvHandler的接口实现  
+开发者要继承(内嵌)Event对象  
 ```go
 type Http struct {
 	goev.Event
@@ -108,9 +108,10 @@ func (h *Http) OnClose(fd int) {
 }
 ```
 
-**定时器的使用**
+**定时器的使用**  
 
-比如我们需要定时向对端发送Ping/Pong
+比如我们需要定时向对端发送Ping/Pong  
+```go
 func (h *Http) OnOpen(fd int, now int64) bool {
 	if err := h.GetReactor().AddEvHandler(h, fd, goev.EvIn); err != nil {
 		return false // 返回false 会直接回调OnClose方法
@@ -144,3 +145,4 @@ func (h *Http) OnClose(fd int) {
     h.closed = true
     h.GetReactor().CancelTimer(h)
 }
+```
