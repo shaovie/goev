@@ -112,7 +112,7 @@ func (h *Http) OnClose(fd int) {
 
 
 **定时器的使用**  
-> golang已经内置Timer了, 为什么框架还要在引入?  
+> **Golang已经内置Timer了, 为什么框架还要在引入?**  
   因为框架中引入timer能让I/O和timer事件全部绑定在一个线程/协栈执行栈中, 避免竞争
   一旦使用golang全局timer, 那么timer中如果有I/O操作, 所有I/O操作必要考虑并发保护, 这是一个非常大的开销
   
