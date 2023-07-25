@@ -110,7 +110,12 @@ func (h *Http) OnClose(fd int) {
 }
 ```
 
+
 **定时器的使用**  
+> golang已经内置Timer了, 为什么框架还要在引入?  
+  因为框架中引入timer能让I/O和timer事件全部绑定在一个线程/协栈执行栈中, 避免竞争
+  一旦使用golang全局timer, 那么timer中如果有I/O操作, 所有I/O操作必要考虑并发保护, 这是一个非常大的开销
+  
 
 比如我们需要定时向对端发送Ping/Pong  
 ```go
@@ -123,7 +128,7 @@ func (h *Http) OnOpen(fd int, now int64) bool {
     // 1. 注册定时器是线程安全的, 内部有mutex保护
     // 2. 注册定时器一定要在 注册I/O事件之后, 这样才能确保跟I/O事件绑定到同一个evpoll上, 以保证Http对象的
     //    I/O和Timer事件都是并发安全的
-    if err := h.GetReactor().SchedueTimer(h, 1000, 20*000); err != nil { 
+    if err := h.GetReactor().SchedueTimer(h, 1000, 20*1000); err != nil { 
         h.GetReactor().RemoveEvHandler(eh, fd) // 要将刚才添加成功的操作, 撤销掉
         return false // 返回false 会直接回调OnClose方法
     }
@@ -133,9 +138,9 @@ func (h *Http) OnOpen(fd int, now int64) bool {
     return true
 }
 // 1秒后触发, 并以20秒为周期循环触发
-func (h *Http) OnTimeout(millisecond int64) bool {
+func (h *Http) OnTimeout(now int64) bool {
     // 特别注意: 此时I/O事件可能已经触发过, 链接可能已经关闭, evpoll中不再持有Http对象
-    if h.closed == true {
+    if h.closed == true { // closed 变量不需要保护
         return false // end, timer removed
     }
     // send ping 这里目前并没有实现共享buf，做为下一步优化点
@@ -148,3 +153,6 @@ func (h *Http) OnClose(fd int) {
     h.GetReactor().CancelTimer(h)
 }
 ```
+
+
+至此, 一个完整的基础框架就完成了,
