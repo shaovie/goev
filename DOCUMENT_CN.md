@@ -24,9 +24,10 @@
         panic(err.Error())
     }
 ```
+Reactor通过对fd % evPollNum 均匀分布到各evpoll中去.  
 
 
-**goev 面向对象的设计思想, 每个链接为一个对象(实现EvHandler接口), 链接有两种来源**  
+**goev 是OOP的设计思想, 将每个链接视为一个对象(实现EvHandler接口), 链接有两种来源**  
 
 **一种是acceptor接收到的**  
 acceptor会指定一个 NewEvHandler的方法, 这样每接受到一个新链接, 就会通过此方法分配一个新的对象  
@@ -66,14 +67,14 @@ connector的使用方法:
 开发者要继承(内嵌)Event对象  
 ```go
 type Http struct {
-    goev.Event
+    goev.Event  // 特别注意: 如果想使用sync.pool之类的技术复用Http对象, 要记得调用Event.Init()
 }
 // 根据自己的需要, 实现具体的I/O事件处理方法
 // OnOpen 是当acceptor/connector得到链接后首先调用的方法
 func (h *Http) OnOpen(fd int, now int64) bool {
     // 新链接要手动指定要轮询的事件类型
     //
-    // 特别注意: 当acceptor/connector使用的Reactor指定了多个EvPollNum时, 这些会出现线程切换,
+    // 特别注意: 当acceptor/connector使用的Reactor指定了多个EvPollNum时, 这时会出现线程切换,
     // 所以一些针对I/O操作的初始化过程要在AddEvHandler之前完成
     //
     // 比如我们要初始化一个buff, 那么如果该buff是在 AddEvHandler 之后初始化的, 
