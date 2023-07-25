@@ -61,7 +61,7 @@ type EvHandler interface {
 	// time to some extent).
 	//
 	// Call OnClose() when return false
-	OnRead(fd int, evPollSharedBuff []byte, millisecond int64) bool
+	OnRead(fd int, nio IOReadWriter, millisecond int64) bool
 
 	// EvPoll catch writeable i/o event
 	// The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
@@ -69,7 +69,7 @@ type EvHandler interface {
 	// time to some extent).
 	//
 	// Call OnClose() when return false
-	OnWrite(fd int, millisecond int64) bool
+	OnWrite(fd int, nio IOReadWriter, millisecond int64) bool
 
 	// EvPoll catch connect result
 	// Only be asynchronously called after connector.Connect() returns nil
@@ -126,12 +126,12 @@ func (*Event) OnOpen(fd int, millisecond int64) bool {
 }
 
 // OnRead please make sure you want to reimplement it.
-func (*Event) OnRead(fd int, evPollSharedBuff []byte, millisecond int64) bool {
+func (*Event) OnRead(fd int, nio IOReadWriter, millisecond int64) bool {
 	panic("Event OnRead")
 }
 
 // OnWrite please make sure you want to reimplement it.
-func (*Event) OnWrite(fd int, millisecond int64) bool {
+func (*Event) OnWrite(fd int, nio IOReadWriter, millisecond int64) bool {
 	panic("Event OnWrite")
 }
 

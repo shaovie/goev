@@ -163,7 +163,7 @@ type inProgressConnect struct {
 }
 
 // Called by reactor when asynchronous connections fail.
-func (p *inProgressConnect) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
+func (p *inProgressConnect) OnRead(fd int, rw IOReadWriter, now int64) bool {
 	if !p.progressDone.CompareAndSwap(0, 1) {
 		return true
 	}
@@ -172,7 +172,7 @@ func (p *inProgressConnect) OnRead(fd int, evPollSharedBuff []byte, now int64) b
 }
 
 // Called by reactor when asynchronous connections succeed.
-func (p *inProgressConnect) OnWrite(fd int, now int64) bool {
+func (p *inProgressConnect) OnWrite(fd int, rw IOReadWriter, now int64) bool {
 	if !p.progressDone.CompareAndSwap(0, 1) {
 		return true
 	}

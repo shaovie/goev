@@ -15,11 +15,11 @@ type Options struct {
 	sockRcvBufSize int // ignore equal 0
 
 	// reactor options
-	evPollNum            int //
-	evReadyNum           int //
-	evDataArrSize        int
-	evPollLockOSThread   bool
-	evPollSharedBuffSize int
+	evPollNum          int //
+	evReadyNum         int //
+	evDataArrSize      int
+	evPollLockOSThread bool
+	ioReadWriter       IOReadWriter
 
 	// timer
 	noTimer           bool
@@ -32,16 +32,16 @@ type Option func(*Options)
 func setOptions(optL ...Option) *Options {
 	//= defaut options
 	opts := &Options{
-		reuseAddr:            true,
-		reusePort:            false,
-		evPollNum:            1,
-		evReadyNum:           512,
-		evDataArrSize:        8192,
-		listenBacklog:        512, // go default 128
-		noTimer:              false,
-		timerHeapInitSize:    1024,
-		evPollLockOSThread:   false,
-		evPollSharedBuffSize: 64 * 1024,
+		reuseAddr:          true,
+		reusePort:          false,
+		evPollNum:          1,
+		evReadyNum:         512,
+		evDataArrSize:      8192,
+		listenBacklog:      512, // go default 128
+		noTimer:            false,
+		timerHeapInitSize:  1024,
+		evPollLockOSThread: false,
+		ioReadWriter:       NewIOReadWriter(64*1024, 1024*1024),
 	}
 
 	for _, opt := range optL {
@@ -139,10 +139,17 @@ func EvReadyNum(n int) Option {
 // 单个evpoll内的全局共享内存, 对cpu cache 友好, 读取socket缓存区的数据时非常高效
 // 另: 如果是Epoll-ET模式, 就需要有足够大的内存来一次性读完缓冲区的数据
 func EvPollSharedBuffSize(n int) Option {
+	panic("deprecated")
+}
+
+// SetIOReadWriter setting IOReadWriter
+//
+// default IOReadWriter buf size is 64KB,
+// Reading data can increase the buffer capacity, but writing data does not impose any restrictions
+// on the buffer capacity
+func SetIOReadWriter(rw IOReadWriter) Option {
 	return func(o *Options) {
-		if n > 0 {
-			o.evPollSharedBuffSize = n
-		}
+		o.ioReadWriter = rw
 	}
 }
 

@@ -17,15 +17,16 @@ type evData struct {
 type evPoll struct {
 	efd int // epoll fd
 
-	evReadyNum       int // epoll_wait一次轮询获取固定数量准备好的I/O事件, 此参数有利于线程处理的敏捷性
-	evPollSharedBuff []byte
+	evReadyNum   int // epoll_wait一次轮询获取固定数量准备好的I/O事件, 此参数有利于线程处理的敏捷性
+	ioReadWriter IOReadWriter
 
 	evHandlerMap *ArrayMapUnion[evData] // Refer to https://zhuanlan.zhihu.com/p/640712548
 	timer        timer
 	evPollWakeup Notifier
 }
 
-func (ep *evPoll) open(evReadyNum, evPollSharedBuffSize, evDataArrSize int, timer timer) error {
+func (ep *evPoll) open(evReadyNum, evDataArrSize int,
+	timer timer, ioReadWriter IOReadWriter) error {
 	if evReadyNum < 1 {
 		return errors.New("EvReadyNum < 1")
 	}
@@ -36,7 +37,7 @@ func (ep *evPoll) open(evReadyNum, evPollSharedBuffSize, evDataArrSize int, time
 	ep.efd = efd
 	ep.timer = timer
 	ep.evReadyNum = evReadyNum
-	ep.evPollSharedBuff = make([]byte, evPollSharedBuffSize)
+	ep.ioReadWriter = ioReadWriter
 	ep.evHandlerMap = NewArrayMapUnion[evData](evDataArrSize)
 
 	// Must be placed last
@@ -106,14 +107,14 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 					continue
 				}
 				if ev.Events&(syscall.EPOLLOUT) != 0 { // MUST before EPOLLIN (e.g. connect)
-					if ed.eh.OnWrite(ed.fd, now) == false {
+					if ed.eh.OnWrite(ed.fd, ep.ioReadWriter, now) == false {
 						ep.remove(ed.fd) // MUST before OnClose()
 						ed.eh.OnClose(ed.fd)
 						continue
 					}
 				}
 				if ev.Events&(syscall.EPOLLIN) != 0 {
-					if ed.eh.OnRead(ed.fd, ep.evPollSharedBuff, now) == false {
+					if ed.eh.OnRead(ed.fd, ep.ioReadWriter, now) == false {
 						ep.remove(ed.fd) // MUST before OnClose()
 						ed.eh.OnClose(ed.fd)
 						continue

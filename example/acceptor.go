@@ -27,31 +27,10 @@ func (h *Http) OnOpen(fd int, now int64) bool {
 	}
 	return true
 }
-func (h *Http) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
-	buf := buffPool.Get().([]byte) // just read
-	defer buffPool.Put(buf)
-
-	readN := 0
-	for {
-		if readN >= cap(buf) { // alloc new buff to read
-			break
-		}
-		n, err := netfd.Read(fd, buf[readN:])
-		if err != nil {
-			if err == syscall.EAGAIN { // epoll ET mode
-				break
-			}
-			fmt.Println("read: ", err.Error())
-			return false
-		}
-		if n > 0 { // n > 0
-			readN += n
-		} else { // n == 0 connection closed,  will not < 0
-			if readN == 0 {
-				fmt.Println("peer closed. ", n)
-			}
-			return false
-		}
+func (h *Http) OnRead(fd int, nio IOReadWriter, now int64) bool {
+	_, err := nio.InitRead().Read(fd)
+	if err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
+		return false
 	}
 	netfd.Write(fd, []byte(httpResp)) // Connection: close
 	return false                      // will goto OnClose
