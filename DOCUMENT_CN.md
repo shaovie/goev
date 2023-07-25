@@ -88,7 +88,7 @@ func (h *Http) OnOpen(fd int, now int64) bool {
 func (h *Http) OnRead(fd int, nio goev.IOReadWriter, now int64) bool {
 
     // goev.IOReadWriter 是框架内置的I/O操作方法, 使用一个全局的buf, 单个evpoll内所有链接共享,
-    // 这样减少了临时内存分配和二次拷贝
+    // 这样减少了临时内存分配和二次拷贝, 更对cpu cache友好!
     recvedData, err := nio.InitRead().Read(fd)
     if err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
         return false
