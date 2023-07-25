@@ -24,7 +24,7 @@ go get -u github.com/shaovie/goev
 
 ## Getting Started
 
-See the [中文文档](DUCUMENT_CN.md) for the Chinese documentation.
+See the [中文文档](DOCUMENT_CN.md) for the Chinese documentation.
 
 ### Simple Service Example
 
