@@ -24,6 +24,8 @@ go get -u github.com/shaovie/goev
 
 ## Getting Started
 
+See the [中文文档](DUCUMENT_CN.md) for the Chinese documentation.
+
 ### Simple Service Example
 
 ```go
@@ -43,10 +45,10 @@ func (h *Http) OnOpen(fd int, now int64) bool {
 	}
 	return true
 }
-func (h *Http) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
-	buf := evPollSharedBuff[:]
-	for {
-        // recv 
+func (h *Http) OnRead(fd int, nio goev.IOReadWriter, now int64) bool {
+	_, err := nio.InitRead().Read(fd)
+	if err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
+		return false
 	}
 	netfd.Write(fd, []byte(httpResp)) // Connection: close
 	return false                     // will goto OnClose

@@ -47,6 +47,9 @@ type EvHandler interface {
 	setReactor(r *Reactor)
 	GetReactor() *Reactor
 
+	setTimerItem(ti *timerItem)
+	getTimerItem() *timerItem
+
 	// Call by acceptor on `accept` a new fd or connector on `connect` successful
 	// The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
 	// precise time. Use it with caution (as it can reduce the frequency of obtaining the current
@@ -103,14 +106,23 @@ type Event struct {
 
 	_ep *evPoll // atomic.Pointer[evPoll]
 	// 这里不需要保护, 在set之前Get是没有任何调用机会的(除非框架之外乱搞)
+
+	_ti *timerItem
+}
+
+// Init 可以Event对象复用的时候用得上
+func (e *Event) Init() {
+	e._r, e._ep, e._ti = nil, nil, nil
 }
 
 func (e *Event) setEvPoll(ep *evPoll) {
 	e._ep = ep
 }
+
 func (e *Event) getEvPoll() *evPoll {
 	return e._ep
 }
+
 func (e *Event) setReactor(r *Reactor) {
 	e._r = r
 }
@@ -118,6 +130,14 @@ func (e *Event) setReactor(r *Reactor) {
 // GetReactor can retrieve the current event object bound to which Reactor
 func (e *Event) GetReactor() *Reactor {
 	return e._r
+}
+
+func (e *Event) setTimerItem(ti *timerItem) {
+	e._ti = ti
+}
+
+func (e *Event) getTimerItem() *timerItem {
+	return e._ti
 }
 
 // OnOpen please make sure you want to reimplement it.

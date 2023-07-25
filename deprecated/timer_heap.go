@@ -69,6 +69,7 @@ func (th *timerHeap) schedule(eh EvHandler, delay, interval int64) error {
 		interval:  interval,
 		eh:        eh,
 	}
+	eh.setTimerItem(ti)
 	th.heapMtx.Lock()
 	heap.Push(&th.heap, ti)
 	th.heapMtx.Unlock()
@@ -80,6 +81,7 @@ func (th *timerHeap) scheduleTest(eh EvHandler, delay, interval int64) error {
 		interval:  interval,
 		eh:        eh,
 	}
+	eh.setTimerItem(ti)
 	th.heapMtx.Lock()
 	heap.Push(&th.heap, ti)
 	th.heapMtx.Unlock()
@@ -98,6 +100,9 @@ func (th *timerHeap) handleExpired(now int64) int64 {
 				delta = -1
 			}
 			break
+		}
+		if item.eh == nil { // canceld
+			continue
 		}
 		if item.eh.OnTimeout(now) == true && item.interval > 0 {
 			item.expiredAt = now + item.interval

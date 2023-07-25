@@ -79,10 +79,10 @@ func (r *Reactor) RemoveEvHandler(eh EvHandler, fd int) error {
 }
 
 // SchedueTimer starts a timer that can be either one-time execution or repeated execution
-//
-// # SchedueTimer 启动一个定时器，可以是执行一次的，也可以是循环执行的
+// SchedueTimer 启动一个定时器，可以是执行一次的，也可以是循环执行的
 //
 // delay, interval are both relative time measurements with millisecond accuracy, for example, delay=5msec.
+// MUST: One EvHandler can only register one timer
 func (r *Reactor) SchedueTimer(eh EvHandler, delay, interval int64) error {
 	i := 0
 	if r.evPollNum > 1 {
@@ -92,6 +92,15 @@ func (r *Reactor) SchedueTimer(eh EvHandler, delay, interval int64) error {
 		i = int(r.timerIdx.Add(1) % int64(r.evPollNum))
 	}
 	return r.evPolls[i].scheduleTimer(eh, delay, interval)
+}
+
+// CancelTimer cancel an timer bound to eh
+func (r *Reactor) CancelTimer(eh EvHandler) {
+	if eh != nil {
+		if ep := eh.getEvPoll(); ep != nil {
+			ep.cancelTimer(eh)
+		}
+	}
 }
 
 // Run starts the multi-event evpolling to run.

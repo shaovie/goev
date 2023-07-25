@@ -76,9 +76,15 @@ func (ep *evPoll) scheduleTimer(eh EvHandler, delay, interval int64) (err error)
 	if ep.timer == nil {
 		return errors.New("not create timer")
 	}
+	eh.setEvPoll(ep)
 	err = ep.timer.schedule(eh, delay, interval)
 	ep.evPollWakeup.Notify()
 	return
+}
+func (ep *evPoll) cancelTimer(eh EvHandler) {
+	if ep.timer != nil {
+		ep.timer.cancel(eh)
+	}
 }
 func (ep *evPoll) run(wg *sync.WaitGroup) error {
 	if wg != nil {

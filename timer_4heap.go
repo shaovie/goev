@@ -28,6 +28,9 @@ func (th *timer4Heap) schedule(eh EvHandler, delay, interval int64) error {
 	if delay < 0 || interval < 0 {
 		return errors.New("params are invalid")
 	}
+	if eh.getTimerItem() != nil {
+		return errors.New("eh had scheduled")
+	}
 
 	now := time.Now().UnixMilli()
 	ti := &timerItem{
@@ -38,6 +41,7 @@ func (th *timer4Heap) schedule(eh EvHandler, delay, interval int64) error {
 	th.fheapMtx.Lock()
 	th.fheap = append(th.fheap, ti)
 	th.shiftUp(len(th.fheap) - 1)
+	eh.setTimerItem(ti)
 	th.fheapMtx.Unlock()
 	return nil
 }
@@ -47,11 +51,21 @@ func (th *timer4Heap) scheduleTest(eh EvHandler, delay, interval int64) error {
 		interval:  interval,
 		eh:        eh,
 	}
+	eh.setTimerItem(ti)
 	th.fheapMtx.Lock()
 	th.fheap = append(th.fheap, ti)
 	th.shiftUp(len(th.fheap) - 1)
 	th.fheapMtx.Unlock()
 	return nil
+}
+func (th *timer4Heap) cancel(eh EvHandler) {
+	ti := eh.getTimerItem()
+	if ti == nil {
+		return
+	}
+	th.fheapMtx.Lock()
+	ti.eh = nil // TODO eh atomic.Value ?
+	th.fheapMtx.Unlock()
 }
 func (th *timer4Heap) handleExpired(now int64) int64 {
 	th.fheapMtx.Lock()
@@ -66,6 +80,9 @@ func (th *timer4Heap) handleExpired(now int64) int64 {
 				delta = -1
 			}
 			break
+		}
+		if item.eh == nil { // canceled
+			continue
 		}
 		if item.eh.OnTimeout(now) == true && item.interval > 0 {
 			item.expiredAt = now + item.interval
