@@ -5,7 +5,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -137,7 +136,7 @@ func (c *Connector) connect(fd int, sa syscall.Sockaddr, eh EvHandler, timeout i
 			syscall.Close(fd)
 			return errors.New("InPorgress AddEvHandler in connector.Connect: " + err.Error())
 		}
-		reactor.SchedueTimer(inh, timeout, 0)
+		reactor.SchedueTimer(inh, timeout, 0) // don't need to cancel it when conn error
 		return nil
 	} else if err == nil { // success
 		eh.setReactor(reactor)
@@ -154,29 +153,22 @@ func (c *Connector) connect(fd int, sa syscall.Sockaddr, eh EvHandler, timeout i
 type inProgressConnect struct {
 	Event
 
-	fd           int
-	eh           EvHandler
-	progressDone atomic.Int32 // Only process one I/O event or timer event
+	fd int
+	eh EvHandler
 }
 
 // Called by reactor when asynchronous connections fail.
 func (p *inProgressConnect) OnRead(fd int, rw IOReadWriter, now int64) bool {
-	if !p.progressDone.CompareAndSwap(0, 1) {
-		return true
-	}
 	p.eh.OnConnectFail(ErrConnectFail)
 	return false // goto p.OnClose()
 }
 
 // Called by reactor when asynchronous connections succeed.
 func (p *inProgressConnect) OnWrite(fd int, rw IOReadWriter, now int64) bool {
-	if !p.progressDone.CompareAndSwap(0, 1) {
-		return true
-	}
 	// From here on, the `fd` resources will be managed by h.
 	p.GetReactor().RemoveEvHandler(p, fd)
-	p.GetReactor().CancelTimer(p)
 	p.fd = -1 //
+
 	p.eh.setReactor(p.GetReactor())
 	if p.eh.OnOpen(fd, now) == false {
 		p.eh.OnClose(fd)
@@ -186,12 +178,9 @@ func (p *inProgressConnect) OnWrite(fd int, rw IOReadWriter, now int64) bool {
 
 // Called if a connection times out before completing.
 func (p *inProgressConnect) OnTimeout(now int64) bool {
-	if !p.progressDone.CompareAndSwap(0, 1) {
-		return true
-	}
-
 	// i/o event not catched
 	p.eh.OnConnectFail(ErrConnectTimeout)
+	p.OnClose(p.fd)
 	return false
 }
 
@@ -200,5 +189,4 @@ func (p *inProgressConnect) OnClose(fd int) {
 		syscall.Close(p.fd)
 		p.fd = -1
 	}
-	p.GetReactor().CancelTimer(p)
 }
