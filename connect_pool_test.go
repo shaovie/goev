@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"testing"
 	"time"
 
@@ -31,31 +30,10 @@ func (s *AsyncPushLog) OnOpen(fd int, now int64) bool {
 	s.fd = fd
 	return true
 }
-func (s *AsyncPushLog) OnRead(fd int, evPollSharedBuff []byte, now int64) bool {
-	buf := buffPool.Get().([]byte) // just read
-	defer buffPool.Put(buf)
-
-	readN := 0
-	for {
-		if readN >= cap(buf) { // alloc new buff to read
-			break
-		}
-		n, err := netfd.Read(fd, buf[readN:])
-		if err != nil {
-			if err == syscall.EAGAIN { // epoll ET mode
-				break
-			}
-			fmt.Printf("read: %s\n", err.Error())
-			return false
-		}
-		if n > 0 { // n > 0
-			readN += n
-		} else { // n == 0 connection closed,  will not < 0
-			if readN == 0 {
-				fmt.Printf("peer closed. %d\n", n)
-			}
-			return false
-		}
+func (s *AsyncPushLog) OnRead(fd int, nio IOReadWriter, now int64) bool {
+	_, err := nio.InitRead().Read(fd)
+	if nio.Closed() || err == ErrRcvBufOutOfLimit { // Abnormal connection
+		return false
 	}
 	return true
 }
@@ -105,7 +83,11 @@ func TestConnectPool(t *testing.T) {
 	}
 
 	// 3. connect_pool
-	cp, err := NewConnectPool(c, "127.0.0.1:6379", 40, 10, 100, func() ConnectPoolHandler { return new(AsyncPushLog) })
+	cp, err := NewConnectPool(
+		c, "127.0.0.1:6379", 40, 10, 100,
+		1000, 200,
+		func() ConnectPoolHandler { return new(AsyncPushLog) },
+	)
 	if err != nil {
 		panic(err.Error())
 	}

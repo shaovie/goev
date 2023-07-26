@@ -48,6 +48,7 @@ type ConnectPool struct {
 	minIdleNum     int
 	addNumOnceTime int
 	maxLiveNum     int
+	connectTimeout int64
 	addr           string
 	connector      *Connector
 
@@ -70,6 +71,7 @@ type newConnInPool struct {
 //
 // The addr format 192.168.0.1:8080
 func NewConnectPool(c *Connector, addr string, minIdleNum, addNumOnceTime, maxLiveNum int,
+	connectTimeout, keepNumTicker int64, // millisecond
 	newConnectPoolHandlerFunc func() ConnectPoolHandler) (*ConnectPool, error) {
 
 	if minIdleNum < 1 || minIdleNum >= maxLiveNum || maxLiveNum < addNumOnceTime {
@@ -83,11 +85,12 @@ func NewConnectPool(c *Connector, addr string, minIdleNum, addNumOnceTime, maxLi
 		minIdleNum:                minIdleNum,
 		addNumOnceTime:            addNumOnceTime,
 		maxLiveNum:                maxLiveNum,
+		connectTimeout:            connectTimeout,
 		addr:                      addr,
 		connector:                 c,
 		conns:                     list.New(),
 		newConnectPoolHandlerFunc: newConnectPoolHandlerFunc,
-		ticker:                    time.NewTicker(time.Millisecond * 200),
+		ticker:                    time.NewTicker(time.Millisecond * time.Duration(keepNumTicker)),
 		newConnChan:               make(chan newConnInPool, runtime.NumCPU()*2),
 		emptySig:                  make(chan struct{}),
 	}
@@ -167,7 +170,7 @@ func (cp *ConnectPool) keepNum() {
 		return
 	}
 	for i := 0; i < toNewNum; i++ {
-		if err := cp.connector.Connect(cp.addr, &connectPoolConn{cp: cp}, 1000); err != nil {
+		if err := cp.connector.Connect(cp.addr, &connectPoolConn{cp: cp}, cp.connectTimeout); err != nil {
 			cp.toNewNum.Add(-1)
 		}
 	}
