@@ -29,7 +29,7 @@ func (h *Http) OnOpen(fd int, now int64) bool {
 }
 func (h *Http) OnRead(fd int, nio IOReadWriter, now int64) bool {
 	_, err := nio.InitRead().Read(fd)
-	if err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
+	if nio.Closed() || err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
 		return false
 	}
 	netfd.Write(fd, []byte(httpResp)) // Connection: close
