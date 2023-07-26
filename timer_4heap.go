@@ -51,10 +51,10 @@ func (th *timer4Heap) scheduleTest(eh EvHandler, delay, interval int64) error {
 		interval:  interval,
 		eh:        eh,
 	}
-	eh.setTimerItem(ti)
 	th.fheapMtx.Lock()
 	th.fheap = append(th.fheap, ti)
 	th.shiftUp(len(th.fheap) - 1)
+	eh.setTimerItem(ti)
 	th.fheapMtx.Unlock()
 	return nil
 }
@@ -64,7 +64,8 @@ func (th *timer4Heap) cancel(eh EvHandler) {
 		return
 	}
 	th.fheapMtx.Lock()
-	ti.eh = nil // TODO eh atomic.Value ?
+	ti.eh = nil      // TODO eh atomic.Value ?
+	ti.expiredAt = 1 // 防止该定时器时间太久, 导致对象回收被延迟太久
 	th.fheapMtx.Unlock()
 }
 func (th *timer4Heap) handleExpired(now int64) int64 {

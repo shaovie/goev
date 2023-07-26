@@ -17,10 +17,13 @@ func (t *fheapTimer) OnTimeout(now int64) bool {
 func TestTimer4Heap_Algo(t *testing.T) {
 	t4h := newTimer4Heap(1024)
 
+	var obj EvHandler
 	for i := 0; i < 200; i++ {
-		delay := rand.Int63() % 200
-		t4h.scheduleTest(&fheapTimer{}, delay, 0)
+		delay := rand.Int63()%200 + 2
+		obj = &fheapTimer{}
+		t4h.scheduleTest(obj, delay, 0)
 	}
+	t4h.cancel(obj)
 	for i := 0; i < 200; i++ {
 		ti, _ := t4h.popOne(0, 10000000)
 		fmt.Println(ti.expiredAt)
