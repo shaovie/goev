@@ -114,9 +114,7 @@ func (c *Connector) udsConnect(addr string, eh EvHandler, timeout int64) error {
 	if err != nil {
 		return errors.New("Socket in connector.open: " + err.Error())
 	}
-
 	// SO_RCVBUF is invalid for unix sock
-
 	rsu := syscall.SockaddrUnix{Name: addr}
 	return c.connect(fd, &rsu, eh, timeout)
 }
@@ -134,7 +132,7 @@ func (c *Connector) connect(fd int, sa syscall.Sockaddr, eh EvHandler, timeout i
 		if timeout < 1 {
 			return ErrConnectInprogress
 		}
-		inh := &inProgressConnect{r: reactor, eh: eh, fd: fd}
+		inh := &inProgressConnect{eh: eh, fd: fd}
 		if err = reactor.AddEvHandler(inh, fd, EvConnect); err != nil {
 			syscall.Close(fd)
 			return errors.New("InPorgress AddEvHandler in connector.Connect: " + err.Error())
@@ -158,7 +156,6 @@ type inProgressConnect struct {
 
 	fd           int
 	eh           EvHandler
-	r            *Reactor
 	progressDone atomic.Int32 // Only process one I/O event or timer event
 }
 
@@ -177,9 +174,10 @@ func (p *inProgressConnect) OnWrite(fd int, rw IOReadWriter, now int64) bool {
 		return true
 	}
 	// From here on, the `fd` resources will be managed by h.
-	p.r.RemoveEvHandler(p, fd)
+	p.GetReactor().RemoveEvHandler(p, fd)
+	p.GetReactor().CancelTimer(p)
 	p.fd = -1 //
-	p.eh.setReactor(p.r)
+	p.eh.setReactor(p.GetReactor())
 	if p.eh.OnOpen(fd, now) == false {
 		p.eh.OnClose(fd)
 	}
@@ -202,4 +200,5 @@ func (p *inProgressConnect) OnClose(fd int) {
 		syscall.Close(p.fd)
 		p.fd = -1
 	}
+	p.GetReactor().CancelTimer(p)
 }
