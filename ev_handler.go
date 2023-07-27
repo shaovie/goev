@@ -110,7 +110,7 @@ type Event struct {
 	_ti *timerItem
 }
 
-// Init 可以Event对象复用的时候用得上
+// Init Event object must be called when reusing it.
 func (e *Event) Init() {
 	e._r, e._ep, e._ti = nil, nil, nil
 }
