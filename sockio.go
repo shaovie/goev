@@ -45,7 +45,7 @@ func NewIOReadWriter(bufSize, maxBufSize int) IOReadWriter {
 		buf:        make([]byte, bufSize),
 	}
 }
-func (rw *IOReadWrite) growReadBuf() bool {
+func (rw *IOReadWrite) growBuf() bool {
 	c := cap(rw.buf)
 	if c == rw.maxBufSize {
 		return false
@@ -100,7 +100,7 @@ func (rw *IOReadWrite) Read(fd int) ([]byte, error) {
 		if n > 0 {
 			readN += n
 			if readN == cap(rw.buf) {
-				if rw.growReadBuf() == false {
+				if rw.growBuf() == false {
 					err = ErrRcvBufOutOfLimit
 					break
 				}
