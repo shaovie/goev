@@ -54,7 +54,8 @@ func NewReactor(opts ...Option) (*Reactor, error) {
 // If multiple evPool instances are specified internally, the fd will be rotated to the designated
 // evPool instance based on fd % idx.
 //
-// AddEvHandler可以将fd及其对应的处理对象注册到Reactor中，如果内部指定了多个evpoll，那么会根据fd %idx 轮转到指定的evpoll中
+// AddEvHandler可以将fd及其对应的处理对象注册到Reactor中，如果内部指定了多个evpoll，
+// 那么会根据fd %idx 轮转到指定的evpoll中
 func (r *Reactor) AddEvHandler(eh EvHandler, fd int, events uint32) error {
 	if fd < 0 || eh == nil {
 		return errors.New("AddEvHandler: invalid params")

@@ -48,6 +48,9 @@ func NewConnector(r *Reactor, opts ...Option) (*Connector, error) {
 //
 // Timeout is relative time measurements with millisecond accuracy, for example, delay=5msec.
 func (c *Connector) Connect(addr string, eh EvHandler, timeout int64) error {
+	if timeout < 0 {
+		return errors.New("Connector:Connect param:timeout < 0")
+	}
 	p := strings.Index(addr, ":")
 	if p < 0 || p >= (len(addr)-1) {
 		return errors.New("Connector:Connect param:addr invalid")
@@ -136,7 +139,7 @@ func (c *Connector) connect(fd int, sa syscall.Sockaddr, eh EvHandler, timeout i
 			syscall.Close(fd)
 			return errors.New("InPorgress AddEvHandler in connector.Connect: " + err.Error())
 		}
-		reactor.SchedueTimer(inh, timeout, 0) // don't need to cancel it when conn error
+		inh.SchedueTimer(timeout, 0) // don't need to cancel it when conn error
 		return nil
 	} else if err == nil { // success
 		eh.setReactor(reactor)

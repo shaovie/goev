@@ -14,24 +14,24 @@ func NewBitMap(size int64) *Bitmap {
 	return bm
 }
 func (b *Bitmap) Set(pos int64) bool {
-    if pos < b.size {
-        b.bytes[pos>>3] |= 1 << (pos & 0x07)
-        return true
-    }
-    return false
+	if pos < b.size {
+		b.bytes[pos>>3] |= 1 << (pos & 0x07)
+		return true
+	}
+	return false
 }
 func (b *Bitmap) Unset(pos int64) bool {
 	if pos < b.size {
-        b.bytes[pos>>3] &= ^(1 << (pos & 0x07))
-        return true
-    }
-    return false
+		b.bytes[pos>>3] &= ^(1 << (pos & 0x07))
+		return true
+	}
+	return false
 }
 func (b *Bitmap) IsSet(pos int64) bool {
-    if pos < b.size {
-        if b.bytes[pos>>3]&(1<<(pos&0x07)) > 0 {
-            return true
-        }
-    }
+	if pos < b.size {
+		if b.bytes[pos>>3]&(1<<(pos&0x07)) > 0 {
+			return true
+		}
+	}
 	return false
 }

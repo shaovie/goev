@@ -1,6 +1,7 @@
 package goev
 
 import (
+	"errors"
 	"syscall"
 )
 
@@ -49,6 +50,15 @@ type EvHandler interface {
 
 	setTimerItem(ti *timerItem)
 	getTimerItem() *timerItem
+
+	// SchedueTimer Add a timer event to an Event that is already registered with the reactor
+	// to ensure that all event handling occurs within the same evpoll
+    //
+    // If it has not been registered with the Reactor yet, please use the Reactor.ScheduleTimer method
+	SchedueTimer(delay, interval int64) error
+
+    // CancelTimer cancels a timer that has been successfully scheduled
+    CancelTimer()
 
 	// Call by acceptor on `accept` a new fd or connector on `connect` successful
 	// The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
@@ -138,6 +148,24 @@ func (e *Event) setTimerItem(ti *timerItem) {
 
 func (e *Event) getTimerItem() *timerItem {
 	return e._ti
+}
+
+// SchedueTimer Add a timer event to an Event that is already registered with the reactor
+// to ensure that all event handling occurs within the same evpoll
+//
+// If it has not been registered with the Reactor yet, please use the Reactor.ScheduleTimer method
+func (e *Event) SchedueTimer(delay, interval int64) error {
+	if ep := e.getEvPoll(); ep != nil {
+		return ep.scheduleTimer(e, delay, interval)
+	}
+	return errors.New("ev handler has not been added to the reactor yet")
+}
+
+// CancelTimer cancels a timer that has been successfully scheduled
+func (e *Event) CancelTimer() {
+	if ep := e.getEvPoll(); ep != nil {
+		ep.cancelTimer(e)
+	}
 }
 
 // OnOpen please make sure you want to reimplement it.
