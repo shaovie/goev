@@ -53,12 +53,12 @@ type EvHandler interface {
 
 	// SchedueTimer Add a timer event to an Event that is already registered with the reactor
 	// to ensure that all event handling occurs within the same evpoll
-    //
-    // If it has not been registered with the Reactor yet, please use the Reactor.ScheduleTimer method
+	//
+	// If it has not been registered with the Reactor yet, please use the Reactor.ScheduleTimer method
 	SchedueTimer(delay, interval int64) error
 
-    // CancelTimer cancels a timer that has been successfully scheduled
-    CancelTimer()
+	// CancelTimer cancels a timer that has been successfully scheduled
+	CancelTimer()
 
 	// Call by acceptor on `accept` a new fd or connector on `connect` successful
 	// The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
