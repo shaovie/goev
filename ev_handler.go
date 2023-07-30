@@ -51,11 +51,11 @@ type EvHandler interface {
 	setTimerItem(ti *timerItem)
 	getTimerItem() *timerItem
 
-	// SchedueTimer Add a timer event to an Event that is already registered with the reactor
+	// ScheduleTimer Add a timer event to an Event that is already registered with the reactor
 	// to ensure that all event handling occurs within the same evpoll
 	//
-	// If it has not been registered with the Reactor yet, please use the Reactor.ScheduleTimer method
-	SchedueTimer(delay, interval int64) error
+	// Only supports binding timers to I/O objects within evpoll internally.
+	ScheduleTimer(delay, interval int64) error
 
 	// CancelTimer cancels a timer that has been successfully scheduled
 	CancelTimer()
@@ -150,11 +150,11 @@ func (e *Event) getTimerItem() *timerItem {
 	return e._ti
 }
 
-// SchedueTimer Add a timer event to an Event that is already registered with the reactor
+// ScheduleTimer Add a timer event to an Event that is already registered with the reactor
 // to ensure that all event handling occurs within the same evpoll
 //
-// If it has not been registered with the Reactor yet, please use the Reactor.ScheduleTimer method
-func (e *Event) SchedueTimer(delay, interval int64) error {
+// Only supports binding timers to I/O objects within evpoll internally.
+func (e *Event) ScheduleTimer(delay, interval int64) error {
 	if ep := e.getEvPoll(); ep != nil {
 		return ep.scheduleTimer(e, delay, interval)
 	}

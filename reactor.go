@@ -8,22 +8,19 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"sync/atomic"
+	//"sync/atomic"
 )
 
 // Reactor provides an I/O event-driven event handling model, where multiple epoll processes
 // can be specified internally. The file descriptors (fd) between multiple Reactors can be
 // bound to each other, enabling concurrent processing in multiple threads.
-//
-// Reactor提供一个I/O事件驱动的事件处理模型，内部可以指定多个evpoll进运，
-// 并且多个Reactor之间的fd可以相互绑定，实现多线程并发处理
 type Reactor struct {
 	noCopy
 
 	evPollLockOSThread bool
 	evPollNum          int
 	evPolls            []evPoll
-	timerIdx           atomic.Int64
+	//timerIdx           atomic.Int64
 }
 
 // NewReactor return an instance
@@ -79,30 +76,30 @@ func (r *Reactor) RemoveEvHandler(eh EvHandler, fd int) error {
 	return errors.New("ev handler not add")
 }
 
-// SchedueTimer starts a timer that can be either one-time execution or repeated execution
-// SchedueTimer 启动一个定时器，可以是执行一次的，也可以是循环执行的
+// ScheduleTimer starts a timer that can be either one-time execution or repeated execution
+// ScheduleTimer 启动一个定时器，可以是执行一次的，也可以是循环执行的
 //
 // delay, interval are both relative time measurements with millisecond accuracy, for example, delay=5msec.
 // MUST: One EvHandler can only register one timer
-func (r *Reactor) SchedueTimer(eh EvHandler, delay, interval int64) error {
-	i := 0
-	if r.evPollNum > 1 {
-		if ep := eh.getEvPoll(); ep != nil {
-			return ep.scheduleTimer(eh, delay, interval)
-		}
-		i = int(r.timerIdx.Add(1) % int64(r.evPollNum))
-	}
-	return r.evPolls[i].scheduleTimer(eh, delay, interval)
-}
+//func (r *Reactor) ScheduleTimer(eh EvHandler, delay, interval int64) error {
+//	i := 0
+//	if r.evPollNum > 1 {
+//		if ep := eh.getEvPoll(); ep != nil {
+//			return ep.scheduleTimer(eh, delay, interval)
+//		}
+//		i = int(r.timerIdx.Add(1) % int64(r.evPollNum))
+//	}
+//	return r.evPolls[i].scheduleTimer(eh, delay, interval)
+//}
 
 // CancelTimer cancel an timer bound to eh
-func (r *Reactor) CancelTimer(eh EvHandler) {
-	if eh != nil {
-		if ep := eh.getEvPoll(); ep != nil {
-			ep.cancelTimer(eh)
-		}
-	}
-}
+//func (r *Reactor) CancelTimer(eh EvHandler) {
+//	if eh != nil {
+//		if ep := eh.getEvPoll(); ep != nil {
+//			ep.cancelTimer(eh)
+//		}
+//	}
+//}
 
 // Run starts the multi-event evpolling to run.
 func (r *Reactor) Run() error {

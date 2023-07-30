@@ -2,15 +2,15 @@ package goev
 
 import (
 	"errors"
-	"sync"
+	//"sync"
 	"time"
 )
 
 type timer4Heap struct {
 	noCopy
 
-	fheap    []*timerItem
-	fheapMtx sync.Mutex
+	fheap []*timerItem
+	//fheapMtx sync.Mutex
 }
 
 func newTimer4Heap(initCap int) *timer4Heap {
@@ -38,11 +38,11 @@ func (th *timer4Heap) schedule(eh EvHandler, delay, interval int64) error {
 		interval:  interval,
 		eh:        eh,
 	}
-	th.fheapMtx.Lock()
+	//th.fheapMtx.Lock()
 	th.fheap = append(th.fheap, ti)
 	th.shiftUp(len(th.fheap) - 1)
 	eh.setTimerItem(ti)
-	th.fheapMtx.Unlock()
+	//th.fheapMtx.Unlock()
 	return nil
 }
 func (th *timer4Heap) scheduleTest(eh EvHandler, delay, interval int64) error {
@@ -51,11 +51,9 @@ func (th *timer4Heap) scheduleTest(eh EvHandler, delay, interval int64) error {
 		interval:  interval,
 		eh:        eh,
 	}
-	th.fheapMtx.Lock()
 	th.fheap = append(th.fheap, ti)
 	th.shiftUp(len(th.fheap) - 1)
 	eh.setTimerItem(ti)
-	th.fheapMtx.Unlock()
 	return nil
 }
 func (th *timer4Heap) cancel(eh EvHandler) {
@@ -63,14 +61,17 @@ func (th *timer4Heap) cancel(eh EvHandler) {
 	if ti == nil {
 		return
 	}
-	th.fheapMtx.Lock()
+	//th.fheapMtx.Lock()
 	ti.eh = nil      // TODO eh atomic.Value ?
 	ti.expiredAt = 1 // 防止该定时器时间太久, 导致对象回收被延迟太久
-	th.fheapMtx.Unlock()
+	//th.fheapMtx.Unlock()
 }
 func (th *timer4Heap) handleExpired(now int64) int64 {
-	th.fheapMtx.Lock()
-	defer th.fheapMtx.Unlock()
+	//th.fheapMtx.Lock()
+	//defer th.fheapMtx.Unlock()
+	if len(th.fheap) == 0 { // no mutex
+		return -1
+	}
 
 	delta := int64(-1)
 	var item *timerItem
@@ -95,8 +96,8 @@ func (th *timer4Heap) handleExpired(now int64) int64 {
 }
 
 func (th *timer4Heap) size() int {
-	th.fheapMtx.Lock()
-	defer th.fheapMtx.Unlock()
+	//th.fheapMtx.Lock()
+	//defer th.fheapMtx.Unlock()
 	return len(th.fheap)
 }
 
