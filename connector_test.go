@@ -32,6 +32,7 @@ func TestConnector(t *testing.T) {
 		EvPollNum(10),
 		EvReadyNum(8), // just timer
 		TimerHeapInitSize(10000),
+		NoTimer(false),
 	)
 	if err != nil {
 		panic(err.Error())

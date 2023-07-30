@@ -139,7 +139,7 @@ func (c *Connector) connect(fd int, sa syscall.Sockaddr, eh EvHandler, timeout i
 			syscall.Close(fd)
 			return errors.New("InPorgress AddEvHandler in connector.Connect: " + err.Error())
 		}
-		inh.SchedueTimer(timeout, 0) // don't need to cancel it when conn error
+		inh.ScheduleTimer(timeout, 0) // don't need to cancel it when conn error
 		return nil
 	} else if err == nil { // success
 		eh.setReactor(reactor)
