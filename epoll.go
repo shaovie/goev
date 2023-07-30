@@ -22,7 +22,7 @@ type evPoll struct {
 
 	evHandlerMap *ArrayMapUnion[evData] // Refer to https://zhuanlan.zhihu.com/p/640712548
 	timer        timer
-	evPollWakeup Notifier
+	evPollWakeup *notify
 }
 
 func (ep *evPoll) open(evReadyNum, evDataArrSize int,

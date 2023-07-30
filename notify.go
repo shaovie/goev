@@ -9,16 +9,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// Notifier provides a mechanism for communication with evpool, only offering a wakeup mechanism
-// to wake epoll up from waiting.
-type Notifier interface {
-	// Tread-safe
-	Notify()
-
-	// Tread-safe close the notifier
-	Close()
-}
-
 type notify struct {
 	Event
 
@@ -34,7 +24,7 @@ var (
 	notifyCloseWriteV       = (*(*[8]byte)(unsafe.Pointer(&notifyCloseV)))[:]
 )
 
-func newNotify(ep *evPoll) (Notifier, error) {
+func newNotify(ep *evPoll) (*notify, error) {
 	// since Linux 2.6.27
 	fd, err := unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC)
 	if err != nil {
