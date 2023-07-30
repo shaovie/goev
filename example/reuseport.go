@@ -15,6 +15,7 @@ var (
 	httpRespContentLength []byte
 	ticker                *time.Ticker
 	liveDate              atomic.Value
+	reactor               *goev.Reactor
 )
 
 const httpHeaderS = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nServer: goev\r\nContent-Type: text/plain\r\nDate: "
@@ -26,7 +27,7 @@ type Http struct {
 
 func (h *Http) OnOpen(fd int, now int64) bool {
 	// AddEvHandler 尽量放在最后, (OnOpen 和ORead可能不在一个线程)
-	if err := h.GetReactor().AddEvHandler(h, fd, goev.EvIn); err != nil {
+	if err := reactor.AddEvHandler(h, fd, goev.EvIn); err != nil {
 		return false
 	}
 	return true
@@ -67,7 +68,8 @@ func main() {
 	httpRespContentLength = []byte(contentLengthS)
 
 	evPollNum := runtime.NumCPU()*2 - 1
-	forNewFdReactor, err := goev.NewReactor(
+	var err error
+	reactor, err = goev.NewReactor(
 		goev.EvDataArrSize(20480), // default val
 		goev.EvPollNum(evPollNum),
 		goev.EvReadyNum(512), // auto calc
@@ -79,7 +81,7 @@ func main() {
 	// ReusePort 模式下, 创建N个相同的acceptor(listener fd), 注册不到同的evPool中,
 	// 内核会将新链接调度到不同的listener fd的全链接队列中去), 这样不会出现惊群效应
 	for i := 0; i < evPollNum; i++ {
-		_, err = goev.NewAcceptor(forNewFdReactor, forNewFdReactor,
+		_, err = goev.NewAcceptor(reactor,
 			func() goev.EvHandler { return new(Http) },
 			":8080",
 			goev.ListenBacklog(128),
@@ -92,7 +94,7 @@ func main() {
 	}
 
 	go updateLiveSecond()
-	if err = forNewFdReactor.Run(); err != nil {
+	if err = reactor.Run(); err != nil {
 		panic(err.Error())
 	}
 }

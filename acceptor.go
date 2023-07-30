@@ -25,19 +25,17 @@ type Acceptor struct {
 	loopAcceptTimes  int
 	newEvHanlderFunc func() EvHandler
 	reactor          *Reactor
-	newFdBindReactor *Reactor
 }
 
 // NewAcceptor return an acceptor
 //
 // New socket has been set to non-blocking
-func NewAcceptor(acceptorBindReactor *Reactor, newFdBindReactor *Reactor,
-	newEvHanlderFunc func() EvHandler, addr string, opts ...Option) (*Acceptor, error) {
+func NewAcceptor(acceptorBindReactor *Reactor, newEvHanlderFunc func() EvHandler,
+	addr string, opts ...Option) (*Acceptor, error) {
 	evOptions := setOptions(opts...)
 	a := &Acceptor{
 		fd:               -1,
 		reactor:          acceptorBindReactor,
-		newFdBindReactor: newFdBindReactor,
 		newEvHanlderFunc: newEvHanlderFunc,
 		listenBacklog:    evOptions.listenBacklog,
 		sockRcvBufSize:   evOptions.sockRcvBufSize,
@@ -174,7 +172,7 @@ func (a *Acceptor) listen(fd int, sa syscall.Sockaddr) error {
 // OnRead handle listner accept event
 func (a *Acceptor) OnRead(fd int, rw IOReadWriter, now int64) bool {
 	for i := 0; i < a.loopAcceptTimes; i++ {
-		conn, _, err := syscall.Accept4(a.fd, syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC)
+		conn, _, err := syscall.Accept4(fd, syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC)
 		if err != nil {
 			if err == syscall.EINTR {
 				continue
@@ -182,7 +180,6 @@ func (a *Acceptor) OnRead(fd int, rw IOReadWriter, now int64) bool {
 			break
 		}
 		h := a.newEvHanlderFunc()
-		h.setReactor(a.newFdBindReactor)
 		if h.OnOpen(conn, now) == false {
 			h.OnClose(conn)
 		}
@@ -193,4 +190,5 @@ func (a *Acceptor) OnRead(fd int, rw IOReadWriter, now int64) bool {
 // OnClose will not happen
 func (a *Acceptor) OnClose(fd int) {
 	syscall.Close(fd)
+	a.fd = -1
 }

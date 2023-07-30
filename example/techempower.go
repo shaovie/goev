@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"runtime"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/shaovie/goev"
@@ -16,6 +15,7 @@ var (
 	httpRespContentLength []byte
 	ticker                *time.Ticker
 	liveDate              atomic.Value
+	forNewFdReactor       *goev.Reactor
 )
 
 const httpHeaderS = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nServer: goev\r\nContent-Type: text/plain\r\nDate: "
@@ -27,21 +27,21 @@ type Http struct {
 
 func (h *Http) OnOpen(fd int, now int64) bool {
 	// AddEvHandler 尽量放在最后, (OnOpen 和ORead可能不在一个线程)
-	if err := h.GetReactor().AddEvHandler(h, fd, goev.EvIn); err != nil {
+	if err := forNewFdReactor.AddEvHandler(h, fd, goev.EvIn); err != nil {
 		return false
 	}
 	return true
 }
-func (h *Http) OnRead(fd int, nio IOReadWriter, now int64) bool {
-    _, err := nio.InitRead().Read(fd)
-    if nio.Closed() || err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
-        return false
-    }
+func (h *Http) OnRead(fd int, nio goev.IOReadWriter, now int64) bool {
+	_, err := nio.InitRead().Read(fd)
+	if nio.Closed() || err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
+		return false
+	}
 
-    nio.InitWrite().Append(httpRespHeader
-        Append([]byte(liveDate.Load().(string))
-	    Append(httpRespContentLength
-	    Write(fd)
+	nio.InitWrite().Append(httpRespHeader).
+		Append([]byte(liveDate.Load().(string))).
+		Append(httpRespContentLength).
+		Write(fd)
 	return true
 }
 func (h *Http) OnClose(fd int) {
@@ -76,7 +76,7 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	forNewFdReactor, err := goev.NewReactor(
+	forNewFdReactor, err = goev.NewReactor(
 		goev.EvDataArrSize(20480), // default val
 		goev.EvPollNum(runtime.NumCPU()*2-1),
 		goev.EvReadyNum(512), // auto calc
@@ -86,7 +86,7 @@ func main() {
 		panic(err.Error())
 	}
 	//= http
-	_, err = goev.NewAcceptor(forAcceptReactor, forNewFdReactor, func() goev.EvHandler { return new(Http) },
+	_, err = goev.NewAcceptor(forAcceptReactor, func() goev.EvHandler { return new(Http) },
 		":8080",
 		goev.ListenBacklog(512),
 		//goev.SockRcvBufSize(16*1024), // 短链接, 不需要很大的缓冲区
