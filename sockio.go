@@ -87,6 +87,8 @@ func (rw *IOReadWrite) Closed() bool {
 
 // Read attempt to read a buffer sized data block once
 func (rw *IOReadWrite) Read(fd int) ([]byte, error) {
+    rw.buf = rw.buf[:]
+    rw.closed = false
 	readN, n := 0, 0
 	var err error
 	for {
@@ -120,6 +122,8 @@ func (rw *IOReadWrite) Read(fd int) ([]byte, error) {
 //
 // For EPOLLET mode
 func (rw *IOReadWrite) ReadWouldBlock(fd int) ([]byte, error) {
+    rw.buf = rw.buf[:]
+    rw.closed = false
 	readN, n := 0, 0
 	var err error
 	for {
