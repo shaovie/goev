@@ -33,7 +33,7 @@ func (h *Http) OnOpen(fd int, now int64) bool {
 	return true
 }
 func (h *Http) OnRead(fd int, nio goev.IOReadWriter, now int64) bool {
-	_, err := nio.InitRead().Read(fd)
+	_, err := nio.Read(fd)
 	if nio.Closed() || err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
 		return false
 	}

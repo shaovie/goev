@@ -31,7 +31,7 @@ func (s *AsyncPushLog) OnOpen(fd int, now int64) bool {
 	return true
 }
 func (s *AsyncPushLog) OnRead(fd int, nio IOReadWriter, now int64) bool {
-	_, err := nio.InitRead().Read(fd)
+	_, err := nio.Read(fd)
 	if nio.Closed() || err == ErrRcvBufOutOfLimit { // Abnormal connection
 		return false
 	}

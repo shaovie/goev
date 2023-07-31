@@ -13,14 +13,12 @@ var (
 // IOReadWriter is a lock-free, shared-buffer IO processor for each evpoll
 // execution stack cycle (without considering thread contention).
 type IOReadWriter interface {
-	InitRead() IOReadWriter
+	Read(fd int) ([]byte, error)
+	ReadWouldBlock(fd int) ([]byte, error)
+
 	InitWrite() IOReadWriter
 
 	Append(v []byte) IOReadWriter
-
-	Buff() []byte
-
-	Read(fd int) ([]byte, error)
 
 	Write(fd int) (n int, err error)
 
@@ -35,7 +33,7 @@ type IOReadWrite struct {
 	closed bool
 
 	maxBufSize int
-    wlen       int
+	wlen       int
 	buf        []byte
 }
 
@@ -61,37 +59,25 @@ func (rw *IOReadWrite) growBuf() bool {
 	return true
 }
 
-// InitRead init ioread buf
-func (rw *IOReadWrite) InitRead() IOReadWriter {
-	rw.buf = rw.buf[:]
-	rw.closed = false
-	return rw
-}
-
 // InitWrite init iowrite buf
 func (rw *IOReadWrite) InitWrite() IOReadWriter {
-	rw.buf = rw.buf[:0]
-    rw.wlen = 0
+	rw.buf = rw.buf[:]
+	rw.wlen = 0
 	rw.closed = false
 	return rw
 }
 
 // Append fill write buf
 func (rw *IOReadWrite) Append(v []byte) IOReadWriter {
-    vl := len(v)
-    if vl > (cap(rw.buf) - rw.wlen) {
-        if rw.growBuf() == false {
-            panic("sockio buf exceeds the limit")
-        }
-    }
-    copy(rw.buf[rw.wlen:], v)
-    rw.wlen += len(v)
+	vl := len(v)
+	if vl > (cap(rw.buf) - rw.wlen) {
+		if rw.growBuf() == false {
+			panic("sockio buf exceeds the limit")
+		}
+	}
+	copy(rw.buf[rw.wlen:], v)
+	rw.wlen += vl
 	return rw
-}
-
-// Buff return buf
-func (rw *IOReadWrite) Buff() []byte {
-	return rw.buf[:0]
 }
 
 // Closed return true if connection closed
@@ -165,13 +151,12 @@ func (rw *IOReadWrite) ReadWouldBlock(fd int) ([]byte, error) {
 // Write before using the Write method, use the Append method to add the data to be sent.
 // It will attempt to send as much as possible, but there is no guarantee of complete transmission
 func (rw *IOReadWrite) Write(fd int) (n int, err error) {
-	wlen := len(rw.buf)
 	writeN := 0
-	for writeN < wlen {
-		n, err = syscall.Write(fd, rw.buf[writeN:])
+	for writeN < rw.wlen {
+		n, err = syscall.Write(fd, rw.buf[writeN:rw.wlen])
 		if n > 0 {
 			writeN += n
-			if writeN == wlen {
+			if writeN == rw.wlen {
 				break
 			}
 			continue
