@@ -35,6 +35,7 @@ type IOReadWrite struct {
 	closed bool
 
 	maxBufSize int
+    wlen       int
 	buf        []byte
 }
 
@@ -70,13 +71,21 @@ func (rw *IOReadWrite) InitRead() IOReadWriter {
 // InitWrite init iowrite buf
 func (rw *IOReadWrite) InitWrite() IOReadWriter {
 	rw.buf = rw.buf[:0]
+    rw.wlen = 0
 	rw.closed = false
 	return rw
 }
 
 // Append fill write buf
 func (rw *IOReadWrite) Append(v []byte) IOReadWriter {
-	rw.buf = append(rw.buf, v...)
+    vl := len(v)
+    if vl > (cap(rw.buf) - rw.wlen) {
+        if rw.growBuf() == false {
+            panic("sockio buf exceeds the limit")
+        }
+    }
+    copy(rw.buf[rw.wlen:], v)
+    rw.wlen += len(v)
 	return rw
 }
 
@@ -90,9 +99,41 @@ func (rw *IOReadWrite) Closed() bool {
 	return rw.closed
 }
 
+// Read attempt to read a buffer sized data block once
+func (rw *IOReadWrite) Read(fd int) ([]byte, error) {
+	readN, n := 0, 0
+	var err error
+	for {
+		n, err = syscall.Read(fd, rw.buf[readN:])
+		if n > 0 {
+			readN += n
+			if readN == cap(rw.buf) {
+				if rw.growBuf() == false {
+					err = ErrRcvBufOutOfLimit
+					break
+				}
+			}
+			break
+		} else if n == 0 { // peer closed
+			rw.closed = true
+			break
+		} else {
+			if err != nil {
+				if err == syscall.EINTR {
+					continue
+				}
+				break // incluce EAGAIN
+			}
+		}
+	}
+	return rw.buf[:readN], err
+}
+
 // Read will attempt to receive as much readable data as possible,
 // directly until syscall.Read returns an error (excluding EINTER)
-func (rw *IOReadWrite) Read(fd int) ([]byte, error) {
+//
+// For EPOLLET mode
+func (rw *IOReadWrite) ReadWouldBlock(fd int) ([]byte, error) {
 	readN, n := 0, 0
 	var err error
 	for {
