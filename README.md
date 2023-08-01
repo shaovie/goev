@@ -35,17 +35,19 @@ import (
     "github.com/shaovie/goev"
 )
 
+var forNewFdReactor *goev.Reactor
+
 type Http struct {
 	goev.Event
 }
 
-func (h *Http) OnOpen(fd int, now int64) bool {
-	if err := h.GetReactor().AddEvHandler(h, fd, goev.EvIn); err != nil {
+func (h *Http) OnOpen(fd int) bool {
+	if err := forNewFdReactor.AddEvHandler(h, fd, goev.EvIn); err != nil {
 		return false
 	}
 	return true
 }
-func (h *Http) OnRead(fd int, nio goev.IOReadWriter, now int64) bool {
+func (h *Http) OnRead(fd int, nio goev.IOReadWriter) bool {
 	_, err := nio.InitRead().Read(fd)
 	if err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
 		return false
@@ -61,19 +63,17 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU()*2 - 1)
 	forAcceptReactor, err := goev.NewReactor(
 		goev.EvPollNum(1),
-		goev.NoTimer(true),
 	)
 	if err != nil {
 		panic(err.Error())
 	}
 	forNewFdReactor, err := goev.NewReactor(
 		goev.EvPollNum(runtime.NumCPU()*2-1),
-		goev.NoTimer(true),
 	)
 	if err != nil {
 		panic(err.Error())
 	}
-	_, err = goev.NewAcceptor(forAcceptReactor, forNewFdReactor, func() goev.EvHandler { return new(Http) },
+	_, err = goev.NewAcceptor(forAcceptReactor, func() goev.EvHandler { return new(Http) },
 		":8080",
 		goev.ListenBacklog(256),
 		goev.SockRcvBufSize(16*1024),
@@ -107,13 +107,12 @@ func main() {
     evPollNum := runtime.NumCPU()*2-1
 	forNewFdReactor, err := goev.NewReactor(
 		goev.EvPollNum(evPollNum),
-		goev.NoTimer(true),
 	)
 	if err != nil {
 		panic(err.Error())
 	}
     for i := 0; i < evPollNum; i++ {
-        _, err = goev.NewAcceptor(forNewFdReactor, forNewFdReactor, func() goev.EvHandler { return new(Http) },
+        _, err = goev.NewAcceptor(forNewFdReactor, func() goev.EvHandler { return new(Http) },
             ":8080",
             goev.ListenBacklog(256),
             goev.SockRcvBufSize(16*1024),

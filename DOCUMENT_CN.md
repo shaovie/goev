@@ -14,9 +14,6 @@
         goev.EvReadyNum(512),      // evpoll(epoll)单次轮询处理的事件个数, 适当调整可以批量处理能力
         goev.EvPollNum(evPollNum), // 指定有多少个线程/协程来执行evpoll工作,
                                    // 每个evpoll独立绑定一个线程/协程, 所以不存在单个链接不存在并发处理
-        goev.NoTimer(true),        // 如果没有定时器或connector的使用需求, 可以设置此参数,
-                                   // 可以稍微减少一些不必要的开销
-
         goev.SetIOReadWriter(goev.NewIOReadWriter(32*1024, 1024*1024)),
                                    // 框架提供的默认I/O操作接口
     )
@@ -35,8 +32,6 @@ acceptor的使用方法:
 ```go
     _, err = goev.NewAcceptor(
         forAcceptReactor,  // 第1个参数负责轮询listener fd的I/O事件
-        forNewFdReactor,   // 第2个参数负责轮询listener fd接受到的新链接的I/O事件
-                           // 前2个参数 也可以是同一值, 即所有I/O事件混在一个Reactor中处理
         func() goev.EvHandler { return new(Http) }, // 负责给新链接分配对象
         ":8080",           // 通常服务监听的地址格式 ipv4
         goev.ListenBacklog(256), // 后边是可选参数
@@ -71,25 +66,25 @@ type Http struct {
 }
 // 根据自己的需要, 实现具体的I/O事件处理方法
 // OnOpen 是当acceptor/connector得到链接后首先调用的方法
-func (h *Http) OnOpen(fd int, now int64) bool {
-    // 新链接要手动指定要轮询的事件类型
+func (h *Http) OnOpen(fd int) bool {
+    // 新链接要手动指定要轮询的事件类型, 注册到指定的Reactor中
     //
     // 特别注意: 当acceptor/connector使用的Reactor指定了多个EvPollNum时, 这时会出现线程切换,
     // 所以一些针对I/O操作的初始化过程要在AddEvHandler之前完成
     //
     // 比如我们要初始化一个buff, 那么如果该buff是在 AddEvHandler 之后初始化的, 
     // 很有可能OnRead方法在buff还没初始化完成就已经调用了
-    if err := h.GetReactor().AddEvHandler(h, fd, goev.EvIn); err != nil {
+    if err := xxxReactor().AddEvHandler(h, fd, goev.EvIn); err != nil {
         return false // 返回false 会直接回调OnClose方法
     }
     return true
 }
 // 处理可读事件(即: 链接有数据可以接收)
-func (h *Http) OnRead(fd int, nio goev.IOReadWriter, now int64) bool {
+func (h *Http) OnRead(fd int, nio goev.IOReadWriter) bool {
 
     // goev.IOReadWriter 是框架内置的I/O操作方法, 使用一个全局的buf, 单个evpoll内所有链接共享,
     // 这样减少了临时内存分配和二次拷贝, 更对cpu cache友好!
-    recvedData, err := nio.InitRead().Read(fd)
+    recvedData, err := nio.Read(fd)
     if err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
         return false
     }
@@ -120,17 +115,17 @@ func (h *Http) OnClose(fd int) {
 
 比如我们需要定时向对端发送Ping/Pong  
 ```go
-func (h *Http) OnOpen(fd int, now int64) bool {
-    if err := h.GetReactor().AddEvHandler(h, fd, goev.EvIn); err != nil {
+func (h *Http) OnOpen(fd int) bool {
+    // 新链接要手动指定要轮询的事件类型, 注册到指定的Reactor中
+    if err := xxxReactor().AddEvHandler(h, fd, goev.EvIn); err != nil {
         return false // 返回false 会直接回调OnClose方法
     }
 
     // 特别注意:
-    // 1. 注册定时器是线程安全的, 内部有mutex保护
-    // 2. 注册定时器一定要在 注册I/O事件之后, 这样才能确保跟I/O事件绑定到同一个evpoll上, 以保证Http对象的
+    // 1. 注册定时器一定要在 注册I/O事件之后, 这样才能确保跟I/O事件绑定到同一个evpoll上, 以保证Http对象的
     //    I/O和Timer事件都是并发安全的
-    if err := h.GetReactor().SchedueTimer(h, 1000, 20*1000); err != nil { 
-        h.GetReactor().RemoveEvHandler(eh, fd) // 要将刚才添加成功的操作, 撤销掉
+    if err := h.SchedueTimer(h, 1000, 20*1000); err != nil { 
+        xxxReactor().RemoveEvHandler(eh, fd) // 要将刚才添加成功的操作, 撤销掉
         return false // 返回false 会直接回调OnClose方法
     }
 
