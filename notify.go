@@ -17,13 +17,6 @@ type notify struct {
 	closeOnce  atomic.Int32 // used to avoid duplicate close
 }
 
-var (
-	notifyV           int64 = 1
-	notifyWriteV            = (*(*[8]byte)(unsafe.Pointer(&notifyV)))[:]
-	notifyCloseV      int64 = 31415927
-	notifyCloseWriteV       = (*(*[8]byte)(unsafe.Pointer(&notifyCloseV)))[:]
-)
-
 func newNotify(ep *evPoll) (*notify, error) {
 	// since Linux 2.6.27
 	fd, err := unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC)
@@ -45,6 +38,8 @@ func (nt *notify) Notify() {
 	if !nt.notifyOnce.CompareAndSwap(0, 1) {
 		return
 	}
+	var notifyV int64 = 1
+	var notifyWriteV = (*(*[8]byte)(unsafe.Pointer(&notifyV)))[:]
 	for {
 		n, err := syscall.Write(nt.efd, notifyWriteV) // man 2 eventfd
 		if n == 8 {
@@ -65,6 +60,9 @@ func (nt *notify) Close() {
 	if !nt.closeOnce.CompareAndSwap(0, 1) {
 		return
 	}
+	var notifyCloseV int64 = 31415927
+	var notifyCloseWriteV = (*(*[8]byte)(unsafe.Pointer(&notifyCloseV)))[:]
+
 	for {
 		n, err := syscall.Write(nt.efd, notifyCloseWriteV) // man 2 eventfd
 		if n == 8 {
@@ -83,7 +81,7 @@ func (nt *notify) Close() {
 }
 
 // Prohibit external calls
-func (nt *notify) OnRead(fd int, rw IOReadWriter, now int64) bool {
+func (nt *notify) OnRead(fd int, rw IOReadWriter) bool {
 	if fd != nt.efd { // 防止外部调用!
 		panic("Prohibit external calls")
 	}
@@ -101,11 +99,11 @@ func (nt *notify) OnRead(fd int, rw IOReadWriter, now int64) bool {
 			return false // TODO add evOptions.debug? panic("Notify: read eventfd failed!")
 		}
 		if n == 8 {
-			if *(*int64)(unsafe.Pointer(&tmp[0])) == notifyV {
+			if *(*int64)(unsafe.Pointer(&tmp[0])) == 1 {
 				nt.notifyOnce.Store(0)
 				return true
 			}
-			if *(*int64)(unsafe.Pointer(&tmp[0])) == notifyCloseV {
+			if *(*int64)(unsafe.Pointer(&tmp[0])) == 31415927 {
 				nt.closeOnce.Store(0) // optional
 				return false          // goto OnClose
 			}

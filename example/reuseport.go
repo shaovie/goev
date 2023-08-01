@@ -25,14 +25,14 @@ type Http struct {
 	goev.Event
 }
 
-func (h *Http) OnOpen(fd int, now int64) bool {
+func (h *Http) OnOpen(fd int) bool {
 	// AddEvHandler 尽量放在最后, (OnOpen 和ORead可能不在一个线程)
 	if err := reactor.AddEvHandler(h, fd, goev.EvIn); err != nil {
 		return false
 	}
 	return true
 }
-func (h *Http) OnRead(fd int, nio goev.IOReadWriter, now int64) bool {
+func (h *Http) OnRead(fd int, nio goev.IOReadWriter) bool {
 	_, err := nio.Read(fd)
 	if nio.Closed() || err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
 		return false
@@ -73,7 +73,6 @@ func main() {
 		goev.EvDataArrSize(20480), // default val
 		goev.EvPollNum(evPollNum),
 		goev.EvReadyNum(512), // auto calc
-		goev.NoTimer(true),
 	)
 	if err != nil {
 		panic(err.Error())

@@ -1,6 +1,8 @@
 package goev
 
-type timer interface {
+type timerx interface {
+	timerfd() int
+
 	schedule(eh EvHandler, delay, interval int64) error
 
 	cancel(eh EvHandler)
@@ -8,11 +10,4 @@ type timer interface {
 	handleExpired(now int64) int64
 
 	size() int
-}
-
-type timerItem struct {
-	noCopy
-	expiredAt int64
-	interval  int64
-	eh        EvHandler
 }

@@ -20,7 +20,6 @@ type Reactor struct {
 	evPollLockOSThread bool
 	evPollNum          int
 	evPolls            []evPoll
-	//timerIdx           atomic.Int64
 }
 
 // NewReactor return an instance
@@ -34,15 +33,14 @@ func NewReactor(opts ...Option) (*Reactor, error) {
 		evPollNum:          evOptions.evPollNum,
 		evPolls:            make([]evPoll, evOptions.evPollNum),
 	}
-	var timer timer
-	if evOptions.noTimer == false {
-		timer = newTimer4Heap(evOptions.timerHeapInitSize)
-	}
 	for i := 0; i < r.evPollNum; i++ {
+		timer := newTimer4Heap(evOptions.timerHeapInitSize)
 		if err := r.evPolls[i].open(evOptions.evReadyNum, evOptions.evDataArrSize,
 			timer, evOptions.ioReadWriter); err != nil {
 			return nil, err
 		}
+		r.evPolls[i].add(timer.timerfd(), EvIn, timer)
+
 	}
 	return r, nil
 }

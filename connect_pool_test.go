@@ -22,7 +22,7 @@ type AsyncPushLog struct {
 	fd int
 }
 
-func (s *AsyncPushLog) OnOpen(fd int, now int64) bool {
+func (s *AsyncPushLog) OnOpen(fd int) bool {
 	if err := s.GetReactor().AddEvHandler(s, fd, EvIn); err != nil {
 		fmt.Printf("error: fd %d %s\n", fd, err.Error())
 		return false
@@ -30,7 +30,7 @@ func (s *AsyncPushLog) OnOpen(fd int, now int64) bool {
 	s.fd = fd
 	return true
 }
-func (s *AsyncPushLog) OnRead(fd int, nio IOReadWriter, now int64) bool {
+func (s *AsyncPushLog) OnRead(fd int, nio IOReadWriter) bool {
 	_, err := nio.Read(fd)
 	if nio.Closed() || err == ErrRcvBufOutOfLimit { // Abnormal connection
 		return false

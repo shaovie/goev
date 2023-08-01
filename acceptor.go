@@ -170,7 +170,7 @@ func (a *Acceptor) listen(fd int, sa syscall.Sockaddr) error {
 }
 
 // OnRead handle listner accept event
-func (a *Acceptor) OnRead(fd int, rw IOReadWriter, now int64) bool {
+func (a *Acceptor) OnRead(fd int, rw IOReadWriter) bool {
 	for i := 0; i < a.loopAcceptTimes; i++ {
 		conn, _, err := syscall.Accept4(fd, syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC)
 		if err != nil {
@@ -180,7 +180,7 @@ func (a *Acceptor) OnRead(fd int, rw IOReadWriter, now int64) bool {
 			break
 		}
 		h := a.newEvHanlderFunc()
-		if h.OnOpen(conn, now) == false {
+		if h.OnOpen(conn) == false {
 			h.OnClose(conn)
 		}
 	}

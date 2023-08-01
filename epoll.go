@@ -4,7 +4,6 @@ import (
 	"errors"
 	"sync"
 	"syscall"
-	"time"
 	"unsafe"
 )
 
@@ -13,7 +12,6 @@ type evData struct {
 	eh EvHandler
 }
 
-// evPoll
 type evPoll struct {
 	efd int // epoll fd
 
@@ -21,12 +19,11 @@ type evPoll struct {
 	ioReadWriter IOReadWriter
 
 	evHandlerMap *ArrayMapUnion[evData] // Refer to https://zhuanlan.zhihu.com/p/640712548
-	timer        timer
-	evPollWakeup *notify
+	timer        *timer4Heap
 }
 
 func (ep *evPoll) open(evReadyNum, evDataArrSize int,
-	timer timer, ioReadWriter IOReadWriter) error {
+	timer *timer4Heap, ioReadWriter IOReadWriter) error {
 	if evReadyNum < 1 {
 		return errors.New("EvReadyNum < 1")
 	}
@@ -40,11 +37,6 @@ func (ep *evPoll) open(evReadyNum, evDataArrSize int,
 	ep.ioReadWriter = ioReadWriter
 	ep.evHandlerMap = NewArrayMapUnion[evData](evDataArrSize)
 
-	// Must be placed last
-	ep.evPollWakeup, err = newNotify(ep)
-	if err != nil {
-		return err
-	}
 	// process max fds
 	// show using `ulimit -Hn`
 	// $GOROOT/src/os/rlimit.go Go had raise the limit to 'Max Hard Limit'
@@ -73,35 +65,23 @@ func (ep *evPoll) remove(fd int) error {
 	return nil
 }
 func (ep *evPoll) scheduleTimer(eh EvHandler, delay, interval int64) (err error) {
-	if ep.timer == nil {
-		return errors.New("not create timer")
-	}
 	eh.setEvPoll(ep)
 	err = ep.timer.schedule(eh, delay, interval)
-	ep.evPollWakeup.Notify()
 	return
 }
 func (ep *evPoll) cancelTimer(eh EvHandler) {
-	if ep.timer != nil {
-		ep.timer.cancel(eh)
-	}
+	ep.timer.cancel(eh)
 }
 func (ep *evPoll) run(wg *sync.WaitGroup) error {
 	if wg != nil {
 		defer wg.Done()
 	}
 
-	var nfds, i, msec int
+	var nfds, i int
 	var err error
-	var now int64
-	msec = -1
 	events := make([]syscall.EpollEvent, ep.evReadyNum)
 	for {
-		nfds, err = syscall.EpollWait(ep.efd, events, msec)
-		if ep.timer != nil {
-			now = time.Now().UnixMilli()
-			msec = int(ep.timer.handleExpired(now))
-		}
+		nfds, err = syscall.EpollWait(ep.efd, events, -1)
 		if nfds > 0 {
 			for i = 0; i < nfds; i++ {
 				ev := &events[i]
@@ -113,14 +93,14 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 					continue
 				}
 				if ev.Events&(syscall.EPOLLOUT) != 0 { // MUST before EPOLLIN (e.g. connect)
-					if ed.eh.OnWrite(ed.fd, ep.ioReadWriter, now) == false {
+					if ed.eh.OnWrite(ed.fd, ep.ioReadWriter) == false {
 						ep.remove(ed.fd) // MUST before OnClose()
 						ed.eh.OnClose(ed.fd)
 						continue
 					}
 				}
 				if ev.Events&(syscall.EPOLLIN) != 0 {
-					if ed.eh.OnRead(ed.fd, ep.ioReadWriter, now) == false {
+					if ed.eh.OnRead(ed.fd, ep.ioReadWriter) == false {
 						ep.remove(ed.fd) // MUST before OnClose()
 						ed.eh.OnClose(ed.fd)
 						continue

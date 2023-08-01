@@ -22,7 +22,6 @@ type Options struct {
 	ioReadWriter       IOReadWriter
 
 	// timer
-	noTimer           bool
 	timerHeapInitSize int //
 }
 
@@ -38,10 +37,9 @@ func setOptions(optL ...Option) *Options {
 		evReadyNum:         512,
 		evDataArrSize:      8192,
 		listenBacklog:      512, // go default 128
-		noTimer:            false,
 		timerHeapInitSize:  1024,
 		evPollLockOSThread: false,
-		ioReadWriter:       NewIOReadWriter(64*1024, 1024*1024),
+		ioReadWriter:       NewIOReadWriter(4*1024, 16*1024),
 	}
 
 	for _, opt := range optL {
@@ -159,18 +157,5 @@ func TimerHeapInitSize(n int) Option {
 		if n > 0 {
 			o.timerHeapInitSize = n
 		}
-	}
-}
-
-// NoTimer can be used to specify that no timer object should be created internally within the Reactor.
-// In addition, the time values in OnOpen, OnRead, and OnWrite will also be set to 0.
-// This can slightly improve performance for applications that do not require a timer.
-// However, if you need a Connector, you should never set Notimer=true.
-//
-// NoTimer 可以指定Reactor内部不创建定时器对象，并且在OnOpen OnRead OnWrite中的时间值也会是0，
-// 这样对于不需要定时器的应用，可以提高一点点性能（如果你需要Connector那么绝对不能设置Notimer=true)
-func NoTimer(v bool) Option {
-	return func(o *Options) {
-		o.noTimer = v
 	}
 }

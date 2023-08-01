@@ -184,7 +184,7 @@ func (cp *ConnectPool) handleNewConn() {
 	}
 }
 func (cp *ConnectPool) onNewConn(fd int, ch ConnectPoolHandler) {
-	if ch.OnOpen(fd, time.Now().UnixMilli()) == false {
+	if ch.OnOpen(fd) == false {
 		return
 	}
 	cp.liveNum.Add(1)
@@ -200,7 +200,7 @@ type connectPoolConn struct {
 	cp *ConnectPool
 }
 
-func (cpc *connectPoolConn) OnOpen(fd int, now int64) bool {
+func (cpc *connectPoolConn) OnOpen(fd int) bool {
 	cpc.cp.toNewNum.Add(-1)
 
 	netfd.SetKeepAlive(fd, 60, 40, 3)

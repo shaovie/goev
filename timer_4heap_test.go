@@ -2,16 +2,36 @@ package goev
 
 import (
 	"fmt"
+	"golang.org/x/sys/unix"
 	"math/rand"
 	"testing"
+	"time"
 )
+
+type fheapTimerOnce struct {
+	Event
+}
+
+func (t *fheapTimerOnce) OnOpen(fd int) bool {
+	t.ScheduleTimer(t, 1000, 0)
+	return true
+}
+func (t *fheapTimerOnce) OnTimeout(now int64) bool {
+	fmt.Println("once now", time.Now().String(), time.UnixMilli(now).String())
+	return true
+}
 
 type fheapTimer struct {
 	Event
 }
 
+func (t *fheapTimer) OnOpen(fd int) bool {
+	t.ScheduleTimer(t, 1000, 2020)
+	return true
+}
 func (t *fheapTimer) OnTimeout(now int64) bool {
-	return false
+	fmt.Println("now", time.Now().String(), time.UnixMilli(now).String())
+	return true
 }
 
 func TestTimer4Heap_Algo(t *testing.T) {
@@ -29,4 +49,26 @@ func TestTimer4Heap_Algo(t *testing.T) {
 		fmt.Println(ti.expiredAt)
 	}
 	fmt.Println("len", t4h.size())
+}
+func TestTimer4Heap(t *testing.T) {
+	reactor, _ := NewReactor(
+		EvDataArrSize(20480), // default val
+		EvPollNum(2),
+		EvReadyNum(512), // auto calc
+	)
+
+	fd, _ := unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC)
+	ft := &fheapTimer{}
+	reactor.AddEvHandler(ft, fd, EvIn)
+	ft.OnOpen(fd)
+
+	fd, _ = unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC)
+	ft2 := &fheapTimerOnce{}
+	reactor.AddEvHandler(ft2, fd, EvIn)
+	ft2.OnOpen(fd)
+
+	go func() {
+		reactor.Run()
+	}()
+	time.Sleep(time.Second * 10)
 }

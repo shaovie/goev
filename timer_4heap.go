@@ -2,15 +2,26 @@ package goev
 
 import (
 	"errors"
-	//"sync"
+	"syscall"
 	"time"
+	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
-type timer4Heap struct {
+type timerItem struct {
 	noCopy
+	expiredAt int64
+	interval  int64
+	eh        EvHandler
+}
 
-	fheap []*timerItem
-	//fheapMtx sync.Mutex
+type timer4Heap struct {
+	Event
+
+	tfd            int
+	timerfdSettime int64
+	fheap          []*timerItem
 }
 
 func newTimer4Heap(initCap int) *timer4Heap {
@@ -18,10 +29,38 @@ func newTimer4Heap(initCap int) *timer4Heap {
 		panic("timer4Heap initCap invalid!")
 	}
 
+	tfd, err := unix.TimerfdCreate(unix.CLOCK_BOOTTIME, unix.TFD_NONBLOCK|unix.TFD_CLOEXEC)
+	if err != nil {
+		if err == unix.ENOSYS {
+			panic("timerfd_create system call not implemented")
+		}
+		panic("TimerfdCreate: " + err.Error())
+	}
 	th := &timer4Heap{
+		tfd:   tfd,
 		fheap: make([]*timerItem, 0, initCap),
 	}
 	return th
+}
+
+func (th *timer4Heap) timerfd() int {
+	return th.tfd
+}
+func (th *timer4Heap) adjustTimerfd(delay /*millisecond*/ int64) {
+	timeSpec := unix.ItimerSpec{
+		Value: unix.NsecToTimespec(delay * 1000 * 1000),
+	}
+	unix.TimerfdSettime(th.tfd, 0 /*Relative time*/, &timeSpec, nil)
+}
+func (th *timer4Heap) OnRead(fd int, nio IOReadWriter) bool {
+	var readTimerfdV int64 = 0
+	var readTimerfdBuf = (*(*[8]byte)(unsafe.Pointer(&readTimerfdV)))[:]
+	syscall.Read(fd, readTimerfdBuf)
+	delay := th.handleExpired(time.Now().UnixMilli())
+	if delay > 0 {
+		th.adjustTimerfd(delay)
+	}
+	return true
 }
 
 func (th *timer4Heap) schedule(eh EvHandler, delay, interval int64) error {
@@ -38,11 +77,16 @@ func (th *timer4Heap) schedule(eh EvHandler, delay, interval int64) error {
 		interval:  interval,
 		eh:        eh,
 	}
-	//th.fheapMtx.Lock()
 	th.fheap = append(th.fheap, ti)
 	th.shiftUp(len(th.fheap) - 1)
 	eh.setTimerItem(ti)
-	//th.fheapMtx.Unlock()
+
+	min := th.fheap[0]
+	if min.expiredAt != th.timerfdSettime {
+		th.adjustTimerfd(min.expiredAt - now)
+		th.timerfdSettime = min.expiredAt
+	}
+
 	return nil
 }
 func (th *timer4Heap) scheduleTest(eh EvHandler, delay, interval int64) error {
@@ -61,26 +105,20 @@ func (th *timer4Heap) cancel(eh EvHandler) {
 	if ti == nil {
 		return
 	}
-	//th.fheapMtx.Lock()
-	ti.eh = nil      // TODO eh atomic.Value ?
+	ti.eh = nil
 	ti.expiredAt = 1 // 防止该定时器时间太久, 导致对象回收被延迟太久
-	//th.fheapMtx.Unlock()
+	// No need to adjust timerfd
 }
 func (th *timer4Heap) handleExpired(now int64) int64 {
-	//th.fheapMtx.Lock()
-	//defer th.fheapMtx.Unlock()
-	if len(th.fheap) == 0 { // no mutex
-		return -1
+	if len(th.fheap) == 0 {
+		return 0
 	}
 
 	delta := int64(-1)
 	var item *timerItem
 	for {
-		item, delta = th.popOne(now, 2)
+		item, delta = th.popOne(now, 2) // 2 是误差范围 表示在0~2之间到期的都会马上执行
 		if item == nil {
-			if delta == 0 { // empty
-				delta = -1
-			}
 			break
 		}
 		if item.eh == nil { // canceled
@@ -96,8 +134,6 @@ func (th *timer4Heap) handleExpired(now int64) int64 {
 }
 
 func (th *timer4Heap) size() int {
-	//th.fheapMtx.Lock()
-	//defer th.fheapMtx.Unlock()
 	return len(th.fheap)
 }
 

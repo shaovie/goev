@@ -15,7 +15,7 @@ type Scanner struct {
 	port int
 }
 
-func (s *Scanner) OnOpen(fd int, now int64) bool {
+func (s *Scanner) OnOpen(fd int) bool {
 	fmt.Printf("port %d open\n", s.port)
 	return false
 }
@@ -32,7 +32,6 @@ func TestConnector(t *testing.T) {
 		EvPollNum(10),
 		EvReadyNum(8), // just timer
 		TimerHeapInitSize(10000),
-		NoTimer(false),
 	)
 	if err != nil {
 		panic(err.Error())

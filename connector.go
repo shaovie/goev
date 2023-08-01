@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 )
 
 var (
@@ -139,11 +138,11 @@ func (c *Connector) connect(fd int, sa syscall.Sockaddr, eh EvHandler, timeout i
 			syscall.Close(fd)
 			return errors.New("InPorgress AddEvHandler in connector.Connect: " + err.Error())
 		}
-		inh.ScheduleTimer(timeout, 0) // don't need to cancel it when conn error
+		inh.ScheduleTimer(inh, timeout, 0) // don't need to cancel it when conn error
 		return nil
 	} else if err == nil { // success
 		eh.setReactor(reactor)
-		if eh.OnOpen(fd, time.Now().UnixMilli()) == false {
+		if eh.OnOpen(fd) == false {
 			eh.OnClose(fd)
 		}
 		return nil
@@ -161,19 +160,19 @@ type inProgressConnect struct {
 }
 
 // Called by reactor when asynchronous connections fail.
-func (p *inProgressConnect) OnRead(fd int, rw IOReadWriter, now int64) bool {
+func (p *inProgressConnect) OnRead(fd int, rw IOReadWriter) bool {
 	p.eh.OnConnectFail(ErrConnectFail)
 	return false // goto p.OnClose()
 }
 
 // Called by reactor when asynchronous connections succeed.
-func (p *inProgressConnect) OnWrite(fd int, rw IOReadWriter, now int64) bool {
+func (p *inProgressConnect) OnWrite(fd int, rw IOReadWriter) bool {
 	// From here on, the `fd` resources will be managed by h.
 	p.GetReactor().RemoveEvHandler(p, fd)
 	p.fd = -1 //
 
 	p.eh.setReactor(p.GetReactor())
-	if p.eh.OnOpen(fd, now) == false {
+	if p.eh.OnOpen(fd) == false {
 		p.eh.OnClose(fd)
 	}
 	return true

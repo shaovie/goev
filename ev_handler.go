@@ -55,34 +55,25 @@ type EvHandler interface {
 	// to ensure that all event handling occurs within the same evpoll
 	//
 	// Only supports binding timers to I/O objects within evpoll internally.
-	ScheduleTimer(delay, interval int64) error
+	ScheduleTimer(eh EvHandler, delay, interval int64) error
 
 	// CancelTimer cancels a timer that has been successfully scheduled
-	CancelTimer()
+	CancelTimer(eh EvHandler)
 
 	// Call by acceptor on `accept` a new fd or connector on `connect` successful
-	// The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
-	// precise time. Use it with caution (as it can reduce the frequency of obtaining the current
-	// time to some extent).
 	//
 	// Call OnClose() when return false
-	OnOpen(fd int, millisecond int64) bool
+	OnOpen(fd int) bool
 
 	// EvPoll catch readable i/o event
-	// The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
-	// precise time. Use it with caution (as it can reduce the frequency of obtaining the current
-	// time to some extent).
 	//
 	// Call OnClose() when return false
-	OnRead(fd int, nio IOReadWriter, millisecond int64) bool
+	OnRead(fd int, nio IOReadWriter) bool
 
 	// EvPoll catch writeable i/o event
-	// The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
-	// precise time. Use it with caution (as it can reduce the frequency of obtaining the current
-	// time to some extent).
 	//
 	// Call OnClose() when return false
-	OnWrite(fd int, nio IOReadWriter, millisecond int64) bool
+	OnWrite(fd int, nio IOReadWriter) bool
 
 	// EvPoll catch connect result
 	// Only be asynchronously called after connector.Connect() returns nil
@@ -95,7 +86,6 @@ type EvHandler interface {
 	// The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
 	// precise time. Use it with caution (as it can reduce the frequency of obtaining the current
 	// time to some extent).
-	// Note: Don't call Reactor.SchedueTimer() or Reactor.CancelTimer() in OnTimeout, it will deadlock
 	//
 	// Remove timer when return false
 	OnTimeout(millisecond int64) bool
@@ -111,11 +101,9 @@ type EvHandler interface {
 type Event struct {
 	noCopy
 
-	_r *Reactor // atomic.Pointer[Reactor]
-	// 这里不需要保护, 在set之前Get是没有任何调用机会的(除非框架之外乱搞)
+	_r *Reactor
 
-	_ep *evPoll // atomic.Pointer[evPoll]
-	// 这里不需要保护, 在set之前Get是没有任何调用机会的(除非框架之外乱搞)
+	_ep *evPoll
 
 	_ti *timerItem
 }
@@ -154,32 +142,32 @@ func (e *Event) getTimerItem() *timerItem {
 // to ensure that all event handling occurs within the same evpoll
 //
 // Only supports binding timers to I/O objects within evpoll internally.
-func (e *Event) ScheduleTimer(delay, interval int64) error {
-	if ep := e.getEvPoll(); ep != nil {
-		return ep.scheduleTimer(e, delay, interval)
+func (e *Event) ScheduleTimer(eh EvHandler, delay, interval int64) error {
+	if ep := eh.getEvPoll(); ep != nil {
+		return ep.scheduleTimer(eh, delay, interval)
 	}
 	return errors.New("ev handler has not been added to the reactor yet")
 }
 
 // CancelTimer cancels a timer that has been successfully scheduled
-func (e *Event) CancelTimer() {
-	if ep := e.getEvPoll(); ep != nil {
-		ep.cancelTimer(e)
+func (e *Event) CancelTimer(eh EvHandler) {
+	if ep := eh.getEvPoll(); ep != nil {
+		ep.cancelTimer(eh)
 	}
 }
 
 // OnOpen please make sure you want to reimplement it.
-func (*Event) OnOpen(fd int, millisecond int64) bool {
+func (*Event) OnOpen(fd int) bool {
 	panic("Event OnOpen")
 }
 
 // OnRead please make sure you want to reimplement it.
-func (*Event) OnRead(fd int, nio IOReadWriter, millisecond int64) bool {
+func (*Event) OnRead(fd int, nio IOReadWriter) bool {
 	panic("Event OnRead")
 }
 
 // OnWrite please make sure you want to reimplement it.
-func (*Event) OnWrite(fd int, nio IOReadWriter, millisecond int64) bool {
+func (*Event) OnWrite(fd int, nio IOReadWriter) bool {
 	panic("Event OnWrite")
 }
 
