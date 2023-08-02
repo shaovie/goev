@@ -33,6 +33,7 @@ func (h *Http) OnOpen(fd int) bool {
 	return true
 }
 func (h *Http) OnRead(fd int, nio goev.IOReadWriter) bool {
+    // 23.08.02 这里使用 goev.IOReadWriter 进行IO操作,非常影响性能(整体吞吐量下降20%, 应该是被调度了), 还没查清原因
 	_, err := nio.Read(fd)
 	if nio.Closed() || err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
 		return false
