@@ -16,7 +16,6 @@ type Options struct {
 
 	// reactor options
 	evPollNum          int //
-	evReadyNum         int //
 	evDataArrSize      int
 	evPollLockOSThread bool
 	ioReadWriter       IOReadWriter
@@ -34,7 +33,6 @@ func setOptions(optL ...Option) *Options {
 		reuseAddr:          true,
 		reusePort:          false,
 		evPollNum:          1,
-		evReadyNum:         512,
 		evDataArrSize:      8192,
 		listenBacklog:      512, // go default 128
 		timerHeapInitSize:  1024,
@@ -121,13 +119,13 @@ func EvPollNum(n int) Option {
 // it can easily impact the processing of new events.
 //
 // EvReadyNum evpoll一次轮询获取数量n的Ready I/O事件, 有利于提高批量处理能力, 太大容易影响新事件的处理
-func EvReadyNum(n int) Option {
-	return func(o *Options) {
-		if n > 0 {
-			o.evReadyNum = n
-		}
-	}
-}
+//func EvReadyNum(n int) Option {
+//	return func(o *Options) {
+//		if n > 0 {
+//			o.evReadyNum = n
+//		}
+//	}
+//}
 
 // EvPollSharedBuffSize is the global shared memory within a single evpoll,
 // which is friendly to CPU cache and highly efficient when reading data from socket buffers.

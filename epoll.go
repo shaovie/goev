@@ -15,25 +15,20 @@ type evData struct {
 type evPoll struct {
 	efd int // epoll fd
 
-	evReadyNum   int // epoll_wait一次轮询获取固定数量准备好的I/O事件, 此参数有利于线程处理的敏捷性
 	ioReadWriter IOReadWriter
 
 	evHandlerMap *ArrayMapUnion[evData] // Refer to https://zhuanlan.zhihu.com/p/640712548
 	timer        *timer4Heap
 }
 
-func (ep *evPoll) open(evReadyNum, evDataArrSize int,
+func (ep *evPoll) open(evDataArrSize int,
 	timer *timer4Heap, ioReadWriter IOReadWriter) error {
-	if evReadyNum < 1 {
-		return errors.New("EvReadyNum < 1")
-	}
 	efd, err := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
 	if err != nil {
 		return errors.New("syscall epoll_create1: " + err.Error())
 	}
 	ep.efd = efd
 	ep.timer = timer
-	ep.evReadyNum = evReadyNum
 	ep.ioReadWriter = ioReadWriter
 	ep.evHandlerMap = NewArrayMapUnion[evData](evDataArrSize)
 
@@ -79,7 +74,7 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 
 	var nfds, i int
 	var err error
-	events := make([]syscall.EpollEvent, ep.evReadyNum)
+	events := make([]syscall.EpollEvent, 256) // does not escape
 	for {
 		nfds, err = syscall.EpollWait(ep.efd, events, -1)
 		if nfds > 0 {

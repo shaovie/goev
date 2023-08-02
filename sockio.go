@@ -16,9 +16,9 @@ type IOReadWriter interface {
 	Read(fd int) ([]byte, error)
 	ReadWouldBlock(fd int) ([]byte, error)
 
-	InitWrite() IOReadWriter
+	InitWrite()
 
-	Append(v []byte) IOReadWriter
+	Append(v []byte)
 
 	Write(fd int) (n int, err error)
 
@@ -60,15 +60,14 @@ func (rw *IOReadWrite) growBuf() bool {
 }
 
 // InitWrite init iowrite buf
-func (rw *IOReadWrite) InitWrite() IOReadWriter {
+func (rw *IOReadWrite) InitWrite() {
 	rw.buf = rw.buf[:]
 	rw.wlen = 0
 	rw.closed = false
-	return rw
 }
 
 // Append fill write buf
-func (rw *IOReadWrite) Append(v []byte) IOReadWriter {
+func (rw *IOReadWrite) Append(v []byte) {
 	vl := len(v)
 	if vl > (cap(rw.buf) - rw.wlen) {
 		if rw.growBuf() == false {
@@ -77,7 +76,6 @@ func (rw *IOReadWrite) Append(v []byte) IOReadWriter {
 	}
 	copy(rw.buf[rw.wlen:], v)
 	rw.wlen += vl
-	return rw
 }
 
 // Closed return true if connection closed

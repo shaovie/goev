@@ -35,8 +35,7 @@ func NewReactor(opts ...Option) (*Reactor, error) {
 	}
 	for i := 0; i < r.evPollNum; i++ {
 		timer := newTimer4Heap(evOptions.timerHeapInitSize)
-		if err := r.evPolls[i].open(evOptions.evReadyNum, evOptions.evDataArrSize,
-			timer, evOptions.ioReadWriter); err != nil {
+		if err := r.evPolls[i].open(evOptions.evDataArrSize, timer, evOptions.ioReadWriter); err != nil {
 			return nil, err
 		}
 		r.evPolls[i].add(timer.timerfd(), EvIn, timer)

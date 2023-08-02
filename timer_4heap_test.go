@@ -54,7 +54,6 @@ func TestTimer4Heap(t *testing.T) {
 	reactor, _ := NewReactor(
 		EvDataArrSize(20480), // default val
 		EvPollNum(2),
-		EvReadyNum(512), // auto calc
 	)
 
 	fd, _ := unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC)

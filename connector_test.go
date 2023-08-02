@@ -30,7 +30,6 @@ func TestConnector(t *testing.T) {
 	r, err := NewReactor(
 		EvDataArrSize(0), // default val
 		EvPollNum(10),
-		EvReadyNum(8), // just timer
 		TimerHeapInitSize(10000),
 	)
 	if err != nil {

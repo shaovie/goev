@@ -38,10 +38,11 @@ func (h *Http) OnRead(fd int, nio goev.IOReadWriter) bool {
 		return false
 	}
 
-	nio.InitWrite().Append(httpRespHeader).
-		Append([]byte(liveDate.Load().(string))).
-		Append(httpRespContentLength).
-		Write(fd)
+	nio.InitWrite()
+    nio.Append(httpRespHeader)
+    nio.Append([]byte(liveDate.Load().(string)))
+	nio.Append(httpRespContentLength)
+	nio.Write(fd)
 	return true
 }
 func (h *Http) OnClose(fd int) {
@@ -70,7 +71,6 @@ func main() {
 	forAcceptReactor, err := goev.NewReactor(
 		goev.EvDataArrSize(20480), // default val
 		goev.EvPollNum(1),
-		goev.EvReadyNum(8), // only accept fd
 	)
 	if err != nil {
 		panic(err.Error())
@@ -78,7 +78,6 @@ func main() {
 	forNewFdReactor, err = goev.NewReactor(
 		goev.EvDataArrSize(20480), // default val
 		goev.EvPollNum(runtime.NumCPU()*2-1),
-		goev.EvReadyNum(512), // auto calc
 	)
 	if err != nil {
 		panic(err.Error())

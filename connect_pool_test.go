@@ -63,7 +63,6 @@ func TestConnectPool(t *testing.T) {
 	r, err := NewReactor(
 		EvDataArrSize(0), // default val
 		EvPollNum(5),
-		EvReadyNum(8), // just timer
 		TimerHeapInitSize(100),
 	)
 	if err != nil {
