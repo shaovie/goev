@@ -52,7 +52,7 @@ func (th *timer4Heap) adjustTimerfd(delay /*millisecond*/ int64) {
 	}
 	unix.TimerfdSettime(th.tfd, 0 /*Relative time*/, &timeSpec, nil)
 }
-func (th *timer4Heap) OnRead(fd int, nio IOReadWriter) bool {
+func (th *timer4Heap) OnRead(fd int) bool {
 	var readTimerfdV int64 = 0
 	var readTimerfdBuf = (*(*[8]byte)(unsafe.Pointer(&readTimerfdV)))[:]
 	syscall.Read(fd, readTimerfdBuf)

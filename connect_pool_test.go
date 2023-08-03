@@ -30,11 +30,12 @@ func (s *AsyncPushLog) OnOpen(fd int) bool {
 	s.fd = fd
 	return true
 }
-func (s *AsyncPushLog) OnRead(fd int, nio IOReadWriter) bool {
-	_, err := nio.Read(fd)
-	if nio.Closed() || err == ErrRcvBufOutOfLimit { // Abnormal connection
+func (s *AsyncPushLog) OnRead(fd int) bool {
+	data, n, _ := s.Read(fd)
+	if n == 0 { // Abnormal connection
 		return false
 	}
+	_ = data
 	return true
 }
 func (s *AsyncPushLog) Push(log string) {

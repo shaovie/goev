@@ -32,17 +32,17 @@ func (h *Http) OnOpen(fd int) bool {
 	}
 	return true
 }
-func (h *Http) OnRead(fd int, nio goev.IOReadWriter) bool {
-	_, err := nio.Read(fd)
-	if nio.Closed() || err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
+func (h *Http) OnRead(fd int) bool {
+	_, n, _ := h.Read(fd)
+	if n == 0 { // Abnormal connection
 		return false
 	}
 
-	nio.InitWrite()
-    nio.Append(httpRespHeader)
-    nio.Append([]byte(liveDate.Load().(string)))
-	nio.Append(httpRespContentLength)
-	nio.Write(fd)
+	buf := h.WriteBuff()[:0]
+	buf = append(buf, httpRespHeader...)
+	buf = append(buf, []byte(liveDate.Load().(string))...)
+	buf = append(buf, httpRespContentLength...)
+	netfd.Write(fd, buf)
 	return true
 }
 func (h *Http) OnClose(fd int) {

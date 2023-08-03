@@ -15,10 +15,11 @@ type Options struct {
 	sockRcvBufSize int // ignore equal 0
 
 	// reactor options
-	evPollNum          int //
-	evDataArrSize      int
-	evPollLockOSThread bool
-	ioReadWriter       IOReadWriter
+	evPollNum           int //
+	evDataArrSize       int
+	evPollLockOSThread  bool
+	evPollReadBuffSize  int
+	evPollWriteBuffSize int
 
 	// timer
 	timerHeapInitSize int //
@@ -30,14 +31,15 @@ type Option func(*Options)
 func setOptions(optL ...Option) *Options {
 	//= defaut options
 	opts := &Options{
-		reuseAddr:          true,
-		reusePort:          false,
-		evPollNum:          1,
-		evDataArrSize:      8192,
-		listenBacklog:      512, // go default 128
-		timerHeapInitSize:  1024,
-		evPollLockOSThread: false,
-		ioReadWriter:       NewIOReadWriter(4*1024, 16*1024),
+		reuseAddr:           true,
+		reusePort:           false,
+		evPollNum:           1,
+		evDataArrSize:       8192,
+		listenBacklog:       512, // go default 128
+		timerHeapInitSize:   1024,
+		evPollLockOSThread:  false,
+		evPollReadBuffSize:  8192,
+		evPollWriteBuffSize: 16 * 1024,
 	}
 
 	for _, opt := range optL {
@@ -127,25 +129,27 @@ func EvPollNum(n int) Option {
 //	}
 //}
 
-// EvPollSharedBuffSize is the global shared memory within a single evpoll,
+// EvPollReadBuffSize is the global shared memory within a single evpoll,
 // which is friendly to CPU cache and highly efficient when reading data from socket buffers.
 // Additionally, if it is Epoll-ET mode, there needs to be a sufficiently large amount of
 // memory to read all the data from the buffer at once
 //
 // 单个evpoll内的全局共享内存, 对cpu cache 友好, 读取socket缓存区的数据时非常高效
 // 另: 如果是Epoll-ET模式, 就需要有足够大的内存来一次性读完缓冲区的数据
-func EvPollSharedBuffSize(n int) Option {
-	panic("deprecated")
+func EvPollReadBuffSize(n int) Option {
+	return func(o *Options) {
+		if n > 0 {
+			o.evPollReadBuffSize = n
+		}
+	}
 }
 
-// SetIOReadWriter setting IOReadWriter
-//
-// default IOReadWriter buf size is 64KB,
-// Reading data can increase the buffer capacity, but writing data does not impose any restrictions
-// on the buffer capacity
-func SetIOReadWriter(rw IOReadWriter) Option {
+// EvPollWriteBuffSize is the global shared memory within a single evpoll,
+func EvPollWriteBuffSize(n int) Option {
 	return func(o *Options) {
-		o.ioReadWriter = rw
+		if n > 0 {
+			o.evPollWriteBuffSize = n
+		}
 	}
 }
 

@@ -81,7 +81,7 @@ func (nt *notify) Close() {
 }
 
 // Prohibit external calls
-func (nt *notify) OnRead(fd int, rw IOReadWriter) bool {
+func (nt *notify) OnRead(fd int) bool {
 	if fd != nt.efd { // 防止外部调用!
 		panic("Prohibit external calls")
 	}

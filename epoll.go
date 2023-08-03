@@ -15,21 +15,24 @@ type evData struct {
 type evPoll struct {
 	efd int // epoll fd
 
-	ioReadWriter IOReadWriter
+	//ioReadWriter IOReadWriter
+	evPollReadBuff  []byte
+	evPollWriteBuff []byte
 
 	evHandlerMap *ArrayMapUnion[evData] // Refer to https://zhuanlan.zhihu.com/p/640712548
 	timer        *timer4Heap
 }
 
-func (ep *evPoll) open(evDataArrSize int,
-	timer *timer4Heap, ioReadWriter IOReadWriter) error {
+func (ep *evPoll) open(evDataArrSize int, timer *timer4Heap,
+	evPollReadBuffSize, evPollWriteBuffSize int) error {
 	efd, err := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
 	if err != nil {
 		return errors.New("syscall epoll_create1: " + err.Error())
 	}
 	ep.efd = efd
 	ep.timer = timer
-	ep.ioReadWriter = ioReadWriter
+	ep.evPollReadBuff = make([]byte, evPollReadBuffSize)
+	ep.evPollWriteBuff = make([]byte, evPollWriteBuffSize)
 	ep.evHandlerMap = NewArrayMapUnion[evData](evDataArrSize)
 
 	// process max fds
@@ -67,6 +70,17 @@ func (ep *evPoll) scheduleTimer(eh EvHandler, delay, interval int64) (err error)
 func (ep *evPoll) cancelTimer(eh EvHandler) {
 	ep.timer.cancel(eh)
 }
+func (ep *evPoll) writeBuff() []byte {
+	return ep.evPollWriteBuff
+}
+func (ep *evPoll) read(fd int) (bf []byte, n int, err error) {
+	n, err = syscall.Read(fd, ep.evPollReadBuff)
+	if n > 0 {
+		bf = ep.evPollReadBuff[:n]
+	}
+	// ignoring syscall.EINTR
+	return
+}
 func (ep *evPoll) run(wg *sync.WaitGroup) error {
 	if wg != nil {
 		defer wg.Done()
@@ -88,14 +102,14 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 					continue
 				}
 				if ev.Events&(syscall.EPOLLOUT) != 0 { // MUST before EPOLLIN (e.g. connect)
-					if ed.eh.OnWrite(ed.fd, ep.ioReadWriter) == false {
+					if ed.eh.OnWrite(ed.fd) == false {
 						ep.remove(ed.fd) // MUST before OnClose()
 						ed.eh.OnClose(ed.fd)
 						continue
 					}
 				}
 				if ev.Events&(syscall.EPOLLIN) != 0 {
-					if ed.eh.OnRead(ed.fd, ep.ioReadWriter) == false {
+					if ed.eh.OnRead(ed.fd) == false {
 						ep.remove(ed.fd) // MUST before OnClose()
 						ed.eh.OnClose(ed.fd)
 						continue

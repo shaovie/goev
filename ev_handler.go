@@ -51,15 +51,6 @@ type EvHandler interface {
 	setTimerItem(ti *timerItem)
 	getTimerItem() *timerItem
 
-	// ScheduleTimer Add a timer event to an Event that is already registered with the reactor
-	// to ensure that all event handling occurs within the same evpoll
-	//
-	// Only supports binding timers to I/O objects within evpoll internally.
-	ScheduleTimer(eh EvHandler, delay, interval int64) error
-
-	// CancelTimer cancels a timer that has been successfully scheduled
-	CancelTimer(eh EvHandler)
-
 	// Call by acceptor on `accept` a new fd or connector on `connect` successful
 	//
 	// Call OnClose() when return false
@@ -68,12 +59,12 @@ type EvHandler interface {
 	// EvPoll catch readable i/o event
 	//
 	// Call OnClose() when return false
-	OnRead(fd int, nio IOReadWriter) bool
+	OnRead(fd int) bool
 
 	// EvPoll catch writeable i/o event
 	//
 	// Call OnClose() when return false
-	OnWrite(fd int, nio IOReadWriter) bool
+	OnWrite(fd int) bool
 
 	// EvPoll catch connect result
 	// Only be asynchronously called after connector.Connect() returns nil
@@ -156,32 +147,50 @@ func (e *Event) CancelTimer(eh EvHandler) {
 	}
 }
 
+// Read use evPollReadBuff, buf size can set by options.EvPollReadBuffSize
+func (e *Event) Read(fd int) (bf []byte, n int, err error) {
+	if ep := e.getEvPoll(); ep != nil {
+		bf, n, err = ep.read(fd)
+	} else {
+		panic("goev: Event.Read fd not register to evpoll")
+	}
+	return
+}
+
+// WriteBuff must be registered with evpoll in order to be used
+func (e *Event) WriteBuff() []byte {
+	if ep := e.getEvPoll(); ep != nil {
+		return ep.writeBuff()
+	}
+	panic("goev: Event.EvPollWriteBuff fd not register to evpoll")
+}
+
 // OnOpen please make sure you want to reimplement it.
 func (*Event) OnOpen(fd int) bool {
-	panic("Event OnOpen")
+	panic("goev: Event OnOpen")
 }
 
 // OnRead please make sure you want to reimplement it.
-func (*Event) OnRead(fd int, nio IOReadWriter) bool {
-	panic("Event OnRead")
+func (*Event) OnRead(fd int) bool {
+	panic("goev: Event OnRead")
 }
 
 // OnWrite please make sure you want to reimplement it.
-func (*Event) OnWrite(fd int, nio IOReadWriter) bool {
-	panic("Event OnWrite")
+func (*Event) OnWrite(fd int) bool {
+	panic("goev: Event OnWrite")
 }
 
 // OnConnectFail please make sure you want to reimplement it.
 func (*Event) OnConnectFail(err error) {
-	panic("Event OnConnectFail")
+	panic("goev: Event OnConnectFail")
 }
 
 // OnTimeout please make sure you want to reimplement it.
 func (*Event) OnTimeout(millisecond int64) bool {
-	panic("Event OnTimeout")
+	panic("goev: Event OnTimeout")
 }
 
 // OnClose please make sure you want to reimplement it.
 func (*Event) OnClose(fd int) {
-	panic("Event OnClose")
+	panic("goev: Event OnClose")
 }

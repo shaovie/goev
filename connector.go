@@ -160,13 +160,13 @@ type inProgressConnect struct {
 }
 
 // Called by reactor when asynchronous connections fail.
-func (p *inProgressConnect) OnRead(fd int, rw IOReadWriter) bool {
+func (p *inProgressConnect) OnRead(fd int) bool {
 	p.eh.OnConnectFail(ErrConnectFail)
 	return false // goto p.OnClose()
 }
 
 // Called by reactor when asynchronous connections succeed.
-func (p *inProgressConnect) OnWrite(fd int, rw IOReadWriter) bool {
+func (p *inProgressConnect) OnWrite(fd int) bool {
 	// From here on, the `fd` resources will be managed by h.
 	p.GetReactor().RemoveEvHandler(p, fd)
 	p.fd = -1 //
