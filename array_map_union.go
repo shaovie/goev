@@ -14,7 +14,9 @@ type ArrayMapUnion[T any] struct {
 	arrSize int
 	arr     []atomic.Pointer[T]
 
-	sMap sync.Map
+	// sync.Map is not suitable for use in evpoll as it is write-only, without read support
+	sMap   map[int]*T
+	mapMtx sync.Mutex
 }
 
 // NewArrayMapUnion return an instance
@@ -24,9 +26,14 @@ func NewArrayMapUnion[T any](arrSize int) *ArrayMapUnion[T] {
 	if arrSize < 1 {
 		panic("NewArrayMapUnion arrSize < 1")
 	}
+	mapPreSize := arrSize / 3 // 1/4
+	if mapPreSize < 1 {
+		mapPreSize = 128
+	}
 	amu := &ArrayMapUnion[T]{
 		arrSize: arrSize,
 		arr:     make([]atomic.Pointer[T], arrSize),
+		sMap:    make(map[int]*T, mapPreSize),
 	}
 	return amu
 }
@@ -36,9 +43,12 @@ func (am *ArrayMapUnion[T]) Load(i int) *T {
 	if i < am.arrSize {
 		return am.arr[i].Load()
 	}
-	if v, ok := am.sMap.Load(i); ok {
-		return v.(*T)
+	am.mapMtx.Lock()
+	if v, ok := am.sMap[i]; ok {
+		am.mapMtx.Unlock()
+		return v
 	}
+	am.mapMtx.Unlock()
 	return nil
 }
 
@@ -48,7 +58,9 @@ func (am *ArrayMapUnion[T]) Store(i int, v *T) {
 		am.arr[i].Store(v)
 		return
 	}
-	am.sMap.Store(i, v)
+	am.mapMtx.Lock()
+	am.sMap[i] = v
+	am.mapMtx.Unlock()
 }
 
 // Delete deletes the value for a key
@@ -57,5 +69,7 @@ func (am *ArrayMapUnion[T]) Delete(i int) {
 		am.arr[i].Store(nil)
 		return
 	}
-	am.sMap.Delete(i)
+	am.mapMtx.Lock()
+	delete(am.sMap, i)
+	am.mapMtx.Unlock()
 }
