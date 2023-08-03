@@ -22,7 +22,7 @@ const httpHeaderS = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nServer: goev\r
 const contentLengthS = "\r\nContent-Length: 13\r\n\r\nHello, World!"
 
 type Http struct {
-	goev.Event
+	goev.IOHandle
 }
 
 func (h *Http) OnOpen(fd int) bool {

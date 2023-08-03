@@ -15,7 +15,7 @@ import (
 // and registering it with the reactor.
 // Newly received file descriptors can be registered with the specified reactor.
 type Acceptor struct {
-	Event
+	IOHandle
 
 	reuseAddr        bool // SO_REUSEADDR
 	reusePort        bool // SO_REUSEPORT

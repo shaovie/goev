@@ -23,7 +23,7 @@ var (
 // It internally uses Reactor to achieve asynchronicity.
 // Connect success or failure will trigger specified methods for notification
 type Connector struct {
-	Event
+	IOHandle
 
 	sockRcvBufSize int // ignore equal 0
 }
@@ -153,7 +153,7 @@ func (c *Connector) connect(fd int, sa syscall.Sockaddr, eh EvHandler, timeout i
 
 // nonblocking inprogress connection
 type inProgressConnect struct {
-	Event
+	IOHandle
 
 	fd int
 	eh EvHandler

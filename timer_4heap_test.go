@@ -9,7 +9,7 @@ import (
 )
 
 type fheapTimerOnce struct {
-	Event
+	IOHandle
 }
 
 func (t *fheapTimerOnce) OnOpen(fd int) bool {
@@ -22,7 +22,7 @@ func (t *fheapTimerOnce) OnTimeout(now int64) bool {
 }
 
 type fheapTimer struct {
-	Event
+	IOHandle
 }
 
 func (t *fheapTimer) OnOpen(fd int) bool {

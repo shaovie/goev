@@ -24,7 +24,7 @@ type ConnectPoolHandler interface {
 
 // ConnectPoolItem is the base object
 type ConnectPoolItem struct {
-	Event
+	IOHandle
 
 	cp *ConnectPool
 }
@@ -195,7 +195,7 @@ func (cp *ConnectPool) closed() {
 }
 
 type connectPoolConn struct {
-	Event
+	IOHandle
 
 	cp *ConnectPool
 }

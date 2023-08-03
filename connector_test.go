@@ -10,7 +10,7 @@ import (
 )
 
 type Scanner struct {
-	Event
+	IOHandle
 
 	port int
 }
@@ -28,7 +28,6 @@ func (s *Scanner) OnClose(fd int) {
 func TestConnector(t *testing.T) {
 	fmt.Println("hello boy")
 	r, err := NewReactor(
-		EvDataArrSize(0), // default val
 		EvPollNum(10),
 		TimerHeapInitSize(10000),
 	)

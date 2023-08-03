@@ -1,7 +1,6 @@
 package goev
 
 import (
-	"errors"
 	"syscall"
 )
 
@@ -31,12 +30,6 @@ const (
 	// EvConnect used for connector
 	EvConnect uint32 = syscall.EPOLLIN | syscall.EPOLLOUT | syscall.EPOLLRDHUP
 )
-
-// Detecting illegal struct copies using `go vet`
-type noCopy struct{}
-
-func (*noCopy) Lock()   {}
-func (*noCopy) Unlock() {}
 
 // EvHandler is the event handling interface of the Reactor core
 //
@@ -88,109 +81,8 @@ type EvHandler interface {
 	OnClose(fd int)
 }
 
-// Event is the base class of event handling objects
-type Event struct {
-	noCopy
+// Detecting illegal struct copies using `go vet`
+type noCopy struct{}
 
-	_r *Reactor
-
-	_ep *evPoll
-
-	_ti *timerItem
-}
-
-// Init Event object must be called when reusing it.
-func (e *Event) Init() {
-	e._r, e._ep, e._ti = nil, nil, nil
-}
-
-func (e *Event) setEvPoll(ep *evPoll) {
-	e._ep = ep
-}
-
-func (e *Event) getEvPoll() *evPoll {
-	return e._ep
-}
-
-func (e *Event) setReactor(r *Reactor) {
-	e._r = r
-}
-
-// GetReactor can retrieve the current event object bound to which Reactor
-func (e *Event) GetReactor() *Reactor {
-	return e._r
-}
-
-func (e *Event) setTimerItem(ti *timerItem) {
-	e._ti = ti
-}
-
-func (e *Event) getTimerItem() *timerItem {
-	return e._ti
-}
-
-// ScheduleTimer Add a timer event to an Event that is already registered with the reactor
-// to ensure that all event handling occurs within the same evpoll
-//
-// Only supports binding timers to I/O objects within evpoll internally.
-func (e *Event) ScheduleTimer(eh EvHandler, delay, interval int64) error {
-	if ep := eh.getEvPoll(); ep != nil {
-		return ep.scheduleTimer(eh, delay, interval)
-	}
-	return errors.New("ev handler has not been added to the reactor yet")
-}
-
-// CancelTimer cancels a timer that has been successfully scheduled
-func (e *Event) CancelTimer(eh EvHandler) {
-	if ep := eh.getEvPoll(); ep != nil {
-		ep.cancelTimer(eh)
-	}
-}
-
-// Read use evPollReadBuff, buf size can set by options.EvPollReadBuffSize
-func (e *Event) Read(fd int) (bf []byte, n int, err error) {
-	if ep := e.getEvPoll(); ep != nil {
-		bf, n, err = ep.read(fd)
-	} else {
-		panic("goev: Event.Read fd not register to evpoll")
-	}
-	return
-}
-
-// WriteBuff must be registered with evpoll in order to be used
-func (e *Event) WriteBuff() []byte {
-	if ep := e.getEvPoll(); ep != nil {
-		return ep.writeBuff()
-	}
-	panic("goev: Event.EvPollWriteBuff fd not register to evpoll")
-}
-
-// OnOpen please make sure you want to reimplement it.
-func (*Event) OnOpen(fd int) bool {
-	panic("goev: Event OnOpen")
-}
-
-// OnRead please make sure you want to reimplement it.
-func (*Event) OnRead(fd int) bool {
-	panic("goev: Event OnRead")
-}
-
-// OnWrite please make sure you want to reimplement it.
-func (*Event) OnWrite(fd int) bool {
-	panic("goev: Event OnWrite")
-}
-
-// OnConnectFail please make sure you want to reimplement it.
-func (*Event) OnConnectFail(err error) {
-	panic("goev: Event OnConnectFail")
-}
-
-// OnTimeout please make sure you want to reimplement it.
-func (*Event) OnTimeout(millisecond int64) bool {
-	panic("goev: Event OnTimeout")
-}
-
-// OnClose please make sure you want to reimplement it.
-func (*Event) OnClose(fd int) {
-	panic("goev: Event OnClose")
-}
+func (*noCopy) Lock()   {}
+func (*noCopy) Unlock() {}

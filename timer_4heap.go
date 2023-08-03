@@ -17,7 +17,7 @@ type timerItem struct {
 }
 
 type timer4Heap struct {
-	Event
+	IOHandle
 
 	tfd            int
 	timerfdSettime int64
