@@ -11,10 +11,9 @@
 ```go
     reactor, err := goev.NewReactor(
         goev.EvDataArrSize(0),     // evpoll内部数据结构需要, 可以实际需要微调提升性能
-        goev.EvReadyNum(512),      // evpoll(epoll)单次轮询处理的事件个数, 适当调整可以批量处理能力
         goev.EvPollNum(evPollNum), // 指定有多少个线程/协程来执行evpoll工作,
                                    // 每个evpoll独立绑定一个线程/协程, 所以不存在单个链接不存在并发处理
-        goev.SetIOReadWriter(goev.NewIOReadWriter(32*1024, 1024*1024)),
+        // goev.SetIOReadWriter(goev.NewIOReadWriter(32*1024, 1024*1024)), 已弃用
                                    // 框架提供的默认I/O操作接口
     )
     if err != nil {
@@ -81,7 +80,19 @@ func (h *Http) OnOpen(fd int) bool {
 }
 // 处理可读事件(即: 链接有数据可以接收)
 func (h *Http) OnRead(fd int, nio goev.IOReadWriter) bool {
+    // IO 处理目前还是最简的裸操作, 会添加异步处理能力和失败缓存处理
+	_, n, _ := h.Read(fd) // 使用poller中的无锁共享缓存
+	if n == 0 { // Abnormal connection
+		return false
+	}
 
+	buf := h.WriteBuff()[:0] // poller中的无锁共享缓存
+	buf = append(buf, httpRespHeader...)
+	buf = append(buf, []byte(liveDate.Load().(string))...)
+	buf = append(buf, httpRespContentLength...)
+	netfd.Write(fd, buf)
+
+    /* 2023-08-04 注: goev.IOReadWriter的方式已经弃用, 会非常影响吞吐能力, 会比使用栈空间的make([]byte)吞吐能力差不少
     // goev.IOReadWriter 是框架内置的I/O操作方法, 使用一个全局的buf, 单个evpoll内所有链接共享,
     // 这样减少了临时内存分配和二次拷贝, 更对cpu cache友好!
     recvedData, err := nio.Read(fd)
@@ -98,6 +109,7 @@ func (h *Http) OnRead(fd int, nio goev.IOReadWriter) bool {
         Append([]byte(liveDate.Load().(string))).
         Append(httpRespContentLength).
         Write(fd)
+    */
     return true
 }
 func (h *Http) OnClose(fd int) {
