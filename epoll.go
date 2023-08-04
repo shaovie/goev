@@ -2,6 +2,7 @@ package goev
 
 import (
 	"errors"
+	"runtime"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -86,12 +87,14 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 		defer wg.Done()
 	}
 
-	var nfds, i int
+	var nfds, i, msec int
 	var err error
 	events := make([]syscall.EpollEvent, 256) // does not escape
+	msec = -1
 	for {
-		nfds, err = syscall.EpollWait(ep.efd, events, -1)
+		nfds, err = syscall.EpollWait(ep.efd, events, msec)
 		if nfds > 0 {
+			msec = 0
 			for i = 0; i < nfds; i++ {
 				ev := &events[i]
 				ed := *(**evData)(unsafe.Pointer(&ev.Fd))
@@ -117,6 +120,8 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 				}
 			} // end of `for i < nfds'
 		} else if nfds == 0 { // timeout
+			msec = -1
+			runtime.Gosched() // https://zhuanlan.zhihu.com/p/647958433
 			continue
 		} else if err != nil && err != syscall.EINTR { // nfds < 0
 			return errors.New("syscall epoll_wait: " + err.Error())

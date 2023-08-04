@@ -177,11 +177,11 @@ func (a *Acceptor) OnRead(fd int) bool {
 			if err == syscall.EINTR {
 				continue
 			} else if err == syscall.EMFILE {
-                // The per-process limit on the number of open file descriptors has been reached
-                if a.ScheduleTimer(a, 100/*msec*/, 0) == nil {
-                    a.reactor.RemoveEvHandler(a, fd)
-                }
-            }
+				// The per-process limit on the number of open file descriptors has been reached
+				if a.ScheduleTimer(a, 100 /*msec*/, 0) == nil {
+					a.reactor.RemoveEvHandler(a, fd)
+				}
+			}
 			break
 		}
 		h := a.newEvHanlderFunc()
@@ -191,11 +191,13 @@ func (a *Acceptor) OnRead(fd int) bool {
 	}
 	return true
 }
+
+// OnTimeout readd to evpoll
 func (a *Acceptor) OnTimeout(millisecond int64) bool {
-    if a.fd != -1 {
-        a.reactor.AddEvHandler(a, a.fd, EvAccept)
-    }
-    return false
+	if a.fd != -1 {
+		a.reactor.AddEvHandler(a, a.fd, EvAccept)
+	}
+	return false
 }
 
 // OnClose will not happen
