@@ -33,7 +33,7 @@ func (h *Http) OnOpen(fd int) bool {
 	return true
 }
 func (h *Http) OnRead(fd int) bool {
-	_, n, _ := h.Read(fd)
+	_, n, _ := h.Read()
 	if n == 0 { // Abnormal connection
 		return false
 	}

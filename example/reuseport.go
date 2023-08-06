@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,6 +17,7 @@ var (
 	ticker                *time.Ticker
 	liveDate              atomic.Value
 	reactor               *goev.Reactor
+	asynBufPool           sync.Pool
 )
 
 const httpHeaderS = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nServer: goev\r\nContent-Type: text/plain\r\nDate: "
@@ -34,7 +36,7 @@ func (h *Http) OnOpen(fd int) bool {
 }
 func (h *Http) OnRead(fd int) bool {
 	// 23.08.02 这里使用 goev.IOReadWriter 进行IO操作,非常影响性能(整体吞吐量下降20%, 应该是被调度了), 还没查清原因
-	_, n, _ := h.Read(fd)
+	_, n, _ := h.Read()
 	if n == 0 { // Abnormal connection
 		return false
 	}
@@ -43,8 +45,24 @@ func (h *Http) OnRead(fd int) bool {
 	buf = append(buf, httpRespHeader...)
 	buf = append(buf, []byte(liveDate.Load().(string))...)
 	buf = append(buf, httpRespContentLength...)
-	netfd.Write(fd, buf)
+	writen, err := h.Write(buf)
+	if err == nil && writen < len(buf) {
+		bf := asynBufPool.Get().([]byte)
+		n = copy(bf, buf[writen:])
+		h.AsyncWrite(h, goev.AsyncWriteBuf{
+			Len: n,
+			Buf: bf,
+		})
+	}
 	return true
+}
+func (h *Http) OnWrite(fd int) bool {
+	h.AsyncOrderedFlush(h)
+	return true
+}
+func (h *Http) OnAsyncWriteBufDone(bf []byte) {
+	// 如果bf来自pool, 那么需要在这里回收
+	asynBufPool.Put(bf)
 }
 func (h *Http) OnClose(fd int) {
 	netfd.Close(fd)
@@ -69,6 +87,10 @@ func main() {
 
 	httpRespHeader = []byte(httpHeaderS)
 	httpRespContentLength = []byte(contentLengthS)
+
+	asynBufPool.New = func() any {
+		return make([]byte, 256)
+	}
 
 	evPollNum := runtime.NumCPU()*2 - 1
 	var err error

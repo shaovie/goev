@@ -31,7 +31,7 @@ func (s *AsyncPushLog) OnOpen(fd int) bool {
 	return true
 }
 func (s *AsyncPushLog) OnRead(fd int) bool {
-	data, n, _ := s.Read(fd)
+	data, n, _ := s.Read()
 	if n == 0 { // Abnormal connection
 		return false
 	}

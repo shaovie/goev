@@ -9,6 +9,10 @@ import (
 type IOHandle struct {
 	noCopy
 
+	_asyncWriteWaiting         bool
+	_asyncWriteTimeout         uint16 // second, e.g. 10
+	_asyncLastPartialWriteTime int    // nanosecond. unix timestamp
+
 	_fd int
 
 	_r *Reactor
@@ -17,7 +21,7 @@ type IOHandle struct {
 
 	_ti *timerItem
 
-	_asyncWriteBufQ *RingBuffer[asyncPartialWriteBuf] // 保存未直接发送完成的
+	_asyncWriteBufQ *RingBuffer[AsyncWriteBuf] // 保存未直接发送完成的
 }
 
 // Init IOHandle must be called when reusing it.
@@ -75,9 +79,12 @@ func (h *IOHandle) CancelTimer(eh EvHandler) {
 }
 
 // Read use evPollReadBuff, buf size can set by options.EvPollReadBuffSize
-func (h *IOHandle) Read(fd int) (bf []byte, n int, err error) {
+func (h *IOHandle) Read() (bf []byte, n int, err error) {
+	if h._fd < 1 {
+		return nil, 0, syscall.EBADF
+	}
 	if h._ep != nil {
-		bf, n, err = h._ep.read(fd)
+		bf, n, err = h._ep.read(h._fd)
 	} else {
 		panic("goev: IOHandle.Read fd not register to evpoll")
 	}
@@ -143,11 +150,11 @@ func (h *IOHandle) Destroy(eh EvHandler) {
 	//
 	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
 		for {
-			bf, ok := h._asyncWriteBufQ.Pop()
+			abf, ok := h._asyncWriteBufQ.Pop()
 			if !ok {
 				break
 			}
-			eh.OnAsyncWriteBufDone(bf.bf)
+			eh.OnAsyncWriteBufDone(abf.Buf)
 		}
 	}
 }

@@ -98,12 +98,15 @@ type EvHandler interface {
 
 	// NOTE: Each bf invokes a syscall.Write once. The framework does not perform secondary assembly
 	// on bf (if needed, please assemble it manually)
-	AsyncWrite(eh EvHandler, bf []byte)
-	asyncOrderedWrite(ev EvHandler, bf []byte, tryTimes int)
+	AsyncWrite(eh EvHandler, abf AsyncWriteBuf)
+	asyncOrderedWrite(ev EvHandler, abf AsyncWriteBuf)
 
 	// OnAsyncWriteBufDone callback after bf used (within the evpoll coroutine),
 	// you can recycle bf. If no recycling is needed, you can ignore this method (Ignored in IOHandle).
 	OnAsyncWriteBufDone(bf []byte)
+
+	// OnAsyncWriteTerminated
+	OnAsyncWriteTerminated()
 
 	// Destroy If you are using the Async write mechanism, it is essential to call the Destroy method
 	// in OnClose to clean up any unsent bf data.

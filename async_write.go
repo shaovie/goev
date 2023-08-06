@@ -10,20 +10,12 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// Direct sending failed, save and wait for the socket buffer to become writable
-// before continuing to send.
-type asyncPartialWriteBuf struct {
-	len      int // wrote len
-	tryTimes int
-	bf       []byte
-}
-
 // Asynchronously written data block.
 // The framework will ensure that it is sent out in the order in which it was enqueued
 type asyncWriteItem struct {
-	fd int
-	eh EvHandler
-	bf []byte
+	fd  int
+	eh  EvHandler
+	abf AsyncWriteBuf
 }
 
 // Using a double buffer queue, the 'writeq' is only responsible for receiving data blocks.
@@ -94,7 +86,7 @@ func (aw *asyncWrite) OnRead(fd int) bool {
 		}
 		ed := aw.evPoll.evHandlerMap.Load(item.fd)
 		if ed != nil && ed.eh == item.eh { // TODO Comparing interfaces, the performance is not very good
-			item.eh.asyncOrderedWrite(item.eh, item.bf, 0)
+			item.eh.asyncOrderedWrite(item.eh, item.abf)
 		}
 	}
 
