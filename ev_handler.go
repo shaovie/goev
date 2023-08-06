@@ -35,7 +35,7 @@ const (
 //
 // The same EvHandler is repeatedly registered with the Reactor
 type EvHandler interface {
-	setEvPoll(ep *evPoll)
+	setParams(fd int, ep *evPoll)
 	getEvPoll() *evPoll
 
 	setReactor(r *Reactor)
@@ -44,29 +44,32 @@ type EvHandler interface {
 	setTimerItem(ti *timerItem)
 	getTimerItem() *timerItem
 
-	// Call by acceptor on `accept` a new fd or connector on `connect` successful
+	// Fd return fd
+	Fd() int
+
+	// OnOpen call by acceptor on `accept` a new fd or connector on `connect` successful
 	//
 	// Call OnClose() when return false
 	OnOpen(fd int) bool
 
-	// EvPoll catch readable i/o event
+	// OnRead evpoll catch readable i/o event
 	//
 	// Call OnClose() when return false
 	OnRead(fd int) bool
 
-	// EvPoll catch writeable i/o event
+	// OnWrite evpoll catch writeable i/o event
 	//
 	// Call OnClose() when return false
 	OnWrite(fd int) bool
 
-	// EvPoll catch connect result
+	// OnConnectFail evpoll catch connect result
 	// Only be asynchronously called after connector.Connect() returns nil
 	//
 	// Will not call OnClose() after OnConnectFail() (So you don't need to manually release the fd)
 	// The param err Refer to ev_handler.go: ErrConnect*
 	OnConnectFail(err error)
 
-	// EvPoll catch timeout event
+	// OnTimeout evpoll catch timeout event
 	// The parameter 'millisecond' represents the time of batch retrieval of epoll events, not the current
 	// precise time. Use it with caution (as it can reduce the frequency of obtaining the current
 	// time to some extent).
@@ -74,11 +77,38 @@ type EvHandler interface {
 	// Remove timer when return false
 	OnTimeout(millisecond int64) bool
 
-	// Call by reactor(OnOpen must have been called before calling OnClose.)
+	// OnClose call by reactor(OnOpen must have been called before calling OnClose.)
 	//
 	// You need to manually release the fd resource call fd.Close()
 	// You'd better only call fd.Close() here.
 	OnClose(fd int)
+
+	// Write
+	Write(bf []byte) (int, error)
+
+	//= Async I/O
+	// AsyncWrite submit data to async send queue
+	//
+	// The data will be synchronously sent by evpoll within its coroutine.
+	// Each bf ensures ordered processing according to the sequence received by AsynWrite.
+	// Whenever a bf is processed (regardless of the send result), the OnAsyncWriteBufDone method is called.
+	// The framework strives to ensure timely data transmission and maintains order (
+	// data that fails to send will be stored in a separate queue and prioritized for the next
+	// transmission to ensure bf order).
+
+	// NOTE: Each bf invokes a syscall.Write once. The framework does not perform secondary assembly
+	// on bf (if needed, please assemble it manually)
+	AsyncWrite(eh EvHandler, bf []byte)
+	asyncOrderedWrite(ev EvHandler, bf []byte, tryTimes int)
+
+	// OnAsyncWriteBufDone callback after bf used (within the evpoll coroutine),
+	// you can recycle bf. If no recycling is needed, you can ignore this method (Ignored in IOHandle).
+	OnAsyncWriteBufDone(bf []byte)
+
+	// Destroy If you are using the Async write mechanism, it is essential to call the Destroy method
+	// in OnClose to clean up any unsent bf data.
+	// The cleanup process will also invoke OnAsyncWriteBufDone
+	Destroy(eh EvHandler)
 }
 
 // Detecting illegal struct copies using `go vet`

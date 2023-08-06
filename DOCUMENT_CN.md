@@ -115,6 +115,7 @@ func (h *Http) OnRead(fd int, nio goev.IOReadWriter) bool {
 func (h *Http) OnClose(fd int) {
     // 释放资源, Http对象也会被gc回收的(前提是开发都没有单独将Http对象另外保存起来)
     netfd.Close(fd)
+    h.Destroy(h) // 必须的, 框架内部申请的资源也需要销毁
 }
 ```
 

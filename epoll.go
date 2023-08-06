@@ -9,8 +9,9 @@ import (
 )
 
 type evData struct {
-	fd int
-	eh EvHandler
+	fd     int
+	events uint32
+	eh     EvHandler
 }
 
 type evPoll struct {
@@ -22,19 +23,26 @@ type evPoll struct {
 
 	evHandlerMap *ArrayMapUnion[evData] // Refer to https://zhuanlan.zhihu.com/p/640712548
 	timer        *timer4Heap
+
+	// async write
+	asyncWrite *asyncWrite
 }
 
 func (ep *evPoll) open(evDataArrSize int, timer *timer4Heap,
 	evPollReadBuffSize, evPollWriteBuffSize int) error {
 	efd, err := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
 	if err != nil {
-		return errors.New("syscall epoll_create1: " + err.Error())
+		return errors.New("goev: epoll_create1 " + err.Error())
 	}
 	ep.efd = efd
 	ep.timer = timer
 	ep.evPollReadBuff = make([]byte, evPollReadBuffSize)
 	ep.evPollWriteBuff = make([]byte, evPollWriteBuffSize)
 	ep.evHandlerMap = NewArrayMapUnion[evData](evDataArrSize)
+	ep.asyncWrite, err = newAsyncWrite(ep)
+	if err != nil {
+		return err
+	}
 
 	// process max fds
 	// show using `ulimit -Hn`
@@ -42,7 +50,7 @@ func (ep *evPoll) open(evDataArrSize int, timer *timer4Heap,
 	return nil
 }
 func (ep *evPoll) add(fd int, events uint32, eh EvHandler) error {
-	eh.setEvPoll(ep)
+	eh.setParams(fd, ep)
 
 	ev := syscall.EpollEvent{Events: events}
 	ed := &evData{fd: fd, eh: eh}
@@ -50,6 +58,7 @@ func (ep *evPoll) add(fd int, events uint32, eh EvHandler) error {
 	*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
 
 	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd, &ev); err != nil {
+		// ENOSPC cat /proc/sys/fs/epoll/max_user_watches
 		return errors.New("epoll_ctl add: " + err.Error())
 	}
 	return nil
@@ -63,14 +72,45 @@ func (ep *evPoll) remove(fd int) error {
 	}
 	return nil
 }
+func (ep *evPoll) append(fd int, events uint32) error {
+	ed := ep.evHandlerMap.Load(fd)
+	if ed == nil {
+		return errors.New("append: not found")
+	}
+
+	ev := syscall.EpollEvent{Events: events | ed.events}
+	*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
+
+	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd, &ev); err != nil {
+		return errors.New("epoll_ctl mod: " + err.Error())
+	}
+	ed.events |= events // TODO mutex ?
+	return nil
+}
+func (ep *evPoll) subtract(fd int, events uint32) error {
+	ed := ep.evHandlerMap.Load(fd)
+	if ed == nil {
+		return errors.New("subtract: not found")
+	}
+
+	ev := syscall.EpollEvent{Events: ed.events &^ events}
+	*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
+
+	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd, &ev); err != nil {
+		return errors.New("epoll_ctl mod: " + err.Error())
+	}
+	ed.events &= ^events // TODO mutex ?
+	return nil
+}
 func (ep *evPoll) scheduleTimer(eh EvHandler, delay, interval int64) (err error) {
-	eh.setEvPoll(ep)
 	err = ep.timer.schedule(eh, delay, interval)
 	return
 }
 func (ep *evPoll) cancelTimer(eh EvHandler) {
 	ep.timer.cancel(eh)
 }
+
+// io handle
 func (ep *evPoll) writeBuff() []byte {
 	return ep.evPollWriteBuff
 }
@@ -82,6 +122,11 @@ func (ep *evPoll) read(fd int) (bf []byte, n int, err error) {
 	// ignoring syscall.EINTR
 	return
 }
+func (ep *evPoll) push(awi asyncWriteItem) {
+	ep.asyncWrite.push(awi)
+}
+
+// end of `io handle'
 func (ep *evPoll) run(wg *sync.WaitGroup) error {
 	if wg != nil {
 		defer wg.Done()

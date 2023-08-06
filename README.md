@@ -57,6 +57,7 @@ func (h *Http) OnRead(fd int, nio goev.IOReadWriter) bool {
 }
 func (h *Http) OnClose(fd int) {
 	netfd.Close(fd)
+    h.Destroy(h)
 }
 
 func main() {
@@ -130,12 +131,6 @@ func main() {
 ```
 > Note: The reactor will bind different acceptors (listener fd) to different epoll instances to achieve multithreaded concurrent listening on the same IP:PORT
 
-## Related Projects
-
-* [ttlcache](https://github.com/shaovie/ttlcache): An in-process object caching library designed specifically for managing the caching and automatic release of objects with lifecycles
-* [tlog](https://github.com/shaovie/tlog): A more compact zerolog
-
-
 ## Benchmarks
 
 We're comparing gnet, which is ranked first on TechEmpower, using the test code from http://github.com/TechEmpower/FrameworkBenchmarks/frameworks/Go/gnet/
@@ -172,9 +167,13 @@ Transfer/sec:      6.82MB
 ## Why high-performance
 
 * Connection bind threads/coroutines, no need for mutex locks within the 'polling stack' loop, provide global shared memory within the 'polling stack' for easy data reading, saving memory, and avoiding frequent memory allocation (also unnecessary for mutex locks)
-* ArrayMapUnion is a combined indexing structure that improves the indexing speed of fd and handler. Please refer to the test code [mutex_arr_vs_map.go](https://github.com/shaovie/goev/blob/main/test/mutex_arr_vs_map.go) for more information.
 * All operations directly use syscall, avoiding the use of encapsulation in the Go standard library (with mutex locks).
 * Less is more, keep the code concise and embody the essence of network programming
+
+## Development Roadmap
+
+- [ ] Async write
+- [ ] Support asynchronous processing logic for upper level applications
 
 ## Contributing
 Contributions are welcome! If you find any bugs or have suggestions for improvement, please open an issue or submit a pull request

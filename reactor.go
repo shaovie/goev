@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	//"sync/atomic"
 )
 
 // Reactor provides an I/O event-driven event handling model, where multiple epoll processes
@@ -52,7 +51,7 @@ func NewReactor(opts ...Option) (*Reactor, error) {
 // AddEvHandler可以将fd及其对应的处理对象注册到Reactor中，如果内部指定了多个evpoll，
 // 那么会根据fd %idx 轮转到指定的evpoll中
 func (r *Reactor) AddEvHandler(eh EvHandler, fd int, events uint32) error {
-	if fd < 0 || eh == nil {
+	if fd < 1 || eh == nil { // NOTE fd must > 0
 		return errors.New("AddEvHandler: invalid params")
 	}
 	i := 0

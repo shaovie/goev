@@ -45,6 +45,7 @@ func (s *AsyncPushLog) OnClose(fd int) {
 	fmt.Printf("closed\n")
 	netfd.Close(fd)
 	s.Closed()
+	s.Destroy(s)
 }
 func doPush(pusher *AsyncPushLog) {
 	msec := rand.Int63()%50 + 1

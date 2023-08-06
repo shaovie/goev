@@ -24,6 +24,7 @@ func (s *Scanner) OnConnectFail(err error) {
 }
 func (s *Scanner) OnClose(fd int) {
 	netfd.Close(fd)
+	s.Destroy(s)
 }
 func TestConnector(t *testing.T) {
 	fmt.Println("hello boy")

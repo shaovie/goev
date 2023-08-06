@@ -12,7 +12,7 @@ import (
 // Refer to test/mutex_arr_vs_map.go
 type ArrayMapUnion[T any] struct {
 	arrSize int
-	arr     []atomic.Pointer[T]
+	arr     []atomic.Pointer[T] // TODO 如果针对fd, 这里应该可以不用atomic, 直接保存value
 
 	// sync.Map is not suitable for use in evpoll as it is write-only, without read support
 	sMap   map[int]*T

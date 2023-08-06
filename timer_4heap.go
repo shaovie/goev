@@ -53,7 +53,7 @@ func (th *timer4Heap) adjustTimerfd(delay /*millisecond*/ int64) {
 	unix.TimerfdSettime(th.tfd, 0 /*Relative time*/, &timeSpec, nil)
 }
 func (th *timer4Heap) OnRead(fd int) bool {
-	var readTimerfdV int64 = 0
+	var readTimerfdV int64 = 0 // Compared to var bf [8] byte, the performance is the same
 	var readTimerfdBuf = (*(*[8]byte)(unsafe.Pointer(&readTimerfdV)))[:]
 	syscall.Read(fd, readTimerfdBuf)
 	delay := th.handleExpired(time.Now().UnixMilli())
@@ -106,8 +106,9 @@ func (th *timer4Heap) cancel(eh EvHandler) {
 		return
 	}
 	ti.eh = nil
-	ti.expiredAt = 1 // 防止该定时器时间太久, 导致对象回收被延迟太久
+	ti.expiredAt = 1 // 防止定时器时间太久导致ti回收被延迟太久(这是不确定的, 因为没有改变ti 在heap的位置)
 	// No need to adjust timerfd
+	eh.setTimerItem(nil)
 }
 func (th *timer4Heap) handleExpired(now int64) int64 {
 	if len(th.fheap) == 0 {

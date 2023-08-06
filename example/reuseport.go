@@ -48,6 +48,7 @@ func (h *Http) OnRead(fd int) bool {
 }
 func (h *Http) OnClose(fd int) {
 	netfd.Close(fd)
+	h.Destroy(h)
 }
 
 func updateLiveSecond() {
