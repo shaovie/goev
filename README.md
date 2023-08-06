@@ -173,7 +173,6 @@ Transfer/sec:      6.82MB
 ## Development Roadmap
 
 - [ ] Async write
-- [ ] Support asynchronous processing logic for upper level applications
 
 ## Contributing
 Contributions are welcome! If you find any bugs or have suggestions for improvement, please open an issue or submit a pull request
