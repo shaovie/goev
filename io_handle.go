@@ -10,10 +10,8 @@ type IOHandle struct {
 	noCopy
 
 	_asyncWriteWaiting         bool
-	_asyncWriteTimeout         uint16 // second, e.g. 10
-	_asyncLastPartialWriteTime int    // nanosecond. unix timestamp
-
-	_fd int
+	_fd                        int
+	_asyncLastPartialWriteTime int64 // nanosecond. unix timestamp
 
 	_r *Reactor
 

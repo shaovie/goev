@@ -5,24 +5,12 @@ import (
 	"time"
 )
 
-// AsyncWriteBuf
+// AsyncWriteBuf x
 type AsyncWriteBuf struct {
 	tryTimes uint16
 	Writen   int    // wrote len
 	Len      int    // buf original len. readonly
 	Buf      []byte // readonly
-}
-
-// AsyncWriteTimeout (0,65535]
-//
-// Start the timer from the last incomplete transmission of AsyncWriteBuf, and if no data is sent
-// within the duration of _asyncWriteTimeout, terminate the transmission.
-// Remove the OnWrite event and trigger the OnAsyncWriteTerminate callback.
-func (h *IOHandle) AsyncWriteTimeout(t uint16) {
-	if t == 0 {
-		return
-	}
-	h._asyncWriteTimeout = t
 }
 
 // AsyncWrite asynchronous write
@@ -58,16 +46,14 @@ func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf AsyncWriteBuf) {
 			return
 		}
 		abf.Writen += n // Partially write, shift n
-		if h._asyncWriteTimeout > 0 {
-			h._asyncLastPartialWriteTime = time.Now().Nanosecond()
-		}
 	}
 
+	h._asyncLastPartialWriteTime = time.Now().UnixMilli()
 	// Error or Partially
 	if h._asyncWriteBufQ == nil {
 		h._asyncWriteBufQ = NewRingBuffer[AsyncWriteBuf](2)
 	}
-	abf.tryTimes += 1
+	abf.tryTimes++
 	h._asyncWriteBufQ.Push(abf)
 
 	if h._asyncWriteWaiting == false {
@@ -75,22 +61,15 @@ func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf AsyncWriteBuf) {
 		h._ep.remove(h._fd)
 		h._ep.append(h._fd, EvOut) // No need to use ET mode
 		// eh needs to implement the OnWrite method, and the OnWrite method needs to call AsyncOrderedFlush.
-		// For example:
-		// func (x *XX) OnWrite(fd int) {
-		//     x.AsyncOrderedFlush(x)
-		// }
-		if h._asyncWriteTimeout > 0 {
-			h._asyncLastPartialWriteTime = time.Now().Nanosecond() // the second set it
-			h.ScheduleTimer(&asyncWriteController{                 // no need to cancel
-				ioh: h,
-				eh:  eh,
-				t:   h._asyncLastPartialWriteTime,
-			}, int64(h._asyncWriteTimeout), 0)
-		}
 	}
 }
 
-// AsyncOrderedFlush
+// AsyncOrderedFlush only called in OnWrite
+// For example:
+//
+//	func (x *XX) OnWrite(fd int) {
+//	    x.AsyncOrderedFlush(x)
+//	}
 func (h *IOHandle) AsyncOrderedFlush(eh EvHandler) {
 	if h._asyncWriteBufQ == nil || h._asyncWriteBufQ.IsEmpty() {
 		return
@@ -118,10 +97,6 @@ func (h *IOHandle) AsyncOrderedFlush(eh EvHandler) {
 func (h *IOHandle) OnAsyncWriteBufDone(bf []byte) {
 }
 
-// OnAsyncWriteTerminated
-func (h *IOHandle) OnAsyncWriteTerminated() {
-}
-
 // AsyncWaitWriteQLen The length of the queue waiting to be sent asynchronously
 //
 // If it is too long, it indicates that the sending is slow and the receiving end is abnormal
@@ -132,19 +107,17 @@ func (h *IOHandle) AsyncWaitWriteQLen() int {
 	return h._asyncWriteBufQ.Len()
 }
 
-// No need to cancel
-type asyncWriteController struct {
-	IOHandle
-	t   int
-	ioh *IOHandle
-	eh  EvHandler
-}
-
-func (c *asyncWriteController) OnTimeout(now int64) bool {
-	if c.t == c.ioh._asyncLastPartialWriteTime {
-		if c.ioh._fd > 0 {
-			c.eh.OnAsyncWriteTerminated()
-		}
-	}
-	return false
+// AsyncLastPartialWriteTime indicates that the previous write was incomplete and requires 'evpoll'
+// to polling for the writable state. This value helps prevent a connection from being indefinitely
+// unreachable due to abnormalities or the recipient not receiving data.
+//
+// e.g.
+// if nowMilli - x.AsyncLastPartialWriteTime() > 10*1000 && x.AsyncWaitWriteQLen() > 0 { // 10secs
+//
+//	    x.GetReactor().RemoveEvHandler(x, x.Fd())
+//	    x.OnClose(x.Fd())
+//	    return // The connection lifecycle has ended
+//	}
+func (h *IOHandle) AsyncLastPartialWriteTime() int64 {
+	return h._asyncLastPartialWriteTime
 }
