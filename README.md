@@ -8,6 +8,7 @@ Moreover, goev excels in terms of performance. In the TechEmpower benchmark test
 
 * I/O event-driven architecture
 * Lightweight and easy-to-use
+* Supporting asynchronous sending allows higher-level applications to perform synchronous I/O operations while asynchronously handling business processing
 * Support multi-threaded polling
 * Perfect support for REUSEPORT multi-threading mode
 * Lock-free operations in a polling stack
