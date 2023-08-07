@@ -1,13 +1,13 @@
-package goev
+package main
 
 import (
 	"fmt"
 	"math/rand"
 	"sync"
 	"sync/atomic"
-	"testing"
 	"time"
 
+	"github.com/shaovie/goev"
 	"github.com/shaovie/goev/netfd"
 )
 
@@ -17,11 +17,11 @@ var (
 )
 
 type AsyncPushLog struct {
-	ConnectPoolItem
+	goev.ConnectPoolItem
 }
 
 func (s *AsyncPushLog) OnOpen(fd int) bool {
-	if err := s.GetReactor().AddEvHandler(s, fd, EvIn); err != nil {
+	if err := s.GetReactor().AddEvHandler(s, fd, goev.EvIn); err != nil {
 		fmt.Printf("error: fd %d %s\n", fd, err.Error())
 		return false
 	}
@@ -51,7 +51,7 @@ func doPush(pusher *AsyncPushLog) {
 	pushCounter.Add(1)
 	pusher.GetPool().Release(pusher)
 }
-func TestConnectPool(t *testing.T) {
+func main() {
 	fmt.Printf("hello boy\n")
 	buffPool = &sync.Pool{
 		New: func() any {
@@ -59,10 +59,10 @@ func TestConnectPool(t *testing.T) {
 		},
 	}
 	// 1. reactor
-	r, err := NewReactor(
-		EvDataArrSize(0), // default val
-		EvPollNum(5),
-		TimerHeapInitSize(100),
+	r, err := goev.NewReactor(
+		goev.EvDataArrSize(0), // default val
+		goev.EvPollNum(5),
+		goev.TimerHeapInitSize(100),
 	)
 	if err != nil {
 		panic(err.Error())
@@ -75,16 +75,16 @@ func TestConnectPool(t *testing.T) {
 		wg.Done()
 	}()
 	// 2. connector
-	c, err := NewConnector(r, SockRcvBufSize(8*1024))
+	c, err := goev.NewConnector(r, goev.SockRcvBufSize(8*1024))
 	if err != nil {
 		panic(err.Error())
 	}
 
 	// 3. connect_pool
-	cp, err := NewConnectPool(
+	cp, err := goev.NewConnectPool(
 		c, "127.0.0.1:6379", 40, 10, 100,
 		1000, 200,
-		func() ConnectPoolHandler { return new(AsyncPushLog) },
+		func() goev.ConnectPoolHandler { return new(AsyncPushLog) },
 	)
 	if err != nil {
 		panic(err.Error())
