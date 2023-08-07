@@ -55,12 +55,12 @@ type EvHandler interface {
 	// OnRead evpoll catch readable i/o event
 	//
 	// Call OnClose() when return false
-	OnRead(fd int) bool
+	OnRead() bool
 
 	// OnWrite evpoll catch writeable i/o event
 	//
 	// Call OnClose() when return false
-	OnWrite(fd int) bool
+	OnWrite() bool
 
 	// OnConnectFail evpoll catch connect result
 	// Only be asynchronously called after connector.Connect() returns nil
@@ -81,7 +81,7 @@ type EvHandler interface {
 	//
 	// You need to manually release the fd resource call fd.Close()
 	// You'd better only call fd.Close() here.
-	OnClose(fd int)
+	OnClose()
 
 	// Write
 	Write(bf []byte) (int, error)

@@ -34,7 +34,7 @@ func (h *Http) OnOpen(fd int) bool {
 	}
 	return true
 }
-func (h *Http) OnRead(fd int) bool {
+func (h *Http) OnRead() bool {
 	// 23.08.02 这里使用 goev.IOReadWriter 进行IO操作,非常影响性能(整体吞吐量下降20%, 应该是被调度了), 还没查清原因
 	_, n, _ := h.Read()
 	if n == 0 { // Abnormal connection
@@ -56,7 +56,7 @@ func (h *Http) OnRead(fd int) bool {
 	}
 	return true
 }
-func (h *Http) OnWrite(fd int) bool {
+func (h *Http) OnWrite() bool {
 	h.AsyncOrderedFlush(h)
 	return true
 }
@@ -64,9 +64,11 @@ func (h *Http) OnAsyncWriteBufDone(bf []byte, flag int) {
 	// 如果bf来自pool, 那么需要在这里回收
 	asynBufPool.Put(bf)
 }
-func (h *Http) OnClose(fd int) {
-	netfd.Close(fd)
-	h.Destroy(h)
+func (h *Http) OnClose() {
+	if h.Fd() != -1 {
+		netfd.Close(h.Fd())
+		h.Destroy(h)
+	}
 }
 
 func updateLiveSecond() {

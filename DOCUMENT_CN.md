@@ -79,9 +79,8 @@ func (h *Http) OnOpen(fd int) bool {
     return true
 }
 // 处理可读事件(即: 链接有数据可以接收)
-func (h *Http) OnRead(fd int, nio goev.IOReadWriter) bool {
-    // IO 处理目前还是最简的裸操作, 会添加异步处理能力和失败缓存处理
-	_, n, _ := h.Read(fd) // 使用poller中的无锁共享缓存
+func (h *Http) OnRead() bool {
+	_, n, _ := h.Read() // 使用poller中的无锁共享缓存
 	if n == 0 { // Abnormal connection
 		return false
 	}
@@ -90,7 +89,7 @@ func (h *Http) OnRead(fd int, nio goev.IOReadWriter) bool {
 	buf = append(buf, httpRespHeader...)
 	buf = append(buf, []byte(liveDate.Load().(string))...)
 	buf = append(buf, httpRespContentLength...)
-	netfd.Write(fd, buf)
+	h.Write(buf)
 
     /* 2023-08-04 注: goev.IOReadWriter的方式已经弃用, 会非常影响吞吐能力, 会比使用栈空间的make([]byte)吞吐能力差不少
     // goev.IOReadWriter 是框架内置的I/O操作方法, 使用一个全局的buf, 单个evpoll内所有链接共享,
@@ -112,10 +111,12 @@ func (h *Http) OnRead(fd int, nio goev.IOReadWriter) bool {
     */
     return true
 }
-func (h *Http) OnClose(fd int) {
+func (h *Http) OnClose() {
     // 释放资源, Http对象也会被gc回收的(前提是开发都没有单独将Http对象另外保存起来)
-    netfd.Close(fd)
-    h.Destroy(h) // 必须的, 框架内部申请的资源也需要销毁
+    if h.Fd() != -1 {
+        netfd.Close(h.Fd())
+        h.Destroy(h) // 必须的, 框架内部申请的资源也需要销毁
+    }
 }
 ```
 
@@ -155,11 +156,13 @@ func (h *Http) OnTimeout(now int64) bool {
     // send ping 这里目前并没有实现共享buf，做为下一步优化点
     return true  // keep interval timer
 }
-func (h *Http) OnClose(fd int) {
+func (h *Http) OnClose() {
     // 释放资源, Http对象也会被gc回收的(前提是开发都没有单独将Http对象另外保存起来)
-    netfd.Close(fd)
-    h.closed = true
-    h.GetReactor().CancelTimer(h)
+    if h.Fd() != -1 {
+        netfd.Close(h.Fd())
+        h.closed = true
+        h.CancelTimer(h)
+    }
 }
 ```
 

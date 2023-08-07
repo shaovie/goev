@@ -32,7 +32,7 @@ func (h *Http) OnOpen(fd int) bool {
 	}
 	return true
 }
-func (h *Http) OnRead(fd int) bool {
+func (h *Http) OnRead() bool {
 	_, n, _ := h.Read()
 	if n == 0 { // Abnormal connection
 		return false
@@ -42,12 +42,14 @@ func (h *Http) OnRead(fd int) bool {
 	buf = append(buf, httpRespHeader...)
 	buf = append(buf, []byte(liveDate.Load().(string))...)
 	buf = append(buf, httpRespContentLength...)
-	netfd.Write(fd, buf)
+	netfd.Write(h.Fd(), buf)
 	return true
 }
-func (h *Http) OnClose(fd int) {
-	netfd.Close(fd)
-	h.Destroy(h)
+func (h *Http) OnClose() {
+	if h.Fd() != -1 {
+		netfd.Close(h.Fd())
+		h.Destroy(h)
+	}
 }
 
 func updateLiveSecond() {

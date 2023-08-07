@@ -170,23 +170,23 @@ func (a *Acceptor) listen(fd int, sa syscall.Sockaddr) error {
 }
 
 // OnRead handle listner accept event
-func (a *Acceptor) OnRead(fd int) bool {
+func (a *Acceptor) OnRead() bool {
 	for i := 0; i < a.loopAcceptTimes; i++ {
-		conn, _, err := syscall.Accept4(fd, syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC)
+		conn, _, err := syscall.Accept4(a.fd, syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC)
 		if err != nil {
 			if err == syscall.EINTR {
 				continue
 			} else if err == syscall.EMFILE {
 				// The per-process limit on the number of open file descriptors has been reached
 				if a.ScheduleTimer(a, 100 /*msec*/, 0) == nil {
-					a.reactor.RemoveEvHandler(a, fd)
+					a.reactor.RemoveEvHandler(a, a.fd)
 				}
 			}
 			break
 		}
 		h := a.newEvHanlderFunc()
 		if h.OnOpen(conn) == false {
-			h.OnClose(conn)
+			h.OnClose()
 		}
 	}
 	return true
@@ -201,7 +201,9 @@ func (a *Acceptor) OnTimeout(millisecond int64) bool {
 }
 
 // OnClose will not happen
-func (a *Acceptor) OnClose(fd int) {
-	syscall.Close(fd)
-	a.fd = -1
+func (a *Acceptor) OnClose() {
+	if a.fd != -1 {
+		syscall.Close(a.fd)
+		a.fd = -1
+	}
 }

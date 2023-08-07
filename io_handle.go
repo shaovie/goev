@@ -57,6 +57,9 @@ func (h *IOHandle) getTimerItem() *timerItem {
 func (h *IOHandle) Fd() int {
 	return h._fd
 }
+func (h *IOHandle) setFd(fd int) {
+	h._fd = fd
+}
 
 // ScheduleTimer Add a timer event to an IOHandle that is already registered with the reactor
 // to ensure that all event handling occurs within the same evpoll
@@ -115,12 +118,12 @@ func (*IOHandle) OnOpen(fd int) bool {
 }
 
 // OnRead please make sure you want to reimplement it.
-func (*IOHandle) OnRead(fd int) bool {
+func (*IOHandle) OnRead() bool {
 	panic("goev: IOHandle OnRead")
 }
 
 // OnWrite please make sure you want to reimplement it.
-func (*IOHandle) OnWrite(fd int) bool {
+func (*IOHandle) OnWrite() bool {
 	panic("goev: IOHandle OnWrite")
 }
 
@@ -135,7 +138,7 @@ func (*IOHandle) OnTimeout(millisecond int64) bool {
 }
 
 // OnClose please make sure you want to reimplement it.
-func (*IOHandle) OnClose(fd int) {
+func (*IOHandle) OnClose() {
 	panic("goev: IOHandle OnClose")
 }
 
@@ -143,7 +146,7 @@ func (*IOHandle) OnClose(fd int) {
 // in OnClose to clean up any unsent bf data.
 // The cleanup process will also invoke OnAsyncWriteBufDone
 func (h *IOHandle) Destroy(eh EvHandler) {
-	h._fd = -1
+	h.setFd(-1)
 
 	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
 		for {

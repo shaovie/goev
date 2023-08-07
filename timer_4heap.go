@@ -56,10 +56,10 @@ func (th *timer4Heap) adjustTimerfd(delay /*millisecond*/ int64) {
 	}
 	unix.TimerfdSettime(th.tfd, 0 /*Relative time*/, &timeSpec, nil)
 }
-func (th *timer4Heap) OnRead(fd int) bool {
+func (th *timer4Heap) OnRead() bool {
 	var readTimerfdV int64 = 0 // Compared to var bf [8] byte, the performance is the same
 	var readTimerfdBuf = (*(*[8]byte)(unsafe.Pointer(&readTimerfdV)))[:]
-	syscall.Read(fd, readTimerfdBuf)
+	syscall.Read(th.tfd, readTimerfdBuf)
 	delay := th.handleExpired(time.Now().UnixMilli())
 	if delay > 0 {
 		th.adjustTimerfd(delay)
@@ -133,6 +133,8 @@ func (th *timer4Heap) handleExpired(now int64) int64 {
 			item.expiredAt = now + item.interval
 			th.fheap = append(th.fheap, item)
 			th.shiftUp(len(th.fheap) - 1)
+		} else {
+			item.eh.setTimerItem(nil) // release timerItem
 		}
 	}
 	return delta

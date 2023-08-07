@@ -18,8 +18,6 @@ var (
 
 type AsyncPushLog struct {
 	ConnectPoolItem
-
-	fd int
 }
 
 func (s *AsyncPushLog) OnOpen(fd int) bool {
@@ -27,10 +25,9 @@ func (s *AsyncPushLog) OnOpen(fd int) bool {
 		fmt.Printf("error: fd %d %s\n", fd, err.Error())
 		return false
 	}
-	s.fd = fd
 	return true
 }
-func (s *AsyncPushLog) OnRead(fd int) bool {
+func (s *AsyncPushLog) OnRead() bool {
 	data, n, _ := s.Read()
 	if n == 0 { // Abnormal connection
 		return false
@@ -39,11 +36,11 @@ func (s *AsyncPushLog) OnRead(fd int) bool {
 	return true
 }
 func (s *AsyncPushLog) Push(log string) {
-	netfd.Write(s.fd, []byte(log))
+	netfd.Write(s.Fd(), []byte(log))
 }
-func (s *AsyncPushLog) OnClose(fd int) {
+func (s *AsyncPushLog) OnClose() {
 	fmt.Printf("closed\n")
-	netfd.Close(fd)
+	netfd.Close(s.Fd())
 	s.Closed()
 	s.Destroy(s)
 }

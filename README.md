@@ -48,17 +48,18 @@ func (h *Http) OnOpen(fd int) bool {
 	}
 	return true
 }
-func (h *Http) OnRead(fd int, nio goev.IOReadWriter) bool {
-	_, err := nio.InitRead().Read(fd)
-	if err == goev.ErrRcvBufOutOfLimit { // Abnormal connection
+func (h *Http) OnRead() bool {
+	_, n, _ := h.Read()
+	if n == 0 { // Abnormal connection
 		return false
 	}
-	netfd.Write(fd, []byte(httpResp)) // Connection: close
-	return false                     // will goto OnClose
+    return true
 }
-func (h *Http) OnClose(fd int) {
-	netfd.Close(fd)
-    h.Destroy(h)
+func (h *Http) OnClose() {
+    if h.Fd() != -1 {
+        netfd.Close(h.Fd())
+        h.Destroy(h)
+    }
 }
 
 func main() {
@@ -173,7 +174,7 @@ Transfer/sec:      6.82MB
 
 ## Development Roadmap
 
-- [x] Async write
+- [x] Async write (refer example/download.go)
 - [ ] Codec interface
 
 ## Contributing

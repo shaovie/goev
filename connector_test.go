@@ -22,8 +22,8 @@ func (s *Scanner) OnOpen(fd int) bool {
 func (s *Scanner) OnConnectFail(err error) {
 	//fmt.Printf("port %d close %s\n", s.port, err.Error())
 }
-func (s *Scanner) OnClose(fd int) {
-	netfd.Close(fd)
+func (s *Scanner) OnClose() {
+	netfd.Close(s.Fd())
 	s.Destroy(s)
 }
 func TestConnector(t *testing.T) {

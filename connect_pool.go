@@ -215,5 +215,5 @@ func (cpc *connectPoolConn) OnOpen(fd int) bool {
 func (cpc *connectPoolConn) OnConnectFail(err error) {
 	cpc.cp.toNewNum.Add(-1)
 }
-func (cpc *connectPoolConn) OnClose(fd int) {
+func (cpc *connectPoolConn) OnClose() {
 }

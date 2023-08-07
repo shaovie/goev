@@ -146,20 +146,20 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 				// EPOLLHUP refer to man 2 epoll_ctl
 				if ev.Events&(syscall.EPOLLHUP|syscall.EPOLLERR) != 0 {
 					ep.remove(ed.fd) // MUST before OnClose()
-					ed.eh.OnClose(ed.fd)
+					ed.eh.OnClose()
 					continue
 				}
 				if ev.Events&(syscall.EPOLLOUT) != 0 { // MUST before EPOLLIN (e.g. connect)
-					if ed.eh.OnWrite(ed.fd) == false {
+					if ed.eh.OnWrite() == false {
 						ep.remove(ed.fd) // MUST before OnClose()
-						ed.eh.OnClose(ed.fd)
+						ed.eh.OnClose()
 						continue
 					}
 				}
 				if ev.Events&(syscall.EPOLLIN) != 0 {
-					if ed.eh.OnRead(ed.fd) == false {
+					if ed.eh.OnRead() == false {
 						ep.remove(ed.fd) // MUST before OnClose()
-						ed.eh.OnClose(ed.fd)
+						ed.eh.OnClose()
 						continue
 					}
 				}

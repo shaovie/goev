@@ -36,7 +36,7 @@ func (c *Conn) OnOpen(fd int) bool {
 	}
 	return true
 }
-func (c *Conn) OnRead(fd int) bool {
+func (c *Conn) OnRead() bool {
 	fmt.Println("on read")
 	_, n, _ := c.Read()
 	if n == 0 { // Abnormal connection
@@ -96,7 +96,7 @@ func (c *Conn) OnTimeout(now int64) bool {
 	}
 	return true
 }
-func (c *Conn) OnWrite(fd int) bool {
+func (c *Conn) OnWrite() bool {
 	c.AsyncOrderedFlush(c)
 	fmt.Println("on write")
 	return true
@@ -107,18 +107,20 @@ func (c *Conn) OnAsyncWriteBufDone(bf []byte, flag int) {
 	} else if flag == 1 && c.Fd() > 0 { // send completely
 		fmt.Println("send completely")
 		reactor.RemoveEvHandler(c, c.Fd())
-		c.OnClose(c.Fd()) // (NOTE: avoid IOHandle.Destroy(eh.OnAsyncWriteBufDone) endless loop)
+		c.OnClose() // (NOTE: avoid IOHandle.Destroy(eh.OnAsyncWriteBufDone) endless loop)
 		return
 	}
 }
-func (c *Conn) OnClose(fd int) {
+func (c *Conn) OnClose() {
 	fmt.Println("on close")
-	if c.f != nil {
-		c.f.Close()
+	if c.Fd() != -1 {
+		if c.f != nil {
+			c.f.Close()
+		}
+		c.CancelTimer(c)
+		netfd.Close(c.Fd())
+		c.Destroy(c)
 	}
-	c.CancelTimer(c)
-	netfd.Close(fd)
-	c.Destroy(c)
 }
 
 func main() {

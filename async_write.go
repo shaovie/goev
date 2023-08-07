@@ -72,7 +72,7 @@ func (aw *asyncWrite) push(awi asyncWriteItem) {
 }
 
 // OnRead writeq has data
-func (aw *asyncWrite) OnRead(fd int) bool {
+func (aw *asyncWrite) OnRead() bool {
 	if aw.readq.IsEmpty() {
 		aw.mtx.Lock()
 		aw.writeq, aw.readq = aw.readq, aw.writeq // Swap read/write queues
