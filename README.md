@@ -4,6 +4,7 @@ Goev provides a high-performance, lightweight, non-blocking, I/O event-driven ne
 
 Moreover, goev excels in terms of performance. In the TechEmpower benchmark tests, it has achieved first place among similar frameworks in the same environment (goev has been submitted to TechEmpower and is awaiting the next round of public evaluation).
 
+![](goev.png)
 ## Features
 
 * I/O event-driven architecture
