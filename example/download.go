@@ -133,7 +133,7 @@ func main() {
 
 	var err error
 	reactor, err = goev.NewReactor(
-		goev.EvDataArrSize(2048), // default val
+		goev.EvFdMaxSize(2048), // default val
 		goev.EvPollNum(runtime.NumCPU()*2-1),
 	)
 	if err != nil {

@@ -2,17 +2,15 @@ package goev
 
 import (
 	"sync"
-	"sync/atomic"
 )
 
 // ArrayMapUnion  is a composite data structure that includes an array and a map.
 // Indexes with a small range use array indexing, while indexes with a large range use a map.
-// It's thread safe atomic array + map
 //
 // Refer to test/mutex_arr_vs_map.go
 type ArrayMapUnion[T any] struct {
 	arrSize int
-	arr     []atomic.Pointer[T] // TODO 如果针对fd, 这里应该可以不用atomic, 直接保存value
+	arr     []*T // 如果针对fd, 这里应该可以不用atomic, 直接保存value
 
 	// sync.Map is not suitable for use in evpoll as it is write-only, without read support
 	sMap   map[int]*T
@@ -26,13 +24,13 @@ func NewArrayMapUnion[T any](arrSize int) *ArrayMapUnion[T] {
 	if arrSize < 1 {
 		panic("NewArrayMapUnion arrSize < 1")
 	}
-	mapPreSize := arrSize / 3 // 1/4
+	mapPreSize := arrSize / 9 // 1/10
 	if mapPreSize < 1 {
 		mapPreSize = 128
 	}
 	amu := &ArrayMapUnion[T]{
 		arrSize: arrSize,
-		arr:     make([]atomic.Pointer[T], arrSize),
+		arr:     make([]*T, arrSize),
 		sMap:    make(map[int]*T, mapPreSize),
 	}
 	return amu
@@ -41,7 +39,7 @@ func NewArrayMapUnion[T any](arrSize int) *ArrayMapUnion[T] {
 // Load returns the value stored in the array/map for a key, or nil if no
 func (am *ArrayMapUnion[T]) Load(i int) *T {
 	if i < am.arrSize {
-		return am.arr[i].Load()
+		return am.arr[i]
 	}
 	am.mapMtx.Lock()
 	if v, ok := am.sMap[i]; ok {
@@ -55,7 +53,7 @@ func (am *ArrayMapUnion[T]) Load(i int) *T {
 // Store sets the value for a key
 func (am *ArrayMapUnion[T]) Store(i int, v *T) {
 	if i < am.arrSize {
-		am.arr[i].Store(v)
+		am.arr[i] = v
 		return
 	}
 	am.mapMtx.Lock()
@@ -66,7 +64,7 @@ func (am *ArrayMapUnion[T]) Store(i int, v *T) {
 // Delete deletes the value for a key
 func (am *ArrayMapUnion[T]) Delete(i int) {
 	if i < am.arrSize {
-		am.arr[i].Store(nil)
+		am.arr[i] = nil
 		return
 	}
 	am.mapMtx.Lock()

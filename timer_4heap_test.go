@@ -52,7 +52,7 @@ func TestTimer4Heap_Algo(t *testing.T) {
 }
 func TestTimer4Heap(t *testing.T) {
 	reactor, _ := NewReactor(
-		EvDataArrSize(20480), // default val
+		EvFdMaxSize(20480), // default val
 		EvPollNum(2),
 	)
 

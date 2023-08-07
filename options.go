@@ -16,7 +16,7 @@ type Options struct {
 
 	// reactor options
 	evPollNum           int //
-	evDataArrSize       int
+	evFdMaxSize         int
 	evPollLockOSThread  bool
 	evPollReadBuffSize  int
 	evPollWriteBuffSize int
@@ -34,7 +34,7 @@ func setOptions(optL ...Option) *Options {
 		reuseAddr:           true,
 		reusePort:           false,
 		evPollNum:           1,
-		evDataArrSize:       8192,
+		evFdMaxSize:         8192,
 		listenBacklog:       512, // go default 128
 		timerHeapInitSize:   1024,
 		evPollLockOSThread:  false,
@@ -80,12 +80,13 @@ func SockRcvBufSize(n int) Option {
 	}
 }
 
-// EvDataArrSize for ArrayMapUnion数据结构中array的容易, 性能不会线性增长,
+// EvFdMaxSize for ArrayMapUnion数据结构中array的容量, 性能不会线性增长,
 // 主要根据自己的服务中fd并发数量(fd=0~n的范围)来定
-func EvDataArrSize(n int) Option {
+// fd数量超过此值并不会拒绝服务, 只是存储结构切换到map
+func EvFdMaxSize(n int) Option {
 	return func(o *Options) {
 		if n > 0 {
-			o.evDataArrSize = n
+			o.evFdMaxSize = n
 		}
 	}
 }

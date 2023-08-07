@@ -28,7 +28,7 @@ type evPoll struct {
 	asyncWrite *asyncWrite
 }
 
-func (ep *evPoll) open(evDataArrSize int, timer *timer4Heap,
+func (ep *evPoll) open(evFdMaxSize int, timer *timer4Heap,
 	evPollReadBuffSize, evPollWriteBuffSize int) error {
 	efd, err := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
 	if err != nil {
@@ -38,7 +38,7 @@ func (ep *evPoll) open(evDataArrSize int, timer *timer4Heap,
 	ep.timer = timer
 	ep.evPollReadBuff = make([]byte, evPollReadBuffSize)
 	ep.evPollWriteBuff = make([]byte, evPollWriteBuffSize)
-	ep.evHandlerMap = NewArrayMapUnion[evData](evDataArrSize)
+	ep.evHandlerMap = NewArrayMapUnion[evData](evFdMaxSize)
 	ep.asyncWrite, err = newAsyncWrite(ep)
 	if err != nil {
 		return err

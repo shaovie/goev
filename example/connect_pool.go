@@ -60,7 +60,7 @@ func main() {
 	}
 	// 1. reactor
 	r, err := goev.NewReactor(
-		goev.EvDataArrSize(0), // default val
+		goev.EvFdMaxSize(0), // default val
 		goev.EvPollNum(5),
 		goev.TimerHeapInitSize(100),
 	)

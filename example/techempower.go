@@ -72,14 +72,14 @@ func main() {
 	httpRespContentLength = []byte(contentLengthS)
 
 	forAcceptReactor, err := goev.NewReactor(
-		goev.EvDataArrSize(20480), // default val
+		goev.EvFdMaxSize(20480), // default val
 		goev.EvPollNum(1),
 	)
 	if err != nil {
 		panic(err.Error())
 	}
 	forNewFdReactor, err = goev.NewReactor(
-		goev.EvDataArrSize(20480), // default val
+		goev.EvFdMaxSize(20480), // default val
 		goev.EvPollNum(runtime.NumCPU()*2-1),
 	)
 	if err != nil {
