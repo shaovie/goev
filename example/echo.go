@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	reactor     *goev.Reactor
+	reactor *goev.Reactor
 )
 
 type Conn struct {
@@ -26,9 +26,9 @@ func (c *Conn) OnOpen(fd int) bool {
 }
 func (c *Conn) OnRead() bool {
 	buf, n, _ := c.Read()
-    if n > 0 {
-        c.Write(buf[0:n])
-    } else if n == 0 { // Abnormal connection
+	if n > 0 {
+		c.Write(buf[0:n])
+	} else if n == 0 { // Abnormal connection
 		return false
 	}
 	return true
@@ -42,25 +42,17 @@ func (c *Conn) OnClose() {
 
 func main() {
 	fmt.Println("hello boy")
-	runtime.GOMAXPROCS(runtime.NumCPU()*2) // 留一部分给网卡中断
+	runtime.GOMAXPROCS(runtime.NumCPU() * 2) // 留一部分给网卡中断
 
 	var err error
-	reactor, err = goev.NewReactor(
-		goev.EvDataArrSize(4096), // default val
-		goev.EvPollNum(runtime.NumCPU()*2-1),
-	)
+	reactor, err = goev.NewReactor(goev.EvPollNum(runtime.NumCPU()*2 - 1))
 	if err != nil {
 		panic(err.Error())
 	}
-	//= http
-	_, err = goev.NewAcceptor(reactor, func() goev.EvHandler { return new(Conn) },
-		":8080",
-		goev.ListenBacklog(128),
-	)
+	_, err = goev.NewAcceptor(reactor, func() goev.EvHandler { return new(Conn) }, ":8080")
 	if err != nil {
 		panic(err.Error())
 	}
-
 	if err = reactor.Run(); err != nil {
 		panic(err.Error())
 	}

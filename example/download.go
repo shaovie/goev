@@ -107,7 +107,7 @@ func (c *Conn) OnAsyncWriteBufDone(bf []byte, flag int) {
 	} else if flag == 1 && c.Fd() > 0 { // send completely
 		fmt.Println("send completely")
 		reactor.RemoveEvHandler(c, c.Fd()) // remove at first, then call OnClose
-		c.OnClose() // (NOTE: avoid IOHandle.Destroy(eh.OnAsyncWriteBufDone) endless loop)
+		c.OnClose()                        // (NOTE: avoid IOHandle.Destroy(eh.OnAsyncWriteBufDone) endless loop)
 		return
 	}
 }
