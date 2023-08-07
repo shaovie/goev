@@ -53,7 +53,7 @@ func (ep *evPoll) add(fd int, events uint32, eh EvHandler) error {
 	eh.setParams(fd, ep)
 
 	ev := syscall.EpollEvent{Events: events}
-	ed := &evData{fd: fd, eh: eh}
+	ed := &evData{fd: fd, events: events, eh: eh}
 	ep.evHandlerMap.Store(fd, ed) // 让evHandlerMap 来控制eh的生命周期, 不然会被gc回收的
 	*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
 

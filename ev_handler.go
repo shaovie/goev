@@ -103,7 +103,9 @@ type EvHandler interface {
 
 	// OnAsyncWriteBufDone callback after bf used (within the evpoll coroutine),
 	// you can recycle bf. If no recycling is needed, you can ignore this method (Ignored in IOHandle).
-	OnAsyncWriteBufDone(bf []byte)
+	//
+	// flag is passed by AsyncWrite{Flag}
+	OnAsyncWriteBufDone(bf []byte, flag int)
 
 	// Destroy If you are using the Async write mechanism, it is essential to call the Destroy method
 	// in OnClose to clean up any unsent bf data.

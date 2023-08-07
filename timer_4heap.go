@@ -47,8 +47,12 @@ func (th *timer4Heap) timerfd() int {
 	return th.tfd
 }
 func (th *timer4Heap) adjustTimerfd(delay /*millisecond*/ int64) {
+	delay = delay * 1000 * 1000
+	if delay < 1 {
+		delay = 1 // 1 nanosecond
+	}
 	timeSpec := unix.ItimerSpec{
-		Value: unix.NsecToTimespec(delay * 1000 * 1000),
+		Value: unix.NsecToTimespec(delay),
 	}
 	unix.TimerfdSettime(th.tfd, 0 /*Relative time*/, &timeSpec, nil)
 }

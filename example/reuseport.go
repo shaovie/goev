@@ -60,7 +60,7 @@ func (h *Http) OnWrite(fd int) bool {
 	h.AsyncOrderedFlush(h)
 	return true
 }
-func (h *Http) OnAsyncWriteBufDone(bf []byte) {
+func (h *Http) OnAsyncWriteBufDone(bf []byte, flag int) {
 	// 如果bf来自pool, 那么需要在这里回收
 	asynBufPool.Put(bf)
 }

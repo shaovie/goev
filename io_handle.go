@@ -145,14 +145,13 @@ func (*IOHandle) OnClose(fd int) {
 func (h *IOHandle) Destroy(eh EvHandler) {
 	h._fd = -1
 
-	//
 	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
 		for {
 			abf, ok := h._asyncWriteBufQ.Pop()
 			if !ok {
 				break
 			}
-			eh.OnAsyncWriteBufDone(abf.Buf)
+			eh.OnAsyncWriteBufDone(abf.Buf, abf.Flag) // avoid endless loop
 		}
 	}
 }
