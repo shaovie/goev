@@ -7,8 +7,8 @@ import (
 
 // AsyncWriteBuf x
 type AsyncWriteBuf struct {
-	Flag   int    // The flag will be returned in OnAsyncWriteBufDone,
-                  // allowing you to know the actual processing progress.
+	Flag int // The flag will be returned in OnAsyncWriteBufDone,
+	// allowing you to know the actual processing progress.
 	Writen int    // wrote len
 	Len    int    // buf original len. readonly
 	Buf    []byte // readonly

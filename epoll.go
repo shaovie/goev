@@ -8,12 +8,6 @@ import (
 	"unsafe"
 )
 
-type evData struct {
-	fd     int
-	events uint32
-	eh     EvHandler
-}
-
 type evPoll struct {
 	efd int // epoll fd
 
@@ -21,7 +15,7 @@ type evPoll struct {
 	evPollReadBuff  []byte
 	evPollWriteBuff []byte
 
-	evHandlerMap *ArrayMapUnion[evData] // Refer to https://zhuanlan.zhihu.com/p/640712548
+	evHandlerMap *evDataMap // Refer to https://zhuanlan.zhihu.com/p/640712548
 	timer        *timer4Heap
 
 	// async write
@@ -38,7 +32,7 @@ func (ep *evPoll) open(evFdMaxSize int, timer *timer4Heap,
 	ep.timer = timer
 	ep.evPollReadBuff = make([]byte, evPollReadBuffSize)
 	ep.evPollWriteBuff = make([]byte, evPollWriteBuffSize)
-	ep.evHandlerMap = NewArrayMapUnion[evData](evFdMaxSize)
+	ep.evHandlerMap = newEvDataMap(evFdMaxSize)
 	ep.asyncWrite, err = newAsyncWrite(ep)
 	if err != nil {
 		return err
@@ -49,12 +43,18 @@ func (ep *evPoll) open(evFdMaxSize int, timer *timer4Heap,
 	// $GOROOT/src/os/rlimit.go Go had raise the limit to 'Max Hard Limit'
 	return nil
 }
+func (ep *evPoll) loadEvData(fd int) *evData {
+	return ep.evHandlerMap.load(fd)
+}
 func (ep *evPoll) add(fd int, events uint32, eh EvHandler) error {
 	eh.setParams(fd, ep)
 
 	ev := syscall.EpollEvent{Events: events}
-	ed := &evData{fd: fd, events: events, eh: eh}
-	ep.evHandlerMap.Store(fd, ed) // 让evHandlerMap 来控制eh的生命周期, 不然会被gc回收的
+	ed := ep.evHandlerMap.newOne(fd)
+	ed.fd = fd
+	ed.events = events
+	ed.eh = eh
+	ep.evHandlerMap.store(fd, ed) // 让evHandlerMap 来控制eh的生命周期, 不然会被gc回收的
 	*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
 
 	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_ADD, fd, &ev); err != nil {
@@ -66,14 +66,14 @@ func (ep *evPoll) add(fd int, events uint32, eh EvHandler) error {
 func (ep *evPoll) remove(fd int) error {
 	// The event argument is ignored and can be NULL (but see `man 2 epoll_ctl` BUGS)
 	// kernel versions > 2.6.9
-	ep.evHandlerMap.Delete(fd)
+	ep.evHandlerMap.del(fd)
 	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_DEL, fd, nil); err != nil {
 		return errors.New("epoll_ctl del: " + err.Error())
 	}
 	return nil
 }
 func (ep *evPoll) append(fd int, events uint32) error {
-	ed := ep.evHandlerMap.Load(fd)
+	ed := ep.evHandlerMap.load(fd)
 	if ed == nil {
 		return errors.New("append: not found")
 	}
@@ -84,11 +84,11 @@ func (ep *evPoll) append(fd int, events uint32) error {
 	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd, &ev); err != nil {
 		return errors.New("epoll_ctl mod: " + err.Error())
 	}
-	ed.events |= events // TODO mutex ?
+	ed.events |= events
 	return nil
 }
 func (ep *evPoll) subtract(fd int, events uint32) error {
-	ed := ep.evHandlerMap.Load(fd)
+	ed := ep.evHandlerMap.load(fd)
 	if ed == nil {
 		return errors.New("subtract: not found")
 	}
@@ -99,7 +99,7 @@ func (ep *evPoll) subtract(fd int, events uint32) error {
 	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd, &ev); err != nil {
 		return errors.New("epoll_ctl mod: " + err.Error())
 	}
-	ed.events &= ^events // TODO mutex ?
+	ed.events &= ^events
 	return nil
 }
 func (ep *evPoll) scheduleTimer(eh EvHandler, delay, interval int64) (err error) {

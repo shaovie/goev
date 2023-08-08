@@ -4,6 +4,12 @@ import (
 	"sync"
 )
 
+type evData struct {
+	fd     int
+	events uint32
+	eh     EvHandler
+}
+
 type evDataMap struct {
 	arrSize int
 	arr     []evData // 如果针对fd, 这里应该可以不用atomic, 直接保存value
@@ -31,22 +37,22 @@ func newEvDataMap(arrSize int) *evDataMap {
 
 func (dm *evDataMap) newOne(i int) *evData {
 	if i < dm.arrSize {
-        p := &(dm.arr[i])
-        if p.fd > 0 { // fd MUST > 0
-            panic("fd release fail!")
-        }
-        return p
+		p := &(dm.arr[i])
+		if p.fd > 0 { // fd MUST > 0
+			panic("fd release fail!")
+		}
+		return p
 	}
-    return &evData{}
+	return &evData{}
 }
 
 func (dm *evDataMap) load(i int) *evData {
 	if i < dm.arrSize {
-        p := &(dm.arr[i])
-        if p.fd == -1 {
-            return nil
-        }
-        return p
+		p := &(dm.arr[i])
+		if p.fd < 1 {
+			return nil
+		}
+		return p
 	}
 	dm.mapMtx.Lock()
 	if v, ok := dm.sMap[i]; ok {
@@ -68,8 +74,8 @@ func (dm *evDataMap) store(i int, v *evData) {
 
 func (dm *evDataMap) del(i int) {
 	if i < dm.arrSize {
-        p := &(dm.arr[i])
-        p.fd = -1
+		p := &(dm.arr[i])
+		p.fd = -1
 		return
 	}
 	dm.mapMtx.Lock()
