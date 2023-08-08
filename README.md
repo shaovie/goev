@@ -176,7 +176,8 @@ Transfer/sec:      6.82MB
 ## Development Roadmap
 
 - [x] Async write (refer example/download.go)
-- [ ] Codec interface
+- [ ] Goev runtime GC zero pressure
+- [ ] Websocket example
 
 ## Contributing
 Contributions are welcome! If you find any bugs or have suggestions for improvement, please open an issue or submit a pull request
