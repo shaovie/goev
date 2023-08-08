@@ -32,7 +32,7 @@ func newEvDataMap(arrSize int) *evDataMap {
 func (dm *evDataMap) newOne(i int) *evData {
 	if i < dm.arrSize {
         p := &(dm.arr[i])
-        if p.fd != -1 {
+        if p.fd > 0 { // fd MUST > 0
             panic("fd release fail!")
         }
         return p
