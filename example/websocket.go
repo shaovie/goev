@@ -4,6 +4,7 @@ import (
 	"fmt"
     "strings"
 	"runtime"
+    "math/rand"
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
@@ -89,6 +90,7 @@ func (cc *CloseInfo) Error() string {
 
 const maxFramePayloadSize = 4*1024*1024
 const maxControlFramePayloadSize = 125
+const maxFreamHeaderSize = 14
 
 type wsFrame struct {
     complete bool // frame complete
@@ -113,10 +115,10 @@ type Conn struct {
 
     upgraded bool
     compressEnabled bool
+    closed bool
 
     partialFrameTime int64
 
-    partialFrame   wsFrame // 不完整的
     partialBuf     []byte
 
     continueFrame  wsFrame
@@ -226,12 +228,14 @@ func (c *Conn) OnWrite() bool {
 	return true
 }
 func (c *Conn) OnAsyncWriteBufDone(bf []byte, flag int) {
-    asynBufPool.Put(bf)
+    if flag == 0 {
+        asynBufPool.Put(bf)
+    }
 }
 
 func (c *Conn) onUpgrade(buf []byte) bool {
     // parse http header
-    // 不支持不完整的http header, 这种八成都是非法请求
+    // 不支持不完整的http header, 第个消息就不完整, 这种八成都是非法请求
 
     var bufLen = len(buf)
     // 1. METHOD
@@ -434,6 +438,7 @@ func (c *Conn) onFrame(buf []byte) bool {
                         ce.Code = CloseCode(binary.BigEndian.Uint16(data))
                         ce.Info = string(data[2:])
                     }
+                    c.closed = true
                     c.OnCloseFrame(ce)
                 }
             } else {
@@ -533,6 +538,9 @@ func (c *Conn) parseFrameHeader(buf []byte) (frameHeader, bool) {
     return fh, true
 }
 func (c *Conn) writeControlFrame(opcode int, data []byte) {
+    if c.closed {
+        return
+    }
     dlen := len(data)
     if dlen > maxControlFramePayloadSize {
         // TODO handle panic
@@ -544,10 +552,55 @@ func (c *Conn) writeControlFrame(opcode int, data []byte) {
     copy(buf[2:], data)
     c.Write(buf[0:dlen + 2])
 }
-func (c *Conn) OnMessage(buf []byte) {
+func (c *Conn) writeMessageFrame(opcode int, data []byte, flate, fin bool) {
+    if c.closed {
+        return
+    }
+	buff := c.WriteBuff()[:0] // poll shared buffer
+    hlen := 2
+    b0 := byte(opcode)
+	if fin {
+		b0 |= 1 << 7
+	}
+	if flate {
+		b0 |= 1 << 6
+	}
+    buff[0] = b0
+
+    payloadLen := len(data) // int Enough
+    if payloadLen > maxFramePayloadSize {
+        return // TODO handle panic
+    }
+
+    if payloadLen >= math.MaxUint16 {
+		buff[1] = 127
+		binary.BigEndian.PutUint64(buff[2:], uint64(payloadLen))
+        hlen += 8
+    } else if payloadLen > 125 {
+		buff[1] = 126
+		binary.BigEndian.PutUint16(buff[2:], uint16(payloadLen))
+        hlen += 2
+    } else {
+		buff[1] = byte(payloadLen)
+	}
+    // no mask in server side
+    copy(buff[hlen:], data)
+    wlen := hlen + payloadLen
+    writen, err := c.Write(buff[:wlen)
+	if err == nil && writen < wlen {
+		bf := make([]byte, wlen - writen)
+		n = copy(bf, buff[writen:])
+		c.AsyncWrite(c, goev.AsyncWriteBuf{
+            Flag: 2,
+			Len: n,
+			Buf: bf,
+		})
+	}
 }
 func (c *Conn) OnTimeout(now int64) bool {
     c.WritePing()
+}
+func (c *Conn) OnMessage(data []byte) {
 }
 func (c *Conn) OnPing(data []byte) {
 }
@@ -564,7 +617,10 @@ func main() {
 	}
 
 	var err error
-	reactor, err = goev.NewReactor(goev.EvPollNum(runtime.NumCPU()*2 - 1))
+	reactor, err = goev.NewReactor(
+        goev.EvPollNum(runtime.NumCPU()*2 - 1),
+        goev.EvPollWriteBuffSize(maxFramePayloadSize+32),
+    )
 	if err != nil {
 		panic(err.Error())
 	}
