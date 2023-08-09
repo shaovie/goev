@@ -6,5 +6,6 @@ GOOS=linux GOARCH=amd64 go build -o /dev/null example/techempower.go
 GOOS=linux GOARCH=amd64 go build -o /dev/null example/reuseport.go
 GOOS=linux GOARCH=amd64 go build -o /dev/null example/download.go
 GOOS=linux GOARCH=amd64 go build -o /dev/null example/echo.go
+GOOS=linux GOARCH=amd64 go build -o /dev/null example/websocket.go
 GOOS=linux GOARCH=amd64 go build -o /dev/null example/connect_pool.go
 GOOS=linux GOARCH=amd64 go test -o /dev/null -c .

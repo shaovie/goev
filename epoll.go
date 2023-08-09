@@ -164,11 +164,11 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 					}
 				}
 			} // end of `for i < nfds'
-		} else if nfds == 0 { // timeout
+		} else if nfds == 0 || (nfds < 0 && err == syscall.EINTR) { // timeout
 			msec = -1
 			runtime.Gosched() // https://zhuanlan.zhihu.com/p/647958433
 			continue
-		} else if err != nil && err != syscall.EINTR { // nfds < 0
+		} else if err != nil {
 			return errors.New("syscall epoll_wait: " + err.Error())
 		}
 	}

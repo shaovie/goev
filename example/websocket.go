@@ -5,8 +5,10 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"math"
+	"os"
 	"runtime"
 	"strings"
 	"sync"
@@ -16,6 +18,28 @@ import (
 	"github.com/shaovie/goev"
 	"github.com/shaovie/goev/netfd"
 )
+
+// Launch args
+var (
+	evPollNum int = 0
+)
+
+func usage() {
+	fmt.Println(`
+    Server options:
+    -c N                   Evpoll num
+
+    Common options:
+    -h                     Show this message
+    `)
+	os.Exit(0)
+}
+func parseFlag() {
+	flag.IntVar(&evPollNum, "c", evPollNum, "evpoll num.")
+
+	flag.Usage = usage
+	flag.Parse()
+}
 
 var (
 	reactor     *goev.Reactor
@@ -223,8 +247,8 @@ func (c *Conn) OnRead() bool {
 	if n > 0 {
 		if c.upgraded == false {
 			return c.onUpgrade(buf[0:n])
-        }
-        return c.onFrame(buf[0:n])
+		}
+		return c.onFrame(buf[0:n])
 	} else if n == 0 { // Abnormal connection
 		return false
 	}
@@ -412,7 +436,7 @@ func (c *Conn) onFrame(buf []byte) bool {
 		c.partialBuf = append(c.partialBuf, buf...)
 		buf = c.partialBuf
 		bufLen = len(c.partialBuf)
-        c.partialBuf = c.partialBuf[:0] // reset
+		c.partialBuf = c.partialBuf[:0] // reset
 		c.partialFrameTime = 0
 	}
 
@@ -424,7 +448,7 @@ func (c *Conn) onFrame(buf []byte) bool {
 		}
 		if wsf.hlen == 0 { // partial header
 			c.partialFrameTime = time.Now().UnixMilli()
-            c.partialBuf = append(c.partialBuf, buf[bufOffset:]...)
+			c.partialBuf = append(c.partialBuf, buf[bufOffset:]...)
 			break
 		}
 
@@ -432,10 +456,10 @@ func (c *Conn) onFrame(buf []byte) bool {
 		if wsf.payload > 0 {
 			if int64(bufLen)-int64(wsf.hlen) < wsf.payload { // partial payload
 				c.partialFrameTime = time.Now().UnixMilli()
-                c.partialBuf = append(c.partialBuf, buf[bufOffset:]...)
+				c.partialBuf = append(c.partialBuf, buf[bufOffset:]...)
 				break
 			}
-			payloadBuf = buf[int(wsf.hlen):int(wsf.hlen)+int(wsf.payload)]
+			payloadBuf = buf[int(wsf.hlen) : int(wsf.hlen)+int(wsf.payload)]
 		}
 
 		bufOffset += int(wsf.hlen) + int(wsf.payload)
@@ -466,12 +490,12 @@ func (c *Conn) onFrame(buf []byte) bool {
 					if c.continueWsFrame.start == false {
 						return false // except
 					}
-                    // continue end
+					// continue end
 					c.continueWsFrame.buf = append(c.continueWsFrame.buf, payloadBuf...)
 					payloadBuf = c.continueWsFrame.buf
 					c.continueWsFrame.buf = nil // release buf
-                    c.continueWsFrame.start = false
-                    c.OnMessage(FrameText, payloadBuf)
+					c.continueWsFrame.start = false
+					c.OnMessage(FrameText, payloadBuf)
 				} else {
 					if isMessageFrame(wsf.opcode) {
 						c.OnMessage(wsf.opcode, payloadBuf)
@@ -645,6 +669,7 @@ func (c *Conn) OnCloseFrame(ci CloseInfo) {
 	}
 }
 func main() {
+	parseFlag()
 	fmt.Println("hello boy")
 	runtime.GOMAXPROCS(runtime.NumCPU() * 2) // 留一部分给网卡中断
 
@@ -654,7 +679,7 @@ func main() {
 
 	var err error
 	reactor, err = goev.NewReactor(
-		goev.EvPollNum(runtime.NumCPU()*2-1),
+		goev.EvPollNum(evPollNum),
 		goev.EvPollWriteBuffSize(maxFramePayloadSize+32),
 	)
 	if err != nil {

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"os"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -17,6 +19,28 @@ var (
 	liveDate              atomic.Value
 	forNewFdReactor       *goev.Reactor
 )
+
+// Launch args
+var (
+	evPollNum int = 0
+)
+
+func usage() {
+	fmt.Println(`
+    Server options:
+    -c N                   Evpoll num
+
+    Common options:
+    -h                     Show this message
+    `)
+	os.Exit(0)
+}
+func parseFlag() {
+	flag.IntVar(&evPollNum, "c", evPollNum, "evpoll num.")
+
+	flag.Usage = usage
+	flag.Parse()
+}
 
 const httpHeaderS = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nServer: goev\r\nContent-Type: text/plain\r\nDate: "
 const contentLengthS = "\r\nContent-Length: 13\r\n\r\nHello, World!"
@@ -62,8 +86,9 @@ func updateLiveSecond() {
 }
 
 func main() {
+	parseFlag()
 	fmt.Println("hello boy")
-	runtime.GOMAXPROCS(runtime.NumCPU()*2 - 1) // 留一部分给网卡中断
+	runtime.GOMAXPROCS(runtime.NumCPU() * 2)
 
 	liveDate.Store(time.Now().Format("Mon, 02 Jan 2006 15:04:05 GMT"))
 	ticker = time.NewTicker(time.Millisecond * 1000)
@@ -80,7 +105,7 @@ func main() {
 	}
 	forNewFdReactor, err = goev.NewReactor(
 		goev.EvFdMaxSize(20480), // default val
-		goev.EvPollNum(runtime.NumCPU()*2-1),
+		goev.EvPollNum(evPollNum),
 	)
 	if err != nil {
 		panic(err.Error())
