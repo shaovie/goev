@@ -408,7 +408,7 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 	fmt.Println(string(resp))
 
 	writen, err := c.Write(resp)
-	if err == nil && writen < len(buf) {
+	if err == nil && writen < len(resp) {
 		bf := asynBufPool.Get().([]byte)
 		n := copy(bf, buf[writen:])
 		c.AsyncWrite(c, goev.AsyncWriteBuf{
