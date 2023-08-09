@@ -137,9 +137,8 @@ const switchHeaderS = "HTTP/1.1 101 Switching Protocols\r\n" +
 const switchHeaderWithFlateS = "HTTP/1.1 101 Switching Protocols\r\n" +
 	"Upgrade: websocket\r\n" +
 	"Connection: Upgrade\r\n" +
-    "Sec-WebSocket-Extensions: permessage-deflate; server_no_context_takeover; client_no_context_takeover\r\n"+
+	"Sec-WebSocket-Extensions: permessage-deflate; server_no_context_takeover; client_no_context_takeover\r\n" +
 	"Sec-WebSocket-Accept: "
-
 
 var keyGUID = []byte("258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
 
@@ -257,7 +256,7 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 	method := 0 // 1:get 2:post 3unsupport
 	bufOffset := 0
 	if bufLen < 18 { // GET / HTTP/1.1\r\n\r\n
-        fmt.Println("bufLen < 18")
+		fmt.Println("bufLen < 18")
 		return false // Abnormal connection. close it
 	}
 	if buf[0] == 'G' || buf[0] == 'g' { // GET
@@ -271,18 +270,18 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 		}
 	}
 	if method == 0 {
-        fmt.Println("method == 0")
+		fmt.Println("method == 0")
 		return false // Abnormal connection. close it
 	}
 
 	// 2. URI  /a/b/c?p=x&p2=2#yyy
 	if buf[bufOffset] != '/' {
-        fmt.Println("buf[bufOffset] != '/'")
+		fmt.Println("buf[bufOffset] != '/'")
 		return false // Abnormal connection. close it
 	}
 	pos := bytes.IndexByte(buf[bufOffset+1:], ' ')
 	if pos < 0 {
-        fmt.Println("pos < 0")
+		fmt.Println("pos < 0")
 		return false // Abnormal connection. close it
 	}
 	var uri string
@@ -294,14 +293,14 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 		bufOffset += 2 + pos
 	}
 	_ = uri // TODO
-    fmt.Println(uri)
+	fmt.Println(uri)
 
 	// 3. Parse headers
 	var CRLF []byte = []byte{'\r', '\n'}
 	// skip first \r\n
 	pos = bytes.Index(buf[bufOffset:], CRLF)
 	if pos < 0 {
-        fmt.Println("3 pos < 0")
+		fmt.Println("3 pos < 0")
 		return false // Abnormal connection. close it
 	}
 	bufOffset += pos + 2
@@ -309,15 +308,15 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 	for bufOffset < bufLen {
 		pos = bytes.Index(buf[bufOffset:], CRLF)
 		if pos > 0 {
-            if (buf[bufOffset] < 'A' || buf[bufOffset] > 'Z') &&
-                (buf[bufOffset] < 'a' || buf[bufOffset] > 'z') {
-                // check first char
-                fmt.Println("A - Z a - z", string(buf[bufOffset:]))
-                return false // Abnormal connection. close it
-            }
+			if (buf[bufOffset] < 'A' || buf[bufOffset] > 'Z') &&
+				(buf[bufOffset] < 'a' || buf[bufOffset] > 'z') {
+				// check first char
+				fmt.Println("A - Z a - z", string(buf[bufOffset:]))
+				return false // Abnormal connection. close it
+			}
 			sepP := bytes.IndexByte(buf[bufOffset:bufOffset+pos], ':')
 			if sepP < 0 {
-                fmt.Println("sepP < 0")
+				fmt.Println("sepP < 0")
 				return false // Abnormal connection. close it
 			}
 			var header [2]string
@@ -326,15 +325,15 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 			headers = append(headers, header)
 			bufOffset += pos + 2
 		} else if pos == 0 {
-            break // EOF
+			break // EOF
 		} else {
-            fmt.Println("pos else")
+			fmt.Println("pos else")
 			return false // Abnormal connection. close it
 		}
 	}
-    for i := range headers {
-        fmt.Println(headers[i][0], ":", headers[i][1])
-    }
+	for i := range headers {
+		fmt.Println(headers[i][0], ":", headers[i][1])
+	}
 
 	// check
 	// Host: xx
@@ -379,23 +378,23 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 	}
 	_ = host // TODO
 	if !(okUpgrade && okWebsocket && okVersion) {
-        fmt.Println("!(okUpgrade && okWebsocket && okVersion)")
+		fmt.Println("!(okUpgrade && okWebsocket && okVersion)")
 		return false // Abnormal connection. close it
 	}
 	if len(key) == 0 {
-        fmt.Println("len(key) == 0")
+		fmt.Println("len(key) == 0")
 		return false // Abnormal connection. close it
 	}
 
 	var resp = make([]byte, 0, 256)
-    c.compressEnabled = false // 还不支持
-    if c.compressEnabled {
-        resp = append(resp, (unsafe.Slice(unsafe.StringData(switchHeaderWithFlateS), len(switchHeaderWithFlateS)))...)
-    } else {
-        resp = append(resp, (unsafe.Slice(unsafe.StringData(switchHeaderS), len(switchHeaderS)))...)
-    }
+	c.compressEnabled = false // 还不支持
+	if c.compressEnabled {
+		resp = append(resp, (unsafe.Slice(unsafe.StringData(switchHeaderWithFlateS), len(switchHeaderWithFlateS)))...)
+	} else {
+		resp = append(resp, (unsafe.Slice(unsafe.StringData(switchHeaderS), len(switchHeaderS)))...)
+	}
 
-    fmt.Println("key=", key)
+	fmt.Println("key=", key)
 	acceptKey := genAcceptKey(key)
 	resp = append(resp, (unsafe.Slice(unsafe.StringData(acceptKey), len(acceptKey)))...)
 	resp = append(resp, CRLF...)
@@ -409,7 +408,7 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 
 	// end
 	resp = append(resp, CRLF...)
-    fmt.Println(string(resp))
+	fmt.Println(string(resp))
 
 	writen, err := c.Write(resp)
 	if err == nil && writen < len(buf) {
@@ -425,7 +424,7 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 	return true
 }
 func (c *Conn) onFrame(buf []byte) bool {
-    fmt.Println("onframe", len(buf))
+	fmt.Println("onframe", len(buf))
 	bufLen := len(buf)
 	if c.partialFrameTime > 0 { // build partial data
 		c.partialBuf = append(c.partialBuf, buf...)
@@ -453,11 +452,11 @@ func (c *Conn) onFrame(buf []byte) bool {
 				c.partialBuf = append(c.partialBuf, buf...)
 				break
 			}
-			payloadBuf = buf[int(wsf.hlen) : int(wsf.payload)]
-            fmt.Println("payload:", string(payloadBuf))
+			payloadBuf = buf[int(wsf.hlen):int(wsf.payload)]
+			fmt.Println("payload:", string(payloadBuf))
 		}
 
-        fmt.Println("hlen:", int(wsf.hlen), int(wsf.payload), wsf.opcode, wsf.isfin)
+		fmt.Println("hlen:", int(wsf.hlen), int(wsf.payload), wsf.opcode, wsf.isfin)
 		bufOffset += int(wsf.hlen) + int(wsf.payload)
 		bufLen -= int(wsf.hlen) + int(wsf.payload)
 		// get a complete frame
@@ -479,7 +478,7 @@ func (c *Conn) onFrame(buf []byte) bool {
 						ce.Info = string(payloadBuf[2:])
 					}
 					c.OnCloseFrame(ce)
-                    break
+					break
 				}
 			} else {
 				if wsf.opcode == FrameContinue {
@@ -515,7 +514,7 @@ func (c *Conn) parseFrameHeader(buf []byte) (wsFrame, bool) {
 	var fh wsFrame
 	bufLen := len(buf)
 	if bufLen < 2 {
-        fmt.Println("bufLen < 2")
+		fmt.Println("bufLen < 2")
 		return fh, true // partial header
 	}
 	// byte1 获取FIN标志、操作码(Opcode)、压缩标志
@@ -527,16 +526,16 @@ func (c *Conn) parseFrameHeader(buf []byte) (wsFrame, bool) {
 	rsv2 := (b1 << 2 >> 7) == 1
 	rsv3 := (b1 << 3 >> 7) == 1
 	if !c.compressEnabled && (rsv1 || rsv2 || rsv3) {
-        fmt.Println("!c.compressEnabled && (rsv1 || rsv2 || rsv3)")
+		fmt.Println("!c.compressEnabled && (rsv1 || rsv2 || rsv3)")
 		return fh, false // Abnormal connection. close it
 	}
 	fh.opcode = int(b1 & 0xf)
 	if isControlFrame(fh.opcode) == false && isMessageFrame(fh.opcode) == false {
-        fmt.Println("isControlFrame(fh.opcode) == false && isMessageFrame(fh.opcode) == false")
+		fmt.Println("isControlFrame(fh.opcode) == false && isMessageFrame(fh.opcode) == false")
 		return fh, false // Abnormal connection. close it
 	}
 	if isControlFrame(fh.opcode) && fh.isfin == false { // control frame not support continue frame
-        fmt.Println("isControlFrame(fh.opcode) && fh.isfin == false")
+		fmt.Println("isControlFrame(fh.opcode) && fh.isfin == false")
 		return fh, false // Abnormal connection. close it
 	}
 
@@ -559,18 +558,18 @@ func (c *Conn) parseFrameHeader(buf []byte) (wsFrame, bool) {
 		bufOffset += 8
 	} else {
 		bufOffset++
-    }
+	}
 
 	if fh.payload < 0 {
-        fmt.Println("fh.payload < 0")
+		fmt.Println("fh.payload < 0")
 		return fh, false // Abnormal connection. close it
 	}
 	if fh.payload > maxFramePayloadSize {
-        fmt.Println("fh.payload > maxFramePayloadSize")
+		fmt.Println("fh.payload > maxFramePayloadSize")
 		return fh, false // Abnormal connection. close it
 	}
 	if isControlFrame(fh.opcode) && fh.payload > maxControlFramePayloadSize {
-        fmt.Println("isControlFrame(fh.opcode) && fh.payload > maxControlFramePayloadSize")
+		fmt.Println("isControlFrame(fh.opcode) && fh.payload > maxControlFramePayloadSize")
 		return fh, false // Abnormal connection. close it
 	}
 
@@ -582,14 +581,14 @@ func (c *Conn) parseFrameHeader(buf []byte) (wsFrame, bool) {
 		}
 		copy(fh.maskKey[:], buf[bufOffset:bufOffset+4])
 		bufOffset += 4
-        fmt.Println("mask 4")
+		fmt.Println("mask 4")
 	}
 	fh.hlen = int8(bufOffset)
 	// parse end
 	return fh, true
 }
 func (c *Conn) writeControlFrame(opcode int, payload []byte) {
-    fmt.Println("writeControlFrame", opcode, len(payload))
+	fmt.Println("writeControlFrame", opcode, len(payload))
 	if c.closed {
 		return
 	}
@@ -598,7 +597,7 @@ func (c *Conn) writeControlFrame(opcode int, payload []byte) {
 		// TODO handle panic
 		return
 	}
-    hlen := 2
+	hlen := 2
 	buf := make([]byte, maxControlFramePayloadSize+hlen)
 	buf[0] = byte(opcode) | 1<<7
 	buf[1] = byte(payloadLen)
@@ -661,13 +660,13 @@ func (c *Conn) OnPing(data []byte) {
 func (c *Conn) OnPong(data []byte) {
 }
 func (c *Conn) OnCloseFrame(ci CloseInfo) {
-    fmt.Println("closeframe ", ci.Code, ci.Info)
-    if c.closed == false {
-        bf := (*(*[2]byte)(unsafe.Pointer(&ci.Code)))[:]
-        binary.BigEndian.PutUint16(bf, uint16(CloseNormalClosure))
-        c.writeControlFrame(FrameClose, bf[0:2])
-        c.closed = true
-    }
+	fmt.Println("closeframe ", ci.Code, ci.Info)
+	if c.closed == false {
+		bf := (*(*[2]byte)(unsafe.Pointer(&ci.Code)))[:]
+		binary.BigEndian.PutUint16(bf, uint16(CloseNormalClosure))
+		c.writeControlFrame(FrameClose, bf[0:2])
+		c.closed = true
+	}
 }
 func main() {
 	fmt.Println("hello boy")
