@@ -412,6 +412,7 @@ func (c *Conn) onFrame(buf []byte) bool {
 		c.partialBuf = append(c.partialBuf, buf...)
 		buf = c.partialBuf
 		bufLen = len(c.partialBuf)
+        c.partialBuf = c.partialBuf[:0] // reset
 		c.partialFrameTime = 0
 	}
 
@@ -423,7 +424,7 @@ func (c *Conn) onFrame(buf []byte) bool {
 		}
 		if wsf.hlen == 0 { // partial header
 			c.partialFrameTime = time.Now().UnixMilli()
-			c.partialBuf = append(c.partialBuf, buf...)
+            c.partialBuf = append(c.partialBuf, buf[bufOffset:]...)
 			break
 		}
 
@@ -431,7 +432,7 @@ func (c *Conn) onFrame(buf []byte) bool {
 		if wsf.payload > 0 {
 			if int64(bufLen)-int64(wsf.hlen) < wsf.payload { // partial payload
 				c.partialFrameTime = time.Now().UnixMilli()
-				c.partialBuf = append(c.partialBuf, buf...)
+                c.partialBuf = append(c.partialBuf, buf[bufOffset:]...)
 				break
 			}
 			payloadBuf = buf[int(wsf.hlen):int(wsf.hlen)+int(wsf.payload)]
@@ -465,9 +466,12 @@ func (c *Conn) onFrame(buf []byte) bool {
 					if c.continueWsFrame.start == false {
 						return false // except
 					}
+                    // continue end
 					c.continueWsFrame.buf = append(c.continueWsFrame.buf, payloadBuf...)
 					payloadBuf = c.continueWsFrame.buf
 					c.continueWsFrame.buf = nil // release buf
+                    c.continueWsFrame.start = false
+                    c.OnMessage(FrameText, payloadBuf)
 				} else {
 					if isMessageFrame(wsf.opcode) {
 						c.OnMessage(wsf.opcode, payloadBuf)
