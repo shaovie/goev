@@ -1,4 +1,5 @@
 # Event-driven network framework in Go
+[中文文档](https://zhuanlan.zhihu.com/p/648641683)
 
 Goev provides a high-performance, lightweight, non-blocking, I/O event-driven networking framework for the Go language. It draws inspiration from the design patterns of [ACE](http://www.dre.vanderbilt.edu/~schmidt/ACE-overview.html) and provides an elegant and concise solution for TCP network programming projects. With goev, you can seamlessly integrate your projects without worrying about the coroutine pressure introduced by the standard library (go net).
 
@@ -26,7 +27,7 @@ go get -u github.com/shaovie/goev
 
 ## Getting Started
 
-See the [中文文档](DOCUMENT_CN.md) for the Chinese documentation.
+See the [中文指南](DOCUMENT_CN.md) for the Chinese documentation.
 
 ### Simple Service Example
 
