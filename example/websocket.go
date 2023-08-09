@@ -223,9 +223,8 @@ func (c *Conn) OnRead() bool {
 	if n > 0 {
 		if c.upgraded == false {
 			return c.onUpgrade(buf[0:n])
-		} else {
-			return c.onFrame(buf[0:n])
-		}
+        }
+        return c.onFrame(buf[0:n])
 	} else if n == 0 { // Abnormal connection
 		return false
 	}
@@ -293,7 +292,6 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 		bufOffset += 2 + pos
 	}
 	_ = uri // TODO
-	fmt.Println(uri)
 
 	// 3. Parse headers
 	var CRLF []byte = []byte{'\r', '\n'}
@@ -394,7 +392,6 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 		resp = append(resp, (unsafe.Slice(unsafe.StringData(switchHeaderS), len(switchHeaderS)))...)
 	}
 
-	fmt.Println("key=", key)
 	acceptKey := genAcceptKey(key)
 	resp = append(resp, (unsafe.Slice(unsafe.StringData(acceptKey), len(acceptKey)))...)
 	resp = append(resp, CRLF...)
@@ -453,7 +450,6 @@ func (c *Conn) onFrame(buf []byte) bool {
 				break
 			}
 			payloadBuf = buf[int(wsf.hlen):int(wsf.payload)]
-			fmt.Println("payload:", string(payloadBuf))
 		}
 
 		fmt.Println("hlen:", int(wsf.hlen), int(wsf.payload), wsf.opcode, wsf.isfin)
