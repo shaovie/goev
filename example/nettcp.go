@@ -46,7 +46,7 @@ func oneConn(conn net.Conn) {
 }
 func main() {
 	fmt.Println("hello boy")
-	runtime.GOMAXPROCS(runtime.NumCPU()*2 - 1)
+	runtime.GOMAXPROCS(runtime.NumCPU()*2)
 	liveDate.Store(time.Now().Format("Mon, 02 Jan 2006 15:04:05 GMT"))
 	ticker = time.NewTicker(time.Millisecond * 1000)
 	httpRespHeader = []byte(httpHeaderS)
