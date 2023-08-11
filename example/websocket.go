@@ -22,12 +22,14 @@ import (
 // Launch args
 var (
 	evPollNum int = 0
+	procNum int = runtime.NumCPU() * 2
 )
 
 func usage() {
 	fmt.Println(`
     Server options:
     -c N                   Evpoll num
+    -p N                   PROC num
 
     Common options:
     -h                     Show this message
@@ -36,6 +38,7 @@ func usage() {
 }
 func parseFlag() {
 	flag.IntVar(&evPollNum, "c", evPollNum, "evpoll num.")
+	flag.IntVar(&procNum, "p", procNum, "proc num.")
 
 	flag.Usage = usage
 	flag.Parse()
@@ -194,46 +197,42 @@ func isMessageFrame(frameType int) bool {
 	return false
 }
 
-const wordSize = int(unsafe.Sizeof(uintptr(0)))
+func maskBytes(b []byte, key [4]byte) {
+    var maskKey = binary.LittleEndian.Uint32(key[:])
+	var key64 = uint64(maskKey)<<32 + uint64(maskKey)
 
-func maskBytes(key [4]byte, pos int, b []byte) int {
-	if len(b) < 2*wordSize {
-		for i := range b {
-			b[i] ^= key[pos&3]
-			pos++
-		}
-		return pos & 3
+	for len(b) >= 64 {
+		v := binary.LittleEndian.Uint64(b)
+		binary.LittleEndian.PutUint64(b, v^key64)
+		v = binary.LittleEndian.Uint64(b[8:16])
+		binary.LittleEndian.PutUint64(b[8:16], v^key64)
+		v = binary.LittleEndian.Uint64(b[16:24])
+		binary.LittleEndian.PutUint64(b[16:24], v^key64)
+		v = binary.LittleEndian.Uint64(b[24:32])
+		binary.LittleEndian.PutUint64(b[24:32], v^key64)
+		v = binary.LittleEndian.Uint64(b[32:40])
+		binary.LittleEndian.PutUint64(b[32:40], v^key64)
+		v = binary.LittleEndian.Uint64(b[40:48])
+		binary.LittleEndian.PutUint64(b[40:48], v^key64)
+		v = binary.LittleEndian.Uint64(b[48:56])
+		binary.LittleEndian.PutUint64(b[48:56], v^key64)
+		v = binary.LittleEndian.Uint64(b[56:64])
+		binary.LittleEndian.PutUint64(b[56:64], v^key64)
+		b = b[64:]
 	}
 
-	if n := int(uintptr(unsafe.Pointer(&b[0]))) % wordSize; n != 0 {
-		n = wordSize - n
-		for i := range b[:n] {
-			b[i] ^= key[pos&3]
-			pos++
-		}
-		b = b[n:]
+	for len(b) >= 8 {
+		v := binary.LittleEndian.Uint64(b[:8])
+		binary.LittleEndian.PutUint64(b[:8], v^key64)
+		b = b[8:]
 	}
 
-	var k [wordSize]byte
-	for i := range k {
-		k[i] = key[(pos+i)&3]
+	var n = len(b)
+	for i := 0; i < n; i++ {
+		idx := i & 3
+		b[i] ^= key[idx]
 	}
-	kw := *(*uintptr)(unsafe.Pointer(&k))
-
-	n := (len(b) / wordSize) * wordSize
-	for i := 0; i < n; i += wordSize {
-		*(*uintptr)(unsafe.Pointer(uintptr(unsafe.Pointer(&b[0])) + uintptr(i))) ^= kw
-	}
-
-	b = b[n:]
-	for i := range b {
-		b[i] ^= key[pos&3]
-		pos++
-	}
-
-	return pos & 3
 }
-
 func (c *Conn) OnOpen(fd int) bool {
 	netfd.SetNoDelay(fd, 1)
 	// AddEvHandler 尽量放在最后, (OnOpen 和ORead可能不在一个线程)
@@ -417,8 +416,8 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 	// end
 	resp = append(resp, CRLF...)
 
-	writen, err := c.Write(resp)
-	if err == nil && writen < len(resp) {
+	writen, _ := c.Write(resp)
+	if writen < len(resp) {
 		bf := asynBufPool.Get().([]byte)
 		n := copy(bf, buf[writen:])
 		c.AsyncWrite(c, goev.AsyncWriteBuf{
@@ -468,7 +467,7 @@ func (c *Conn) onFrame(buf []byte) bool {
 
 		if wsf.isfin {
 			if len(payloadBuf) > 0 {
-				maskBytes(wsf.maskKey, 0, payloadBuf)
+                maskBytes(payloadBuf, wsf.maskKey)
 			}
 
 			if isControlFrame(wsf.opcode) {
@@ -545,6 +544,11 @@ func (c *Conn) parseFrameHeader(buf []byte) (wsFrame, bool) {
 
 	// byte2 获取掩码标志、数据长度
 	b2 := buf[bufOffset]
+	fh.masked = b2&(1<<7) != 0
+    // RFC6455: All frames sent from client to server have this bit set to 1
+    if fh.masked == false {
+		return fh, false // Abnormal connection. close it
+    }
 	fh.payload = int64(b2 & 0x7f)
 	if fh.payload == 126 {
 		bufOffset++
@@ -575,7 +579,6 @@ func (c *Conn) parseFrameHeader(buf []byte) (wsFrame, bool) {
 	}
 
 	// 获取掩码(Mask)标志，并读取掩码（4个字节）
-	fh.masked = b2&(1<<7) != 0
 	if fh.masked {
 		if bufOffset+4 > bufLen {
 			return fh, true // partial header
@@ -670,8 +673,8 @@ func (c *Conn) OnCloseFrame(ci CloseInfo) {
 }
 func main() {
 	parseFlag()
-	fmt.Println("hello boy")
-	runtime.GOMAXPROCS(runtime.NumCPU() * 2) // 留一部分给网卡中断
+	fmt.Printf("hello boy! GOMAXPROCS=%d evpoll num=%d\n", procNum, evPollNum)
+	runtime.GOMAXPROCS(procNum)
 
 	asynBufPool.New = func() any {
 		return make([]byte, 1024)
