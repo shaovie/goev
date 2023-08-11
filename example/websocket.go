@@ -284,7 +284,7 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 	if buf[0] == 'G' || buf[0] == 'g' { // GET
 		if buf[1] == 'E' || buf[1] == 'e' {
 			if buf[2] == 'T' || buf[2] == 't' {
-				if buf[3] == ' ' {
+				if buf[3] == ' ' || buf[3] == '\t' {
 					method = 1
 					bufOffset += 4
 				}
@@ -299,7 +299,7 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 	if buf[bufOffset] != '/' {
 		return false // Abnormal connection. close it
 	}
-	pos := bytes.IndexByte(buf[bufOffset+1:], ' ')
+	pos := bytes.IndexByte(buf[bufOffset+1:], ' ') // \t ?
 	if pos < 0 {
 		return false // Abnormal connection. close it
 	}

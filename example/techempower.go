@@ -22,13 +22,15 @@ var (
 
 // Launch args
 var (
-	evPollNum int = 0
+	evPollNum int = runtime.NumCPU()
+	procNum int = runtime.NumCPU() * 2
 )
 
 func usage() {
 	fmt.Println(`
     Server options:
     -c N                   Evpoll num
+    -p N                   PROC num
 
     Common options:
     -h                     Show this message
@@ -37,6 +39,7 @@ func usage() {
 }
 func parseFlag() {
 	flag.IntVar(&evPollNum, "c", evPollNum, "evpoll num.")
+	flag.IntVar(&procNum, "p", procNum, "proc num.")
 
 	flag.Usage = usage
 	flag.Parse()
@@ -87,8 +90,8 @@ func updateLiveSecond() {
 
 func main() {
 	parseFlag()
-	fmt.Println("hello boy")
-	runtime.GOMAXPROCS(runtime.NumCPU() * 2)
+	fmt.Printf("hello boy! GOMAXPROCS=%d evpoll num=%d\n", procNum, evPollNum)
+	runtime.GOMAXPROCS(procNum)
 
 	liveDate.Store(time.Now().Format("Mon, 02 Jan 2006 15:04:05 GMT"))
 	ticker = time.NewTicker(time.Millisecond * 1000)
