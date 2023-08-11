@@ -137,7 +137,7 @@ func main() {
 
 ## Benchmarks
 
-We're comparing gnet, which is ranked first on TechEmpower, using the test code from http://github.com/TechEmpower/FrameworkBenchmarks/frameworks/Go/gnet/
+We're comparing gnet, which is ranked first on TechEmpower, using the test code from [gnet (GoLang) Benchmarking Test](https://github.com/TechEmpower/FrameworkBenchmarks/tree/master/frameworks/Go/gnet)
 
 > Test environment GCP cloud VM, 2 cores, 4GB RAM
 
