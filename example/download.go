@@ -28,7 +28,6 @@ type Conn struct {
 }
 
 func (c *Conn) OnOpen(fd int) bool {
-	fmt.Println("onopen")
 	netfd.SetSendBuffSize(fd, 1*4096)
 	// AddEvHandler 尽量放在最后, (OnOpen 和ORead可能不在一个线程)
 	if err := reactor.AddEvHandler(c, fd, goev.EvIn); err != nil {
@@ -37,7 +36,6 @@ func (c *Conn) OnOpen(fd int) bool {
 	return true
 }
 func (c *Conn) OnRead() bool {
-	fmt.Println("on read")
 	_, n, _ := c.Read()
 	if n == 0 { // Abnormal connection
 		fmt.Println("peer closed")
@@ -52,8 +50,8 @@ func (c *Conn) OnRead() bool {
 	buf = append(buf, (unsafe.Slice(unsafe.StringData(httpHeaderS), len(httpHeaderS)))...)
 	buf = strconv.AppendInt(buf, f.Size(), 10)
 	buf = append(buf, []byte("\r\n\r\n")...)
-	writen, err := c.Write(buf)
-	if err == nil && writen < len(buf) {
+	writen, _ := c.Write(buf)
+	if writen < len(buf) {
 		bf := asynBufPool.Get().([]byte)
 		n = copy(bf, buf[writen:])
 		c.AsyncWrite(c, goev.AsyncWriteBuf{
