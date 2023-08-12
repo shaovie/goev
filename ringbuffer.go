@@ -40,8 +40,8 @@ func (rb *RingBuffer[T]) Len() int {
 	return rb.len
 }
 
-// Push an item
-func (rb *RingBuffer[T]) Push(data T) {
+// PushBack an item
+func (rb *RingBuffer[T]) PushBack(data T) {
 	if rb.len == rb.size {
 		rb.grow()
 	}
@@ -50,8 +50,8 @@ func (rb *RingBuffer[T]) Push(data T) {
 	rb.len++
 }
 
-// Pop an item
-func (rb *RingBuffer[T]) Pop() (data T, ok bool) {
+// PopFront an item
+func (rb *RingBuffer[T]) PopFront() (data T, ok bool) {
 	if rb.len == 0 {
 		return
 	}
@@ -60,6 +60,15 @@ func (rb *RingBuffer[T]) Pop() (data T, ok bool) {
 	rb.len--
 	ok = true
 	return
+}
+// PushFront an item
+func (rb *RingBuffer[T]) PushFront(data T) {
+	if rb.len == rb.size {
+		rb.grow()
+	}
+	rb.head = (rb.size + rb.head - 1) % rb.size // prev
+	rb.buffer[rb.head] = data
+	rb.len++
 }
 
 func (rb *RingBuffer[T]) grow() {

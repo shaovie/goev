@@ -104,6 +104,9 @@ func (h *IOHandle) WriteBuff() []byte {
 // n = [n, len(bf]
 func (h *IOHandle) Write(bf []byte) (n int, err error) {
 	if h._fd > 0 { // NOTE fd must > 0
+        if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
+            return
+        }
 		for {
 			n, err = syscall.Write(h._fd, bf)
 			if n < 0 {
@@ -159,7 +162,7 @@ func (h *IOHandle) Destroy(eh EvHandler) {
 
 	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
 		for {
-			abf, ok := h._asyncWriteBufQ.Pop()
+			abf, ok := h._asyncWriteBufQ.PopFront()
 			if !ok {
 				break
 			}

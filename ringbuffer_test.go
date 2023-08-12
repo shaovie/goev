@@ -6,26 +6,30 @@ import (
 )
 
 func TestRingBuffer(t *testing.T) {
-	rb := NewRingBuffer[int](50)
+	rb := NewRingBuffer[int](10)
 
-	for i := 0; i < 100; i++ {
-		rb.Push(i)
+	for i := 0; i < 10; i++ {
+		rb.PushBack(i)
 	}
-	for i := 0; i < 50; i++ {
-		rb.Pop()
+	t.Logf("is full:%v\n", rb.IsFull())
+	v, _ := rb.PopFront()
+	rb.PushFront(v)
+	t.Logf("is full:%v\n", rb.IsFull())
+
+	for i := 0; i < 5; i++ {
+		rb.PopFront()
 	}
-	t.Logf("is empty:%v\n", rb.IsEmpty())
-	for i := 0; i < 50; i++ {
-		rb.Push(i)
+	for i := 0; i < 5; i++ {
+		rb.PushBack(i)
 	}
+	t.Logf("is full:%v\n", rb.IsFull())
 
 	fmt.Println("len:", rb.Len())
-	fmt.Println(rb.Pop()) // Output: 0
-	fmt.Println(rb.Pop()) // Output: 1
-	fmt.Println(rb.Pop()) // Output: 2
+	fmt.Println(rb.PopFront()) // Output: 0
+	fmt.Println(rb.PopFront()) // Output: 1
 
 	for !rb.IsEmpty() {
-		data, _ := rb.Pop()
+		data, _ := rb.PopFront()
 		fmt.Println(data)
 	}
 	fmt.Println("len:", rb.Len())

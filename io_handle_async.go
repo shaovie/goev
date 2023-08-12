@@ -33,7 +33,7 @@ func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf AsyncWriteBuf) {
 		return
 	}
 	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
-		h._asyncWriteBufQ.Push(abf)
+		h._asyncWriteBufQ.PushBack(abf)
 		return
 	}
 
@@ -56,7 +56,7 @@ func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf AsyncWriteBuf) {
 	if h._asyncWriteBufQ == nil {
 		h._asyncWriteBufQ = NewRingBuffer[AsyncWriteBuf](2)
 	}
-	h._asyncWriteBufQ.Push(abf)
+	h._asyncWriteBufQ.PushBack(abf)
 
 	if h._asyncWriteWaiting == false {
 		h._asyncWriteWaiting = true
@@ -73,9 +73,6 @@ func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf AsyncWriteBuf) {
 //	    x.AsyncOrderedFlush(x)
 //	}
 func (h *IOHandle) AsyncOrderedFlush(eh EvHandler) {
-	if h._asyncWriteBufQ == nil || h._asyncWriteBufQ.IsEmpty() {
-		return
-	}
 	if h._fd < 1 {
 		return
 	}
@@ -83,11 +80,26 @@ func (h *IOHandle) AsyncOrderedFlush(eh EvHandler) {
 	// It is necessary to use n to limit the number of sending attempts.
 	// If there is a possibility of sending failure, the data should be saved again in _asyncWriteBufQ
 	for i := 0; i < n; i++ {
-		abf, ok := h._asyncWriteBufQ.Pop()
+		abf, ok := h._asyncWriteBufQ.PopFront()
 		if !ok {
 			break
 		}
-		eh.asyncOrderedWrite(eh, abf)
+		if abf.Len < 1 || abf.Writen >= abf.Len { // so you can pass Buf=nil
+			eh.OnAsyncWriteBufDone(abf.Buf, abf.Flag)
+			continue
+		}
+		n, _ := syscall.Write(h._fd, abf.Buf[abf.Writen:abf.Len])
+		if n > 0 {
+			if n == (abf.Len - abf.Writen) {
+				h._asyncLastPartialWriteTime = 0
+				eh.OnAsyncWriteBufDone(abf.Buf, abf.Flag) // send completely
+				continue
+			}
+			abf.Writen += n // Partially write, shift n
+		}
+		h._asyncLastPartialWriteTime = time.Now().UnixMilli()
+		h._asyncWriteBufQ.PushFront(abf)
+		break
 	}
 	if h._asyncWriteBufQ.IsEmpty() {
 		h._ep.subtract(h._fd, EvOut)

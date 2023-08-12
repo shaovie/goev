@@ -55,7 +55,7 @@ func newAsyncWrite(ep *evPoll) (*asyncWrite, error) {
 }
 func (aw *asyncWrite) push(awi asyncWriteItem) {
 	aw.mtx.Lock()
-	aw.writeq.Push(awi)
+	aw.writeq.PushBack(awi)
 	aw.mtx.Unlock()
 
 	if !aw.notified.CompareAndSwap(0, 1) {
@@ -80,7 +80,7 @@ func (aw *asyncWrite) OnRead() bool {
 	}
 
 	for i := 0; i < 256; i++ { // Don't process too many at once
-		item, ok := aw.readq.Pop()
+		item, ok := aw.readq.PopFront()
 		if !ok {
 			break
 		}

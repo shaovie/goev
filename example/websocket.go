@@ -48,6 +48,8 @@ var (
 	asynBufPool sync.Pool
 )
 
+const asynBufSize int = 4096
+
 const (
 	FrameNull     = -1
 	FrameContinue = 0
@@ -124,13 +126,14 @@ const maxControlFramePayloadSize = 125
 const maxFreamHeaderSize = 14
 
 type wsFrame struct {
-	isfin   bool
-	flate   bool
-	masked  bool
-	hlen    int8 // header len
-	opcode  int
-	payload int64
-	maskKey [4]byte
+	complete bool // frame complete
+	isfin    bool
+	flate    bool
+	masked   bool
+	hlen     int8 // header len
+	opcode   int
+	payload  int64
+	maskKey  [4]byte
 }
 
 type continueWsFrame struct {
@@ -238,9 +241,6 @@ func (c *Conn) OnOpen(fd int) bool {
 	return true
 }
 func (c *Conn) OnRead() bool {
-	if c.closed == true {
-		return false
-	}
 	buf, n, _ := c.Read()
 	if n > 0 {
 		if c.upgraded == false {
@@ -396,8 +396,7 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 	var resp = make([]byte, 0, 256)
 	c.compressEnabled = false // 还不支持
 	if c.compressEnabled {
-		resp = append(resp, (unsafe.Slice(unsafe.StringData(switchHeaderWithFlateS),
-			len(switchHeaderWithFlateS)))...)
+		resp = append(resp, (unsafe.Slice(unsafe.StringData(switchHeaderWithFlateS), len(switchHeaderWithFlateS)))...)
 	} else {
 		resp = append(resp, (unsafe.Slice(unsafe.StringData(switchHeaderS), len(switchHeaderS)))...)
 	}
@@ -418,11 +417,20 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 
 	writen, _ := c.Write(resp)
 	if writen < len(resp) {
-		bf := asynBufPool.Get().([]byte)
-		n := copy(bf, buf[writen:])
+		var bf []byte
+		var flag, n int
+		if len(resp)-writen <= asynBufSize {
+			bf = asynBufPool.Get().([]byte)
+			n = copy(bf, resp[writen:])
+		} else {
+			bf = make([]byte, len(resp)-writen)
+			n = copy(bf, resp[writen:])
+			flag = 2
+		}
 		c.AsyncWrite(c, goev.AsyncWriteBuf{
-			Len: n,
-			Buf: bf,
+			Flag: flag,
+			Len:  n,
+			Buf:  bf,
 		})
 	}
 	c.upgraded = true
@@ -460,9 +468,9 @@ func (c *Conn) onFrame(buf []byte) bool {
 			payloadBuf = buf[bufOffset+hlen : bufOffset+hlen+payloadLen]
 		}
 
-		// get a complete frame
 		bufOffset += hlen + payloadLen
 		bufLen -= hlen + payloadLen
+		// get a complete frame
 
 		if wsf.isfin {
 			if len(payloadBuf) > 0 {
@@ -475,13 +483,13 @@ func (c *Conn) onFrame(buf []byte) bool {
 				} else if wsf.opcode == FramePong {
 					c.OnPong(payloadBuf)
 				} else if wsf.opcode == FrameClose {
-					ce := CloseInfo{Code: CloseNoCloseRcvd}
+					ce := CloseInfo{Code: CloseNoCloseRcvd, Info: ""}
 					if len(payloadBuf) > 1 {
 						ce.Code = CloseCode(binary.BigEndian.Uint16(payloadBuf))
 						ce.Info = string(payloadBuf[2:])
 					}
 					c.OnCloseFrame(ce)
-					return false // close
+					break
 				}
 			} else {
 				if wsf.opcode == FrameContinue {
@@ -603,7 +611,24 @@ func (c *Conn) writeControlFrame(opcode int, payload []byte) {
 	buf[0] = byte(opcode) | 1<<7
 	buf[1] = byte(payloadLen)
 	copy(buf[hlen:], payload)
-	c.Write(buf[0 : payloadLen+hlen])
+	writen, _ := c.Write(buf[:payloadLen+hlen])
+	if writen < payloadLen+hlen {
+		var bf []byte
+		var flag, n int
+		if payloadLen+hlen-writen <= asynBufSize {
+			bf = asynBufPool.Get().([]byte)
+			n = copy(bf, buf[writen:payloadLen+hlen])
+		} else {
+			bf = make([]byte, payloadLen+hlen-writen)
+			n = copy(bf, buf[writen:payloadLen+hlen])
+			flag = 2
+		}
+		c.AsyncWrite(c, goev.AsyncWriteBuf{
+			Flag: flag,
+			Len:  n,
+			Buf:  bf,
+		})
+	}
 }
 func (c *Conn) writeMessageFrame(opcode int, data []byte, flate, fin bool) {
 	if c.closed {
@@ -639,17 +664,17 @@ func (c *Conn) writeMessageFrame(opcode int, data []byte, flate, fin bool) {
 	// no mask in server side
 	copy(buff[hlen:], data)
 	wlen := hlen + payloadLen
-	writen, err := c.Write(buff[:wlen])
-	if err == nil && writen < wlen {
-		var flag, n int
+	writen, _ := c.Write(buff[:wlen])
+	if writen < wlen {
 		var bf []byte
-		if wlen-writen < 1024 {
+		var flag, n int
+		if wlen-writen <= asynBufSize {
 			bf = asynBufPool.Get().([]byte)
-			n = copy(bf, buf[writen:])
+			n = copy(bf, buff[writen:wlen])
 		} else {
 			bf = make([]byte, wlen-writen)
-			n = copy(bf, buff[writen:])
-			flat = 2
+			n = copy(bf, buff[writen:wlen])
+			flag = 2
 		}
 		c.AsyncWrite(c, goev.AsyncWriteBuf{
 			Flag: flag,
@@ -672,6 +697,7 @@ func (c *Conn) OnPong(data []byte) {
 }
 func (c *Conn) OnCloseFrame(ci CloseInfo) {
 	if c.closed == false {
+		fmt.Println("on close frame")
 		bf := (*(*[2]byte)(unsafe.Pointer(&ci.Code)))[:]
 		binary.BigEndian.PutUint16(bf, uint16(CloseNormalClosure))
 		c.writeControlFrame(FrameClose, bf[0:2])
@@ -684,7 +710,7 @@ func main() {
 	runtime.GOMAXPROCS(procNum)
 
 	asynBufPool.New = func() any {
-		return make([]byte, 1024)
+		return make([]byte, asynBufSize)
 	}
 
 	var err error
