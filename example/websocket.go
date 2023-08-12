@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"time"
 	"unsafe"
 
 	"github.com/shaovie/goev"
@@ -125,14 +124,13 @@ const maxControlFramePayloadSize = 125
 const maxFreamHeaderSize = 14
 
 type wsFrame struct {
-	complete bool // frame complete
-	isfin    bool
-	flate    bool
-	masked   bool
-	hlen     int8 // header len
-	opcode   int
-	payload  int64
-	maskKey  [4]byte
+	isfin   bool
+	flate   bool
+	masked  bool
+	hlen    int8 // header len
+	opcode  int
+	payload int64
+	maskKey [4]byte
 }
 
 type continueWsFrame struct {
@@ -240,6 +238,9 @@ func (c *Conn) OnOpen(fd int) bool {
 	return true
 }
 func (c *Conn) OnRead() bool {
+	if c.closed == true {
+		return false
+	}
 	buf, n, _ := c.Read()
 	if n > 0 {
 		if c.upgraded == false {
@@ -395,7 +396,8 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 	var resp = make([]byte, 0, 256)
 	c.compressEnabled = false // 还不支持
 	if c.compressEnabled {
-		resp = append(resp, (unsafe.Slice(unsafe.StringData(switchHeaderWithFlateS), len(switchHeaderWithFlateS)))...)
+		resp = append(resp, (unsafe.Slice(unsafe.StringData(switchHeaderWithFlateS),
+			len(switchHeaderWithFlateS)))...)
 	} else {
 		resp = append(resp, (unsafe.Slice(unsafe.StringData(switchHeaderS), len(switchHeaderS)))...)
 	}
@@ -458,9 +460,9 @@ func (c *Conn) onFrame(buf []byte) bool {
 			payloadBuf = buf[bufOffset+hlen : bufOffset+hlen+payloadLen]
 		}
 
+		// get a complete frame
 		bufOffset += hlen + payloadLen
 		bufLen -= hlen + payloadLen
-		// get a complete frame
 
 		if wsf.isfin {
 			if len(payloadBuf) > 0 {
@@ -473,13 +475,13 @@ func (c *Conn) onFrame(buf []byte) bool {
 				} else if wsf.opcode == FramePong {
 					c.OnPong(payloadBuf)
 				} else if wsf.opcode == FrameClose {
-					ce := CloseInfo{Code: CloseNoCloseRcvd, Info: ""}
+					ce := CloseInfo{Code: CloseNoCloseRcvd}
 					if len(payloadBuf) > 1 {
 						ce.Code = CloseCode(binary.BigEndian.Uint16(payloadBuf))
 						ce.Info = string(payloadBuf[2:])
 					}
 					c.OnCloseFrame(ce)
-					break
+					return false // close
 				}
 			} else {
 				if wsf.opcode == FrameContinue {
@@ -639,10 +641,18 @@ func (c *Conn) writeMessageFrame(opcode int, data []byte, flate, fin bool) {
 	wlen := hlen + payloadLen
 	writen, err := c.Write(buff[:wlen])
 	if err == nil && writen < wlen {
-		bf := make([]byte, wlen-writen)
-		n := copy(bf, buff[writen:])
+		var flag, n int
+		var bf []byte
+		if wlen-writen < 1024 {
+			bf = asynBufPool.Get().([]byte)
+			n = copy(bf, buf[writen:])
+		} else {
+			bf = make([]byte, wlen-writen)
+			n = copy(bf, buff[writen:])
+			flat = 2
+		}
 		c.AsyncWrite(c, goev.AsyncWriteBuf{
-			Flag: 2,
+			Flag: flag,
 			Len:  n,
 			Buf:  bf,
 		})
