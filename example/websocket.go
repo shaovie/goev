@@ -22,7 +22,7 @@ import (
 // Launch args
 var (
 	evPollNum int = 0
-	procNum int = runtime.NumCPU() * 2
+	procNum   int = runtime.NumCPU() * 2
 )
 
 func usage() {
@@ -149,8 +149,6 @@ type Conn struct {
 	compressEnabled bool
 	closed          bool
 
-	partialFrameTime int64
-
 	partialBuf []byte
 
 	continueWsFrame continueWsFrame
@@ -198,7 +196,7 @@ func isMessageFrame(frameType int) bool {
 }
 
 func maskBytes(b []byte, key [4]byte) {
-    var maskKey = binary.LittleEndian.Uint32(key[:])
+	var maskKey = binary.LittleEndian.Uint32(key[:])
 	var key64 = uint64(maskKey)<<32 + uint64(maskKey)
 
 	for len(b) >= 64 {
@@ -431,12 +429,11 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 }
 func (c *Conn) onFrame(buf []byte) bool {
 	bufLen := len(buf)
-	if c.partialFrameTime > 0 { // build partial data
+	if len(c.partialBuf) > 0 { // build partial data
 		c.partialBuf = append(c.partialBuf, buf...)
 		buf = c.partialBuf
 		bufLen = len(c.partialBuf)
 		c.partialBuf = c.partialBuf[:0] // reset
-		c.partialFrameTime = 0
 	}
 
 	bufOffset := 0
@@ -446,28 +443,28 @@ func (c *Conn) onFrame(buf []byte) bool {
 			return false
 		}
 		if wsf.hlen == 0 { // partial header
-			c.partialFrameTime = time.Now().UnixMilli()
 			c.partialBuf = append(c.partialBuf, buf[bufOffset:]...)
 			break
 		}
 
 		var payloadBuf []byte
-		if wsf.payload > 0 {
-			if int64(bufLen)-int64(wsf.hlen) < wsf.payload { // partial payload
-				c.partialFrameTime = time.Now().UnixMilli()
+		hlen := int(wsf.hlen)
+		payloadLen := int(wsf.payload)
+		if payloadLen > 0 {
+			if bufLen-hlen < payloadLen { // partial payload
 				c.partialBuf = append(c.partialBuf, buf[bufOffset:]...)
 				break
 			}
-			payloadBuf = buf[int(wsf.hlen) : int(wsf.hlen)+int(wsf.payload)]
+			payloadBuf = buf[bufOffset+hlen : bufOffset+hlen+payloadLen]
 		}
 
-		bufOffset += int(wsf.hlen) + int(wsf.payload)
-		bufLen -= int(wsf.hlen) + int(wsf.payload)
+		bufOffset += hlen + payloadLen
+		bufLen -= hlen + payloadLen
 		// get a complete frame
 
 		if wsf.isfin {
 			if len(payloadBuf) > 0 {
-                maskBytes(payloadBuf, wsf.maskKey)
+				maskBytes(payloadBuf, wsf.maskKey)
 			}
 
 			if isControlFrame(wsf.opcode) {
@@ -545,10 +542,10 @@ func (c *Conn) parseFrameHeader(buf []byte) (wsFrame, bool) {
 	// byte2 获取掩码标志、数据长度
 	b2 := buf[bufOffset]
 	fh.masked = b2&(1<<7) != 0
-    // RFC6455: All frames sent from client to server have this bit set to 1
-    if fh.masked == false {
+	// RFC6455: All frames sent from client to server have this bit set to 1
+	if fh.masked == false {
 		return fh, false // Abnormal connection. close it
-    }
+	}
 	fh.payload = int64(b2 & 0x7f)
 	if fh.payload == 126 {
 		bufOffset++
