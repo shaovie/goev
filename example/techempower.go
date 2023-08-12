@@ -23,7 +23,7 @@ var (
 // Launch args
 var (
 	evPollNum int = runtime.NumCPU()
-	procNum int = runtime.NumCPU() * 2
+	procNum   int = runtime.NumCPU() * 2
 )
 
 func usage() {

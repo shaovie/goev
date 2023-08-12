@@ -115,21 +115,22 @@ func (ep *evPoll) writeBuff() []byte {
 	return ep.evPollWriteBuff
 }
 func (ep *evPoll) read(fd int) (bf []byte, n int, err error) {
-    for {
-        n, err = syscall.Read(fd, ep.evPollReadBuff)
-        if n > 0 {
-            bf = ep.evPollReadBuff[:n]
-        } else if n < 0 && err == syscall.EINTR {
-            continue
-        }
-        return
-    }
+	for {
+		n, err = syscall.Read(fd, ep.evPollReadBuff)
+		if n > 0 {
+			bf = ep.evPollReadBuff[:n]
+		} else if n < 0 && err == syscall.EINTR {
+			continue
+		}
+		return
+	}
 }
 func (ep *evPoll) push(awi asyncWriteItem) {
 	ep.asyncWrite.push(awi)
 }
 
 // end of `io handle'
+
 func (ep *evPoll) run(wg *sync.WaitGroup) error {
 	if wg != nil {
 		defer wg.Done()

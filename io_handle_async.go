@@ -37,7 +37,7 @@ func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf AsyncWriteBuf) {
 		return
 	}
 
-	if abf.Len < 1 || abf.Writen >= abf.Len {
+	if abf.Len < 1 || abf.Writen >= abf.Len { // so you can pass Buf=nil
 		eh.OnAsyncWriteBufDone(abf.Buf, abf.Flag)
 		return
 	}

@@ -104,16 +104,16 @@ func (h *IOHandle) WriteBuff() []byte {
 // n = [n, len(bf]
 func (h *IOHandle) Write(bf []byte) (n int, err error) {
 	if h._fd > 0 { // NOTE fd must > 0
-        for {
-            n, err = syscall.Write(h._fd, bf)
-            if n < 0 {
-                if err == syscall.EINTR {
-                    continue
-                }
-                n = 0
-            }
-            return
-        }
+		for {
+			n, err = syscall.Write(h._fd, bf)
+			if n < 0 {
+				if err == syscall.EINTR {
+					continue
+				}
+				n = 0
+			}
+			return
+		}
 	}
 	return 0, syscall.EBADF
 }
