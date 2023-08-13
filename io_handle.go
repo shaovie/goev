@@ -31,7 +31,7 @@ func (h *IOHandle) Init() {
 }
 
 func (h *IOHandle) setParams(fd int, ep *evPoll) {
-	h.setFd(-1)
+	h.setFd(fd)
 	h._ep = ep
 }
 
