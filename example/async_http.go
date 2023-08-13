@@ -67,8 +67,8 @@ func (h *Http) OnRead() bool {
     go h.AsyncHandle()
 	return true
 }
-func (c *Conn) OnWrite() bool {
-	c.AsyncOrderedFlush(c)
+func (h *Http) OnWrite() bool {
+	h.AsyncOrderedFlush(h)
 	return true
 }
 func (h *Http) AsyncHandle() {
