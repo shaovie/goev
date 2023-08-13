@@ -2,67 +2,14 @@ package goev
 
 import (
 	"syscall"
-	"time"
 )
 
-// AsyncWriteBuf x
-type AsyncWriteBuf struct {
-	Flag int // The flag will be returned in OnAsyncWriteBufDone,
+type asyncWriteBuf struct {
+	//Flag int // The flag will be returned in OnAsyncWriteBufDone,
 	// allowing you to know the actual processing progress.
-	Writen int    // wrote len
-	Len    int    // buf original len. readonly
-	Buf    []byte // readonly
-}
-
-// AsyncWrite asynchronous write
-func (h *IOHandle) AsyncWrite(eh EvHandler, abf AsyncWriteBuf) {
-	if h._fd > 0 { // NOTE fd must > 0
-		h._ep.push(asyncWriteItem{
-			fd:  h._fd,
-			eh:  eh,
-			abf: abf,
-		})
-	} else {
-		eh.OnAsyncWriteBufDone(abf.Buf, abf.Flag)
-	}
-}
-
-func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf AsyncWriteBuf) {
-	if h._fd < 1 { // closed or except
-		eh.OnAsyncWriteBufDone(abf.Buf, abf.Flag)
-		return
-	}
-	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
-		h._asyncWriteBufQ.PushBack(abf)
-		return
-	}
-
-	if abf.Len < 1 || abf.Writen >= abf.Len { // so you can pass Buf=nil
-		eh.OnAsyncWriteBufDone(abf.Buf, abf.Flag)
-		return
-	}
-	n, _ := syscall.Write(h._fd, abf.Buf[abf.Writen:abf.Len])
-	if n > 0 {
-		if n == (abf.Len - abf.Writen) {
-			h._asyncLastPartialWriteTime = 0
-			eh.OnAsyncWriteBufDone(abf.Buf, abf.Flag) // send completely
-			return
-		}
-		abf.Writen += n // Partially write, shift n
-	}
-
-	h._asyncLastPartialWriteTime = time.Now().UnixMilli()
-	// Error or Partially
-	if h._asyncWriteBufQ == nil {
-		h._asyncWriteBufQ = NewRingBuffer[AsyncWriteBuf](2)
-	}
-	h._asyncWriteBufQ.PushBack(abf)
-
-	if h._asyncWriteWaiting == false {
-		h._asyncWriteWaiting = true
-		h._ep.append(h._fd, EvOut) // No need to use ET mode
-		// eh needs to implement the OnWrite method, and the OnWrite method needs to call AsyncOrderedFlush.
-	}
+	writen int    // wrote len
+	len    int    // buf original len. readonly
+	buf    []byte // readonly
 }
 
 // AsyncOrderedFlush only called in OnWrite
@@ -73,7 +20,8 @@ func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf AsyncWriteBuf) {
 //	    x.AsyncOrderedFlush(x)
 //	}
 func (h *IOHandle) AsyncOrderedFlush(eh EvHandler) {
-	if h._fd < 1 {
+	fd := h.Fd()
+	if fd < 1 {
 		return
 	}
 	n := h._asyncWriteBufQ.Len()
@@ -84,26 +32,71 @@ func (h *IOHandle) AsyncOrderedFlush(eh EvHandler) {
 		if !ok {
 			break
 		}
-		if abf.Len < 1 || abf.Writen >= abf.Len { // so you can pass Buf=nil
-			eh.OnAsyncWriteBufDone(abf.Buf, abf.Flag)
-			continue
-		}
-		n, _ := syscall.Write(h._fd, abf.Buf[abf.Writen:abf.Len])
+		n, _ := syscall.Write(fd, abf.buf[abf.writen:abf.len])
 		if n > 0 {
-			if n == (abf.Len - abf.Writen) {
-				h._asyncLastPartialWriteTime = 0
-				eh.OnAsyncWriteBufDone(abf.Buf, abf.Flag) // send completely
+			h._asyncWriteBufSize -= n
+			if n == (abf.len - abf.writen) { // send completely
 				continue
 			}
-			abf.Writen += n // Partially write, shift n
+			abf.writen += n // Partially write, shift n
 		}
-		h._asyncLastPartialWriteTime = time.Now().UnixMilli()
 		h._asyncWriteBufQ.PushFront(abf)
 		break
 	}
 	if h._asyncWriteBufQ.IsEmpty() {
-		h._ep.subtract(h._fd, EvOut)
+		h._ep.subtract(fd, EvOut)
 		h._asyncWriteWaiting = false
+	}
+}
+
+// AsyncWrite asynchronous write
+func (h *IOHandle) AsyncWrite(eh EvHandler, buf []byte) {
+	fd := h.Fd()
+	if fd > 0 { // NOTE fd must > 0
+		abf := make([]byte, len(buf))
+		copy(abf, buf)
+		h._ep.push(asyncWriteItem{
+			fd: fd,
+			eh: eh,
+			abf: asyncWriteBuf{
+				len: len(buf),
+				buf: abf,
+			},
+		})
+	}
+}
+
+func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf asyncWriteBuf) {
+	fd := h.Fd()
+	if fd < 1 { // closed or except
+		return
+	}
+	h._asyncWriteBufSize += abf.len
+	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
+		h._asyncWriteBufQ.PushBack(abf)
+		return
+	}
+
+	n, _ := syscall.Write(fd, abf.buf[abf.writen:abf.len])
+	if n > 0 {
+		h._asyncWriteBufSize -= n
+		if n == (abf.len - abf.writen) {
+			return
+		}
+		abf.writen += n // Partially write, shift n
+	}
+
+	// Error or Partially
+	if h._asyncWriteBufQ == nil {
+		h._asyncWriteBufQ = NewRingBuffer[asyncWriteBuf](2)
+	}
+	h._asyncWriteBufQ.PushBack(abf)
+
+	if h._asyncWriteWaiting == false {
+		h._asyncWriteWaiting = true
+		h._ep.append(fd, EvOut) // No need to use ET mode
+		// eh needs to implement the OnWrite method, and the OnWrite method
+		// needs to call AsyncOrderedFlush.
 	}
 }
 

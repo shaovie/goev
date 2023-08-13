@@ -50,15 +50,7 @@ func (c *Conn) OnRead() bool {
 	buf = append(buf, (unsafe.Slice(unsafe.StringData(httpHeaderS), len(httpHeaderS)))...)
 	buf = strconv.AppendInt(buf, f.Size(), 10)
 	buf = append(buf, []byte("\r\n\r\n")...)
-	writen, _ := c.Write(buf)
-	if writen < len(buf) {
-		bf := asynBufPool.Get().([]byte)
-		n = copy(bf, buf[writen:])
-		c.AsyncWrite(c, goev.AsyncWriteBuf{
-			Len: n,
-			Buf: bf,
-		})
-	}
+	c.Write(buf)
 	c.f, _ = os.Open("./downloadfile")
 	c.ScheduleTimer(c, 0, 200)
 	fmt.Println("start")
@@ -76,16 +68,8 @@ func (c *Conn) OnTimeout(now int64) bool {
 	bf := asynBufPool.Get().([]byte)
 	n, err := c.f.Read(bf)
 	if n > 0 {
-		c.AsyncWrite(c, goev.AsyncWriteBuf{
-			Len: n,
-			Buf: bf,
-		})
+		c.AsyncWrite(c, bf[0:n])
 	} else if err == io.EOF {
-		c.AsyncWrite(c, goev.AsyncWriteBuf{
-			Flag: 1, // end flag
-			Len:  0,
-			Buf:  nil,
-		})
 		fmt.Println("EOF")
 		return false
 	}

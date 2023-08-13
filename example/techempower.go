@@ -69,7 +69,7 @@ func (h *Http) OnRead() bool {
 	buf = append(buf, httpRespHeader...)
 	buf = append(buf, []byte(liveDate.Load().(string))...)
 	buf = append(buf, httpRespContentLength...)
-	netfd.Write(h.Fd(), buf)
+	h.Write(buf)
 	return true
 }
 func (h *Http) OnClose() {

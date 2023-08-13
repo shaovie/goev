@@ -45,15 +45,7 @@ func (h *Http) OnRead() bool {
 	buf = append(buf, httpRespHeader...)
 	buf = append(buf, []byte(liveDate.Load().(string))...)
 	buf = append(buf, httpRespContentLength...)
-	writen, err := h.Write(buf)
-	if err == nil && writen < len(buf) {
-		bf := asynBufPool.Get().([]byte)
-		n = copy(bf, buf[writen:])
-		h.AsyncWrite(h, goev.AsyncWriteBuf{
-			Len: n,
-			Buf: bf,
-		})
-	}
+	h.Write(buf)
 	return true
 }
 func (h *Http) OnWrite() bool {

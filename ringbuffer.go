@@ -61,6 +61,7 @@ func (rb *RingBuffer[T]) PopFront() (data T, ok bool) {
 	ok = true
 	return
 }
+
 // PushFront an item
 func (rb *RingBuffer[T]) PushFront(data T) {
 	if rb.len == rb.size {

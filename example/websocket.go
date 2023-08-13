@@ -415,24 +415,7 @@ func (c *Conn) onUpgrade(buf []byte) bool {
 	// end
 	resp = append(resp, CRLF...)
 
-	writen, _ := c.Write(resp)
-	if writen < len(resp) {
-		var bf []byte
-		var flag, n int
-		if len(resp)-writen <= asynBufSize {
-			bf = asynBufPool.Get().([]byte)
-			n = copy(bf, resp[writen:])
-		} else {
-			bf = make([]byte, len(resp)-writen)
-			n = copy(bf, resp[writen:])
-			flag = 2
-		}
-		c.AsyncWrite(c, goev.AsyncWriteBuf{
-			Flag: flag,
-			Len:  n,
-			Buf:  bf,
-		})
-	}
+	c.Write(resp)
 	c.upgraded = true
 	//c.ScheduleTimer(c, 20*1000, 20*1000)
 	return true
@@ -611,24 +594,7 @@ func (c *Conn) writeControlFrame(opcode int, payload []byte) {
 	buf[0] = byte(opcode) | 1<<7
 	buf[1] = byte(payloadLen)
 	copy(buf[hlen:], payload)
-	writen, _ := c.Write(buf[:payloadLen+hlen])
-	if writen < payloadLen+hlen {
-		var bf []byte
-		var flag, n int
-		if payloadLen+hlen-writen <= asynBufSize {
-			bf = asynBufPool.Get().([]byte)
-			n = copy(bf, buf[writen:payloadLen+hlen])
-		} else {
-			bf = make([]byte, payloadLen+hlen-writen)
-			n = copy(bf, buf[writen:payloadLen+hlen])
-			flag = 2
-		}
-		c.AsyncWrite(c, goev.AsyncWriteBuf{
-			Flag: flag,
-			Len:  n,
-			Buf:  bf,
-		})
-	}
+	c.Write(buf[:payloadLen+hlen])
 }
 func (c *Conn) writeMessageFrame(opcode int, data []byte, flate, fin bool) {
 	if c.closed {
@@ -664,24 +630,7 @@ func (c *Conn) writeMessageFrame(opcode int, data []byte, flate, fin bool) {
 	// no mask in server side
 	copy(buff[hlen:], data)
 	wlen := hlen + payloadLen
-	writen, _ := c.Write(buff[:wlen])
-	if writen < wlen {
-		var bf []byte
-		var flag, n int
-		if wlen-writen <= asynBufSize {
-			bf = asynBufPool.Get().([]byte)
-			n = copy(bf, buff[writen:wlen])
-		} else {
-			bf = make([]byte, wlen-writen)
-			n = copy(bf, buff[writen:wlen])
-			flag = 2
-		}
-		c.AsyncWrite(c, goev.AsyncWriteBuf{
-			Flag: flag,
-			Len:  n,
-			Buf:  bf,
-		})
-	}
+	c.Write(buff[:wlen])
 }
 func (c *Conn) OnTimeout(now int64) bool {
 	c.writeControlFrame(FramePing, nil)
