@@ -29,8 +29,8 @@ func updateLiveSecond() {
 }
 
 func oneConn(conn net.Conn) {
-	buf := make([]byte, 1024)
 	for {
+        buf := make([]byte, 1024)
 		n, _ := conn.Read(buf)
 		if n == 0 {
 			conn.Close()
