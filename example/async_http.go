@@ -72,7 +72,7 @@ func (h *Http) OnWrite() bool {
 	return true
 }
 func (h *Http) AsyncHandle() {
-	buf := make([]byte, 256)
+	buf := make([]byte, 0, 256)
 	buf = append(buf, httpRespHeader...)
 	buf = append(buf, []byte(liveDate.Load().(string))...)
 	buf = append(buf, httpRespContentLength...)
