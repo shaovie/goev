@@ -67,7 +67,11 @@ func (h *Http) OnRead() bool {
     go h.AsyncHandle()
 	return true
 }
-func (h *Http) AsyncHandle([) {
+func (c *Conn) OnWrite() bool {
+	c.AsyncOrderedFlush(c)
+	return true
+}
+func (h *Http) AsyncHandle() {
 	buf := make([]byte, 256)
 	buf = append(buf, httpRespHeader...)
 	buf = append(buf, []byte(liveDate.Load().(string))...)
