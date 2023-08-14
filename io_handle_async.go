@@ -5,7 +5,6 @@ import (
 )
 
 type asyncWriteBuf struct {
-	//Flag int // The flag will be returned in OnAsyncWriteBufDone,
 	// allowing you to know the actual processing progress.
 	writen int    // wrote len
 	len    int    // buf original len. readonly
@@ -53,7 +52,7 @@ func (h *IOHandle) AsyncOrderedFlush(eh EvHandler) {
 func (h *IOHandle) AsyncWrite(eh EvHandler, buf []byte) {
 	fd := h.Fd()
 	if fd > 0 { // NOTE fd must > 0
-		abf := make([]byte, len(buf))
+		abf := make([]byte, len(buf)) // TODO optimize
 		copy(abf, buf)
 		h._ep.push(asyncWriteItem{
 			fd: fd,
@@ -100,10 +99,6 @@ func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf asyncWriteBuf) {
 	}
 }
 
-// OnAsyncWriteBufDone callback after bf used (within the evpoll coroutine),
-func (h *IOHandle) OnAsyncWriteBufDone(bf []byte, flag int) {
-}
-
 // AsyncWaitWriteQLen The length of the queue waiting to be sent asynchronously
 //
 // If it is too long, it indicates that the sending is slow and the receiving end is abnormal
@@ -112,19 +107,4 @@ func (h *IOHandle) AsyncWaitWriteQLen() int {
 		return 0
 	}
 	return h._asyncWriteBufQ.Len()
-}
-
-// AsyncLastPartialWriteTime indicates that the previous write was incomplete and requires 'evpoll'
-// to polling for the writable state. This value helps prevent a connection from being indefinitely
-// unreachable due to abnormalities or the recipient not receiving data. Millisecond
-//
-// e.g.
-// if nowMilli - x.AsyncLastPartialWriteTime() > 10*1000 && x.AsyncWaitWriteQLen() > 0 { // 10secs
-//
-//	    x.GetReactor().RemoveEvHandler(x, x.Fd())
-//	    x.OnClose(x.Fd())
-//	    return // The connection lifecycle has ended
-//	}
-func (h *IOHandle) AsyncLastPartialWriteTime() int64 {
-	return h._asyncLastPartialWriteTime
 }

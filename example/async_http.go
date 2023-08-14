@@ -64,7 +64,7 @@ func (h *Http) OnRead() bool {
 	if n == 0 { // Abnormal connection
 		return false
 	}
-    go h.AsyncHandle()
+	go h.AsyncHandle()
 	return true
 }
 func (h *Http) OnWrite() bool {

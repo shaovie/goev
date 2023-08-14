@@ -10,10 +10,9 @@ import (
 type IOHandle struct {
 	noCopy
 
-	_asyncWriteWaiting         bool
-	_fd                        int32
-	_asyncWriteBufSize         int   // total size of wait to write
-	_asyncLastPartialWriteTime int64 // nanosecond. unix timestamp
+	_asyncWriteWaiting bool
+	_fd                int32
+	_asyncWriteBufSize int // total size of wait to write
 
 	_r *Reactor
 
@@ -83,6 +82,8 @@ func (h *IOHandle) CancelTimer(eh EvHandler) {
 }
 
 // Read use evPollReadBuff, buf size can set by options.EvPollReadBuffSize
+//
+// Can only be used within the poller goroutine
 func (h *IOHandle) Read() (bf []byte, n int, err error) {
 	fd := h.Fd()
 	if fd < 1 {
@@ -97,6 +98,8 @@ func (h *IOHandle) Read() (bf []byte, n int, err error) {
 }
 
 // WriteBuff must be registered with evpoll in order to be used
+//
+// Can only be used within the poller goroutine
 func (h *IOHandle) WriteBuff() []byte {
 	if h._ep != nil {
 		return h._ep.writeBuff()
@@ -112,7 +115,7 @@ func (h *IOHandle) Write(bf []byte) (n int, err error) {
 		return 0, syscall.EBADF
 	}
 	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
-		abf := make([]byte, len(bf))
+		abf := make([]byte, len(bf)) // TODO optimize
 		n = copy(abf, bf)
 		h._asyncWriteBufQ.PushBack(asyncWriteBuf{
 			len: n,
@@ -132,7 +135,7 @@ func (h *IOHandle) Write(bf []byte) (n int, err error) {
 		break
 	}
 	if n < len(bf) {
-		abf := make([]byte, len(bf)-n)
+		abf := make([]byte, len(bf)-n) // TODO optimize
 		n = copy(abf, bf[n:])
 		if h._asyncWriteBufQ == nil {
 			h._asyncWriteBufQ = NewRingBuffer[asyncWriteBuf](2)
@@ -151,6 +154,21 @@ func (h *IOHandle) Write(bf []byte) (n int, err error) {
 		n = len(bf)
 	}
 	return
+}
+
+// Destroy If you are using the Async write mechanism, it is essential to call the Destroy method
+// in OnClose to clean up any unsent bf data.
+func (h *IOHandle) Destroy(eh EvHandler) {
+	h.setFd(-1)
+
+	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
+		for {
+			_, ok := h._asyncWriteBufQ.PopFront()
+			if !ok {
+				break
+			}
+		}
+	}
 }
 
 //
@@ -184,21 +202,4 @@ func (*IOHandle) OnTimeout(millisecond int64) bool {
 // OnClose please make sure you want to reimplement it.
 func (*IOHandle) OnClose() {
 	panic("goev: IOHandle OnClose")
-}
-
-// Destroy If you are using the Async write mechanism, it is essential to call the Destroy method
-// in OnClose to clean up any unsent bf data.
-// The cleanup process will also invoke OnAsyncWriteBufDone
-func (h *IOHandle) Destroy(eh EvHandler) {
-	h.setFd(-1)
-
-	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
-		for {
-			_, ok := h._asyncWriteBufQ.PopFront()
-			if !ok {
-				break
-			}
-			//eh.OnAsyncWriteBufDone(abf.Buf, abf.Flag) // avoid endless loop
-		}
-	}
 }
