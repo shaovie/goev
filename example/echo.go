@@ -34,10 +34,7 @@ func (c *Conn) OnRead() bool {
 	return true
 }
 func (c *Conn) OnClose() {
-	if c.Fd() != -1 {
-		netfd.Close(c.Fd())
-		c.Destroy(c)
-	}
+	c.Destroy(c)
 }
 
 func main() {

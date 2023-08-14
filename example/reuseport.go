@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/shaovie/goev"
-	"github.com/shaovie/goev/netfd"
 )
 
 var (
@@ -57,10 +56,7 @@ func (h *Http) OnAsyncWriteBufDone(bf []byte, flag int) {
 	asynBufPool.Put(bf)
 }
 func (h *Http) OnClose() {
-	if h.Fd() != -1 {
-		netfd.Close(h.Fd())
-		h.Destroy(h)
-	}
+	h.Destroy(h)
 }
 
 func updateLiveSecond() {

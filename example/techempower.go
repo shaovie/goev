@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/shaovie/goev"
-	"github.com/shaovie/goev/netfd"
 )
 
 var (
@@ -73,10 +72,7 @@ func (h *Http) OnRead() bool {
 	return true
 }
 func (h *Http) OnClose() {
-	if h.Fd() != -1 {
-		netfd.Close(h.Fd())
-		h.Destroy(h)
-	}
+	h.Destroy(h)
 }
 
 func updateLiveSecond() {

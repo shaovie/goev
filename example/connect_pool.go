@@ -40,7 +40,6 @@ func (s *AsyncPushLog) Push(log string) {
 }
 func (s *AsyncPushLog) OnClose() {
 	fmt.Printf("closed\n")
-	netfd.Close(s.Fd())
 	s.Closed()
 	s.Destroy(s)
 }

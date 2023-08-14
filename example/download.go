@@ -61,20 +61,18 @@ func (c *Conn) OnTimeout(now int64) bool {
 		fmt.Println("fd closed")
 		return false
 	}
-	//fmt.Println("timeout", c.AsyncLastPartialWriteTime(), c.AsyncWaitWriteQLen())
-	if c.AsyncWaitWriteQLen() > 0 {
+	if c.AsyncWaitWriteQLen() > 0 { // wait
 		return true
 	}
-	bf := asynBufPool.Get().([]byte)
-	n, err := c.f.Read(bf)
+	bf := c.WriteBuff()
+	n, err := c.f.Read(bf[0:4096])
 	if n > 0 {
-		c.AsyncWrite(c, bf[0:n])
+		c.Write(bf[0:n])
 	} else if err == io.EOF {
+		c.f.Close()
+		c.f = nil
 		fmt.Println("EOF")
 		return false
-	}
-	if c.AsyncWaitWriteQLen() > 0 {
-		fmt.Println("AsyncWaitWriteQLen: ", c.AsyncWaitWriteQLen())
 	}
 	return true
 }
@@ -83,26 +81,14 @@ func (c *Conn) OnWrite() bool {
 	fmt.Println("on write")
 	return true
 }
-func (c *Conn) OnAsyncWriteBufDone(bf []byte, flag int) {
-	if flag == 0 {
-		asynBufPool.Put(bf)
-	} else if flag == 1 && c.Fd() > 0 { // send completely
-		fmt.Println("send completely")
-		reactor.RemoveEvHandler(c, c.Fd()) // remove at first, then call OnClose
-		c.OnClose()                        // (NOTE: avoid IOHandle.Destroy(eh.OnAsyncWriteBufDone) endless loop)
-		return
-	}
-}
 func (c *Conn) OnClose() {
 	fmt.Println("on close")
-	if c.Fd() != -1 {
-		if c.f != nil {
-			c.f.Close()
-		}
-		c.CancelTimer(c)
-		netfd.Close(c.Fd())
-		c.Destroy(c)
+	if c.f != nil {
+		c.f.Close()
+		c.f = nil
 	}
+	c.CancelTimer(c)
+	c.Destroy(c)
 }
 
 func main() {

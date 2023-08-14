@@ -4,6 +4,8 @@ import (
 	"errors"
 	"sync/atomic"
 	"syscall"
+
+	"github.com/shaovie/goev/netfd"
 )
 
 // IOHandle is the base class of io event handling objects
@@ -159,7 +161,11 @@ func (h *IOHandle) Write(bf []byte) (n int, err error) {
 // Destroy If you are using the Async write mechanism, it is essential to call the Destroy method
 // in OnClose to clean up any unsent bf data.
 func (h *IOHandle) Destroy(eh EvHandler) {
-	h.setFd(-1)
+	fd := h.Fd()
+	if fd > 0 {
+		netfd.Close(fd)
+		h.setFd(-1)
+	}
 
 	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
 		for {

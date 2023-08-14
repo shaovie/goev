@@ -79,10 +79,7 @@ func (h *Http) AsyncHandle() {
 	h.AsyncWrite(h, buf)
 }
 func (h *Http) OnClose() {
-	if h.Fd() != -1 {
-		netfd.Close(h.Fd())
-		h.Destroy(h)
-	}
+	h.Destroy(h)
 }
 
 func updateLiveSecond() {

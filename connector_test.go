@@ -2,11 +2,10 @@ package goev
 
 import (
 	"fmt"
+	"runtime"
 	"strconv"
 	"sync"
 	"testing"
-
-	"github.com/shaovie/goev/netfd"
 )
 
 type Scanner struct {
@@ -23,13 +22,12 @@ func (s *Scanner) OnConnectFail(err error) {
 	//fmt.Printf("port %d close %s\n", s.port, err.Error())
 }
 func (s *Scanner) OnClose() {
-	netfd.Close(s.Fd())
 	s.Destroy(s)
 }
 func TestConnector(t *testing.T) {
 	fmt.Println("hello boy")
 	r, err := NewReactor(
-		EvPollNum(10),
+		EvPollNum(runtime.NumCPU()*2),
 		TimerHeapInitSize(10000),
 	)
 	if err != nil {
