@@ -51,18 +51,19 @@ func (h *IOHandle) AsyncOrderedFlush(eh EvHandler) {
 // AsyncWrite asynchronous write
 func (h *IOHandle) AsyncWrite(eh EvHandler, buf []byte) {
 	fd := h.Fd()
-	if fd > 0 { // NOTE fd must > 0
-		abf := make([]byte, len(buf)) // TODO optimize
-		copy(abf, buf)
-		h._ep.push(asyncWriteItem{
-			fd: fd,
-			eh: eh,
-			abf: asyncWriteBuf{
-				len: len(buf),
-				buf: abf,
-			},
-		})
+	if fd < 1 { // NOTE fd must > 0
+		return
 	}
+	abf := make([]byte, len(buf)) // TODO optimize
+	n := copy(abf, buf)
+	h._ep.push(asyncWriteItem{
+		fd: fd,
+		eh: eh,
+		abf: asyncWriteBuf{
+			len: n,
+			buf: abf,
+		},
+	})
 }
 
 func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf asyncWriteBuf) {

@@ -79,7 +79,7 @@ func (aw *asyncWrite) OnRead() bool {
 		aw.mtx.Unlock()
 	}
 
-	for i := 0; i < 1024; i++ { // Don't process too many at once
+	for i := 0; i < 256; i++ { // Don't process too many at once
 		item, ok := aw.readq.PopFront()
 		if !ok {
 			break
