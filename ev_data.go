@@ -5,8 +5,8 @@ import (
 )
 
 type evData struct {
-	fd     int
 	events uint32
+	fd     int // 8 bits
 	eh     EvHandler
 }
 
