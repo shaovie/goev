@@ -176,8 +176,9 @@ Transfer/sec:      6.82MB
 
 ## Development Roadmap
 
-- [x] Async write (refer example/download.go)
+- [x] Async write (refer example/async_http.go)
 - [x] Websocket example
+- [ ] Service oriented model
 - [ ] Goev runtime GC zero pressure
 
 ## Contributing

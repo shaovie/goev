@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 	"sync/atomic"
+    "math/rand"
 	"time"
 
 	"github.com/shaovie/goev"
@@ -72,6 +73,10 @@ func (h *Http) OnWrite() bool {
 	return true
 }
 func (h *Http) AsyncHandle() {
+	v := rand.Int63() % 3
+    if v > 0 {
+        time.Sleep(time.Duration(v) * time.Millisecond) // Simulate time-consuming work
+    }
 	buf := make([]byte, 0, 256)
 	buf = append(buf, httpRespHeader...)
 	buf = append(buf, []byte(liveDate.Load().(string))...)
