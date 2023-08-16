@@ -9,7 +9,8 @@ import (
 )
 
 type evPoll struct {
-	efd int // epoll fd
+	efd             int // epoll fd
+	cachedTimestamp int64
 
 	//ioReadWriter IOReadWriter
 	evPollReadBuff  []byte
@@ -44,10 +45,10 @@ func (ep *evPoll) open(evFdMaxSize int, timer *timer4Heap,
 	return nil
 }
 func (ep *evPoll) updateCachedTime(t int64) {
-    ep.cachedTime = t
+	ep.cachedTimestamp = t
 }
 func (ep *evPoll) cachedTime() int64 {
-    return ep.cachedTime
+	return ep.cachedTimestamp
 }
 func (ep *evPoll) loadEvData(fd int) *evData {
 	return ep.evHandlerMap.load(fd)
