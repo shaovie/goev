@@ -109,6 +109,9 @@ func (h *IOHandle) WriteBuff() []byte {
 	panic("goev: IOHandle.WriteBuff fd not register to evpoll")
 }
 
+func (h *IOHandle) CachedTime() int64 {
+    return h._ep.cachedTime()
+}
 // Write synchronous write.
 // n = [n, len(bf]
 func (h *IOHandle) Write(bf []byte) (n int, err error) {

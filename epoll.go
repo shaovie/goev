@@ -43,6 +43,12 @@ func (ep *evPoll) open(evFdMaxSize int, timer *timer4Heap,
 	// $GOROOT/src/os/rlimit.go Go had raise the limit to 'Max Hard Limit'
 	return nil
 }
+func (ep *evPoll) updateCachedTime(t int64) {
+    ep.cachedTime = t
+}
+func (ep *evPoll) cachedTime() int64 {
+    return ep.cachedTime
+}
 func (ep *evPoll) loadEvData(fd int) *evData {
 	return ep.evHandlerMap.load(fd)
 }
