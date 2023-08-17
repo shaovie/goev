@@ -30,5 +30,5 @@ func TestBitmap(t *testing.T) {
 	for i := 0; i < 61; i++ {
 		a.Set(i)
 	}
-	fmt.Println("first unset=", a.firstUnSet())
+	fmt.Println("first unset=", a.FirstUnSet())
 }
