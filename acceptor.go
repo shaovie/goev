@@ -185,6 +185,7 @@ func (a *Acceptor) OnRead() bool {
 			break
 		}
 		h := a.newEvHanlderFunc()
+		h.setReactor(a.reactor)
 		h.setFd(conn)
 		if h.OnOpen() == false {
 			h.OnClose()

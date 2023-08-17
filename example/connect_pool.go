@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	buffPool    *sync.Pool
-	pushCounter atomic.Int32
+	buffPool        *sync.Pool
+	pushCounter     atomic.Int32
+	forNewFdReactor *goev.Reactor
 )
 
 type AsyncPushLog struct {
@@ -21,7 +22,7 @@ type AsyncPushLog struct {
 }
 
 func (s *AsyncPushLog) OnOpen() bool {
-	if err := s.GetReactor().AddEvHandler(s, s.Fd(), goev.EvIn); err != nil {
+	if err := forNewFdReactor.AddEvHandler(s, s.Fd(), goev.EvIn); err != nil {
 		fmt.Printf("error: fd %d %s\n", s.Fd(), err.Error())
 		return false
 	}
@@ -63,6 +64,7 @@ func main() {
 		goev.EvPollNum(5),
 		goev.TimerHeapInitSize(100),
 	)
+	forNewFdReactor = r
 	if err != nil {
 		panic(err.Error())
 	}
@@ -74,7 +76,7 @@ func main() {
 		wg.Done()
 	}()
 	// 2. connector
-	c, err := goev.NewConnector(r, goev.SockRcvBufSize(8*1024))
+	c, err := goev.NewConnector(forNewFdReactor, goev.SockRcvBufSize(8*1024))
 	if err != nil {
 		panic(err.Error())
 	}
@@ -90,7 +92,7 @@ func main() {
 	}
 
 	time.Sleep(time.Millisecond * 500)
-	fmt.Printf("conn pool idel: %d after 500msec\n", cp.IdleNum())
+	fmt.Printf("conn pool idle: %d after 500msec\n", cp.IdleNum())
 
 	//gp := NewGoPool(100, 100, 100)
 	for i := 0; i < 10000; {
