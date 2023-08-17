@@ -27,8 +27,8 @@ func TestBitmap(t *testing.T) {
 		}
 	}
 	a := NewBitMap(62)
-    for i := 0; i < 61; i++ {
-        a.Set(i)
-    }
-    fmt.Println("first unset=", a.firstUnSet())
+	for i := 0; i < 61; i++ {
+		a.Set(i)
+	}
+	fmt.Println("first unset=", a.firstUnSet())
 }

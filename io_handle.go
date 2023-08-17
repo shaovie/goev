@@ -110,8 +110,9 @@ func (h *IOHandle) WriteBuff() []byte {
 }
 
 func (h *IOHandle) CachedTime() int64 {
-    return h._ep.cachedTime()
+	return h._ep.cachedTime()
 }
+
 // Write synchronous write.
 // n = [n, len(bf]
 func (h *IOHandle) Write(bf []byte) (n int, err error) {

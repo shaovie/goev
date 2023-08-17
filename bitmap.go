@@ -6,7 +6,7 @@ type Bitmap struct {
 }
 
 func NewBitMap(size int) *Bitmap {
-    bcap := (size + 63) / 64 // 计算最大倍数
+	bcap := (size + 63) / 64 // 计算最大倍数
 	bm := &Bitmap{
 		bytes: make([]uint64, bcap),
 		size:  size,
@@ -14,7 +14,7 @@ func NewBitMap(size int) *Bitmap {
 	return bm
 }
 func (b *Bitmap) Size() int {
-    return b.size
+	return b.size
 }
 func (b *Bitmap) Set(pos int) bool {
 	if pos < b.size {
@@ -39,15 +39,15 @@ func (b *Bitmap) IsSet(pos int) bool {
 	return false
 }
 func (b *Bitmap) firstUnSet() int {
-    for i, val := range b.bytes {
-        if ^val == 0 {
-            continue
-        }
-        for j := 0; j < 64 && (i*64 + j) < b.size; j++ {
-            if val&(1<<j) == 0 {
-                return i*64 + j
-            }
-        }
-    }
-    return -1
+	for i, val := range b.bytes {
+		if ^val == 0 {
+			continue
+		}
+		for j := 0; j < 64 && (i*64+j) < b.size; j++ {
+			if val&(1<<j) == 0 {
+				return i*64 + j
+			}
+		}
+	}
+	return -1
 }

@@ -39,11 +39,11 @@ func NewReactor(opts ...Option) (*Reactor, error) {
 			return nil, err
 		}
 		r.evPolls[i].add(timer.timerfd(), EvIn, timer)
-        if evOptions.evPollCacheTimePeriod > 0 {
-            newCachedTime(&(r.evPolls[i]), evOptions.evPollCacheTimePeriod)
-        }
-    }
-    return r, nil
+		if evOptions.evPollCacheTimePeriod > 0 {
+			newCachedTime(&(r.evPolls[i]), evOptions.evPollCacheTimePeriod)
+		}
+	}
+	return r, nil
 }
 
 // AddEvHandler can register a file descriptor (fd) and its corresponding handler object into the Reactor.
