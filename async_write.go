@@ -87,6 +87,8 @@ func (aw *asyncWrite) OnRead() bool {
 		ed := aw.evPoll.loadEvData(item.fd)
 		if ed != nil && ed.eh == item.eh { // TODO Comparing interfaces, the performance is not very good
 			item.eh.asyncOrderedWrite(item.eh, item.abf)
+		} else {
+			//
 		}
 	}
 

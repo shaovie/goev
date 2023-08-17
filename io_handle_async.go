@@ -5,7 +5,7 @@ import (
 )
 
 type asyncWriteBuf struct {
-	// allowing you to know the actual processing progress.
+	// fromMemPool bool
 	writen int    // wrote len
 	len    int    // buf original len. readonly
 	buf    []byte // readonly

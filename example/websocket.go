@@ -1,5 +1,7 @@
 package main
 
+// bench1 ulimit -n 100000; ./wsbench iops -c 1000 -n 2000 -p 1000 -u 'ws://127.0.0.1:8080/connect'
+
 import (
 	"bytes"
 	"crypto/sha1"
