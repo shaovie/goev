@@ -40,7 +40,7 @@ func NewReactor(opts ...Option) (*Reactor, error) {
 		}
 		r.evPolls[i].add(timer.timerfd(), EvIn, timer)
 		if evOptions.evPollCacheTimePeriod > 0 {
-			newCachedTime(&(r.evPolls[i]), evOptions.evPollCacheTimePeriod)
+			newCacheTime(&(r.evPolls[i]), evOptions.evPollCacheTimePeriod)
 		}
 	}
 	return r, nil

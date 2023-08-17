@@ -4,21 +4,21 @@ import (
 	"time"
 )
 
-type cachedTime struct {
+type cacheTime struct {
 	IOHandle
 
 	ep *evPoll
 }
 
-func newCachedTime(ep *evPoll, period int) *cachedTime {
-	ct := &cachedTime{
+func newCacheTime(ep *evPoll, period int) *cacheTime {
+	ct := &cacheTime{
 		ep: ep,
 	}
 	ep.updateCachedTime(time.Now().UnixMilli())
 	ep.scheduleTimer(ct, int64(period), int64(period))
 	return ct
 }
-func (ct *cachedTime) OnTimeout(now int64) bool {
+func (ct *cacheTime) OnTimeout(now int64) bool {
 	ct.ep.updateCachedTime(now)
 	return true
 }
