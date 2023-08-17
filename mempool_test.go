@@ -17,8 +17,33 @@ func TestMempool(t *testing.T) {
 		mbL = append(mbL, mb)
 	}
 	fmt.Println(MemPoolStat())
-	for _, v := range mbL {
-		Free(v)
+	fmt.Println("--------------------------------------")
+	for i := range mbL {
+		Free(mbL[i])
 	}
 	fmt.Println(MemPoolStat())
+}
+func BenchmarkMempool(b *testing.B) {
+	mbL := make([]MBuff, 4096)
+	for i := 0; i < b.N; i++ {
+		for i := 0; i < 4096; i++ {
+			mb := Malloc(int(rand.Int63() % 4096))
+			mbL[i] = mb
+		}
+		for i := range mbL {
+			Free(mbL[i])
+		}
+	}
+}
+func BenchmarkMake(b *testing.B) {
+	mbL := make([][]byte, 4096)
+	for i := 0; i < b.N; i++ {
+		for i := 0; i < 4096; i++ {
+			mb := make([]byte, int(rand.Int63()%4096))
+			mbL[i] = mb
+		}
+		for i := range mbL {
+			mbL[i] = nil
+		}
+	}
 }
