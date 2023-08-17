@@ -9,25 +9,25 @@ import (
 	"syscall"
 )
 
-// MBuff save buf in mempool info
-type MBuff struct {
+// mmItem save alloc info
+type mmItem struct {
 	idx int
 	sp  *span
 	sg  *spanGroup
-	buf []byte
+	bp  []byte
 }
 
 var lockedMemPool = newMemPool(getMallocSizeInfo)
 var lockedMemPoolMtx sync.Mutex
 
-// Malloc alloc buf
+// Malloc alloc []byte
 func Malloc(s int) []byte {
 	lockedMemPoolMtx.Lock()
 	defer lockedMemPoolMtx.Unlock()
 	return lockedMemPool.Malloc(s)
 }
 
-// Free release buf
+// Free release []byte
 func Free(bf []byte) {
 	lockedMemPoolMtx.Lock()
 	defer lockedMemPoolMtx.Unlock()
@@ -48,45 +48,43 @@ func MemPoolGC() {
 	lockedMemPool.GC()
 }
 
-// init val
-func getMallocSizeInfo(s int) (idx, size, n int) {
-	//   s                      idx    size      n
+// This method can provide a size class along with the initial quantity 'n' for each size.
+//
+// Reimplement this method to enable customizing the size class.
+func getMallocSizeInfo(s int) (size, n int) {
+	//   s                        size      n
 	//
-	// { (0-256],               0      256      1024*2 },  // span size 256*1024*2         0.5M
-	// { (256-512],             1      512      1024*2 },  // span size 512*1024*2         1M
-	// { (512-1024*1],          2      1024*1   1024*2 },  // span size (1024*1)*(1024*2)  2M
+	// { (0-256],                 256           1024*2 },  // span size 256*(1024*2)       0.5M
+	// { (256-512],               512           1024*2 },  // span size 512*(1024*2)       1M
+	// { (512-1024*1],            1024*1        1024*2 },  // span size (1024*1)*(1024*2)  2M
 	//
-	// { (1024*1-1024*2],       3      1024*2   1024*1 },  // span size (1024*2)*(1024*1)  2M
-	// { (1024*2-1024*3],       4      1024*3   1024*1 },  // span size (1024*3)*(1024*1)  3M
+	// { (1024*1-1024*2],         1024*2        1024*1 },  // span size (1024*2)*(1024*1)  2M
+	// { (1024*2-1024*3],         1024*3        1024*1 },  // span size (1024*3)*(1024*1)  3M
 	// ...
-	// { (1024*15-1024*16],     17     1024*16  256    },  // span size (1024*16)*(256)    4M
+	// { (1024*15-1024*16],       1024*16       256    },  // span size (1024*16)*(256)    4M
 	// ...
-	// { (1024*63-1024*64],     65     1024*64  64     },  // span size (1024*64)*(64)     4M
-	// { (1024*64-1024*65],     66     1024*65  64     },  // span size (1024*65)*(64)     4.1M
+	// { (1024*63-1024*64],       1024*64       64     },  // span size (1024*64)*(64)     4M
+	// { (1024*64-1024*65],       1024*65       64     },  // span size (1024*65)*(64)     4.1M
 	// ...
-	// { (1024*256-1024*512],   513    1024*512 16     },  // span size (1024*512)*(16)    8M
+	// { (1024*256-1024*512],     1024*512      16     },  // span size (1024*512)*(16)    8M
 	// ...
-	// { (1024*1023-1024*1024], 1025   1024*1024 16    },  // span size (1024*1024)*(16)   16M
+	// { (1024*1023-1024*1024],   1024*1024     16     },  // span size (1024*1024)*(16)   16M
 
 	if s <= 1024 {
 		n = 2048
 		if s > 512 {
 			size = 1024
-			idx = 2
 		} else if s > 256 {
 			size = 512
-			idx = 1
 		} else {
-			idx = 0
 			size = 256
 		}
 	} else {
 		if s > 1024*1024*1 { // use make([]byte, n)
-			return 0, 0, 0
+			return 0, 0
 		}
 
 		size = (s + 1024 - 1) / 1024 * 1024
-		idx = size/1024 + 1
 		if size >= 1024*256 {
 			n = 16
 		} else if size >= 1024*64 {
@@ -108,47 +106,47 @@ func getMallocSizeInfo(s int) (idx, size, n int) {
 }
 
 type memPool struct {
-	getInitSize func(int) (idx, size, n int)
+	getInitSize func(int) (size, n int)
 	spanMap     map[int]*spanGroup
-	active      map[*byte]MBuff
+	active      map[*byte]mmItem
 }
 
-func newMemPool(f func(int) (idx, size, n int)) *memPool {
+func newMemPool(f func(int) (size, n int)) *memPool {
 	return &memPool{
 		getInitSize: f,
 		spanMap:     make(map[int]*spanGroup, 512+2),
-		active:      make(map[*byte]MBuff, 1024),
+		active:      make(map[*byte]mmItem, 1024),
 	}
 }
 func (mp *memPool) Malloc(s int) []byte {
-	idx, size, n := mp.getInitSize(s)
+	size, n := mp.getInitSize(s)
 	if n == 0 {
 		return make([]byte, s)
 	}
 
-	sg, ok := mp.spanMap[idx]
+	sg, ok := mp.spanMap[size]
 	if !ok {
 		sg = newSpanGroup(mp, size, n)
-		mp.spanMap[idx] = sg
+		mp.spanMap[size] = sg
 	}
-	mbuff := sg.alloc()
-	mp.active[&(mbuff.buf[0])] = mbuff
-	return mbuff.buf
+	mm := sg.alloc()
+	mp.active[&(mm.bp[0])] = mm
+	return mm.bp
 }
 func (mp *memPool) Free(bf []byte) {
 	if len(bf) == 0 {
 		panic("goev: memPool.Free bf is illegal")
 	}
 	p := &bf[0]
-	mbuff, ok := mp.active[p]
+	mm, ok := mp.active[p]
 	if ok {
-		if &(mbuff.buf[0]) != p {
+		if &(mm.bp[0]) != p {
 			panic("goev: memPool.Free bf is invalid")
 		}
-		if mbuff.sg.mp != mp {
+		if mm.sg.mp != mp {
 			panic("goev: memPool.Free mb not belong this mempool")
 		}
-		mbuff.sg.free(mbuff.idx, mbuff.sp)
+		mm.sg.free(mm.idx, mm.sp)
 		delete(mp.active, p)
 	}
 	// !ok maybe alloc by make([]byte, n)
@@ -202,7 +200,7 @@ type spanGroup struct {
 	size int // readonly
 	n    int // Dynamically increase n=n*2 based on the number of times spanGroup full.
 
-	fullTimes  int // Accumulated allocation times within the 'gc' cycle
+	fullTimes  int // Accumulated times
 	allocTimes int // Accumulated allocation times within the 'gc' cycle
 
 	idleL *list.List
@@ -227,7 +225,7 @@ func (sg *spanGroup) addSpan() *span {
 	sp.list = sg.idleL
 	return sp
 }
-func (sg *spanGroup) alloc() MBuff {
+func (sg *spanGroup) alloc() mmItem {
 	for {
 		if sg.idleL.Len() == 0 {
 			sg.n *= 2 // Dynamically increase
@@ -236,15 +234,15 @@ func (sg *spanGroup) alloc() MBuff {
 		}
 		for e := sg.idleL.Front(); e != nil; e = e.Next() {
 			sp := e.Value.(*span)
-			idx, mm := sp.alloc()
-			if mm == nil { // empty
+			idx, bp := sp.alloc()
+			if bp == nil { // empty
 				sg.idleL.Remove(e)
 				sg.fullL.PushBack(sp)
 				sp.list = sg.fullL
 				break
 			}
 			sg.allocTimes++ //
-			return MBuff{buf: mm, sg: sg, sp: sp, idx: idx}
+			return mmItem{bp: bp, sg: sg, sp: sp, idx: idx}
 		}
 	}
 }
