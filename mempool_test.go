@@ -7,28 +7,41 @@ import (
 )
 
 func TestMempool(t *testing.T) {
-	mbL := make([]MBuff, 0, 4096)
-	for i := 0; i < 4097; i++ {
-		mb := Malloc(int(rand.Int63() % 4096))
-		if mb.sg == nil {
-			fmt.Println("err: sg == nil")
-			return
-		}
-		mbL = append(mbL, mb)
+	mbL := make([][]byte, 0, 4096)
+	for i := 0; i < 4096; i++ {
+		bf := Malloc(int(rand.Int63()%4080) + 16)
+		mbL = append(mbL, bf)
 	}
 	fmt.Println(MemPoolStat())
-	fmt.Println("--------------------------------------")
+	fmt.Println("## to free")
 	for i := range mbL {
 		Free(mbL[i])
 	}
+	fmt.Println("## free end")
+	fmt.Println(MemPoolStat())
+	MemPoolGC()
+
+	mbL = mbL[:0]
+	for i := 0; i < 1024; i++ {
+		mb := Malloc(int(rand.Int63()%2032) + 16)
+		mbL = append(mbL, mb)
+	}
+	for i := range mbL {
+		Free(mbL[i])
+	}
+
+	MemPoolGC()
+	fmt.Println("## gc end")
 	fmt.Println(MemPoolStat())
 }
 func BenchmarkMempool(b *testing.B) {
-	mbL := make([]MBuff, 4096)
+	mbL := make([][]byte, 4096)
 	for i := 0; i < b.N; i++ {
 		for i := 0; i < 4096; i++ {
-			mb := Malloc(int(rand.Int63() % 4096))
+			mb := Malloc(int(rand.Int63()%4096) + 16)
+			//mb := Malloc(2048 + int(rand.Int63() % 256))
 			mbL[i] = mb
+			mb[len(mb)-1] = 'a'
 		}
 		for i := range mbL {
 			Free(mbL[i])
@@ -39,8 +52,15 @@ func BenchmarkMake(b *testing.B) {
 	mbL := make([][]byte, 4096)
 	for i := 0; i < b.N; i++ {
 		for i := 0; i < 4096; i++ {
-			mb := make([]byte, int(rand.Int63()%4096))
-			mbL[i] = mb
+			if true { // in heap
+				mb := make([]byte, int(rand.Int63()%4096)+16)
+				//mb := make([]byte, 2048 + int(rand.Int63()%256))
+				mbL[i] = mb
+				mb[len(mb)-1] = 'a'
+			} else { // in stack
+				mb := make([]byte, 2098)
+				mb[len(mb)-1] = 'a'
+			}
 		}
 		for i := range mbL {
 			mbL[i] = nil
