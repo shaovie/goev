@@ -14,7 +14,7 @@ type Scanner struct {
 	port int
 }
 
-func (s *Scanner) OnOpen(fd int) bool {
+func (s *Scanner) OnOpen() bool {
 	fmt.Printf("port %d open\n", s.port)
 	return false
 }

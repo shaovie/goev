@@ -38,12 +38,14 @@ func (cph *ConnectPoolItem) GetPool() *ConnectPool {
 	return cph.cp
 }
 
-// Closed when a conn is detected as closed, it needs to notify the ConnectPool to perform resource recycling.
+// Closed when a conn is detected as closed, it needs to notify the ConnectPool
+// to perform resource recycling.
 func (cph *ConnectPoolItem) Closed() {
 	cph.cp.closed()
 }
 
-// ConnectPool provides a reusable connection pool that can dynamically scale and manage network connections
+// ConnectPool provides a reusable connection pool that can dynamically scale
+// and manage network connections
 type ConnectPool struct {
 	minIdleNum     int
 	addNumOnceTime int
@@ -60,11 +62,7 @@ type ConnectPool struct {
 	newConnectPoolHandlerFunc func() ConnectPoolHandler
 
 	emptySig    chan struct{}
-	newConnChan chan newConnInPool
-}
-type newConnInPool struct {
-	fd int
-	ch ConnectPoolHandler
+	newConnChan chan ConnectPoolHandler
 }
 
 // NewConnectPool return an instance
@@ -91,7 +89,7 @@ func NewConnectPool(c *Connector, addr string, minIdleNum, addNumOnceTime, maxLi
 		conns:                     list.New(),
 		newConnectPoolHandlerFunc: newConnectPoolHandlerFunc,
 		ticker:                    time.NewTicker(time.Millisecond * time.Duration(keepNumTicker)),
-		newConnChan:               make(chan newConnInPool, runtime.NumCPU()*2),
+		newConnChan:               make(chan ConnectPoolHandler, runtime.NumCPU()*2),
 		emptySig:                  make(chan struct{}),
 	}
 
@@ -170,7 +168,8 @@ func (cp *ConnectPool) keepNum() {
 		return
 	}
 	for i := 0; i < toNewNum; i++ {
-		if err := cp.connector.Connect(cp.addr, &connectPoolConn{cp: cp}, cp.connectTimeout); err != nil {
+		if err := cp.connector.Connect(cp.addr,
+			&connectPoolConn{cp: cp}, cp.connectTimeout); err != nil {
 			cp.toNewNum.Add(-1)
 		}
 	}
@@ -178,13 +177,14 @@ func (cp *ConnectPool) keepNum() {
 func (cp *ConnectPool) handleNewConn() {
 	for {
 		select {
-		case conn := <-cp.newConnChan:
-			cp.onNewConn(conn.fd, conn.ch)
+		case ch := <-cp.newConnChan:
+			cp.onNewConn(ch)
 		}
 	}
 }
-func (cp *ConnectPool) onNewConn(fd int, ch ConnectPoolHandler) {
-	if ch.OnOpen(fd) == false {
+func (cp *ConnectPool) onNewConn(ch ConnectPoolHandler) {
+	if ch.OnOpen() == false {
+		ch.OnClose()
 		return
 	}
 	cp.liveNum.Add(1)
@@ -200,20 +200,23 @@ type connectPoolConn struct {
 	cp *ConnectPool
 }
 
-func (cpc *connectPoolConn) OnOpen(fd int) bool {
+func (cpc *connectPoolConn) OnOpen() bool {
 	cpc.cp.toNewNum.Add(-1)
 
-	netfd.SetKeepAlive(fd, 60, 40, 3)
+	netfd.SetKeepAlive(cpc.Fd(), 60, 40, 3)
 
 	connHandler := cpc.cp.newConnectPoolHandlerFunc()
 	connHandler.setReactor(cpc.GetReactor())
 	connHandler.setPool(cpc.cp)
-	cpc.cp.newConnChan <- newConnInPool{fd: fd, ch: connHandler}
+	connHandler.setFd(cpc.Fd())
+	cpc.cp.newConnChan <- connHandler
 
+	cpc.setFd(-1)
 	return false
 }
 func (cpc *connectPoolConn) OnConnectFail(err error) {
 	cpc.cp.toNewNum.Add(-1)
 }
 func (cpc *connectPoolConn) OnClose() {
+	cpc.Destroy(cpc)
 }

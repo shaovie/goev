@@ -16,10 +16,10 @@ type Conn struct {
 	goev.IOHandle
 }
 
-func (c *Conn) OnOpen(fd int) bool {
-	netfd.SetNoDelay(fd, 1)
+func (c *Conn) OnOpen() bool {
+	netfd.SetNoDelay(c.Fd(), 1)
 	// AddEvHandler 尽量放在最后, (OnOpen 和ORead可能不在一个线程)
-	if err := reactor.AddEvHandler(c, fd, goev.EvIn); err != nil {
+	if err := reactor.AddEvHandler(c, c.Fd(), goev.EvIn); err != nil {
 		return false
 	}
 	return true

@@ -53,9 +53,9 @@ type Http struct {
 	goev.IOHandle
 }
 
-func (h *Http) OnOpen(fd int) bool {
+func (h *Http) OnOpen() bool {
 	// AddEvHandler 尽量放在最后, (OnOpen 和ORead可能不在一个线程)
-	if err := forNewFdReactor.AddEvHandler(h, fd, goev.EvIn); err != nil {
+	if err := forNewFdReactor.AddEvHandler(h, h.Fd(), goev.EvIn); err != nil {
 		return false
 	}
 	return true

@@ -35,6 +35,7 @@ const (
 //
 // The same EvHandler is repeatedly registered with the Reactor
 type EvHandler interface {
+	setFd(fd int)
 	setParams(fd int, ep *evPoll)
 	getEvPoll() *evPoll
 
@@ -50,7 +51,7 @@ type EvHandler interface {
 	// OnOpen call by acceptor on `accept` a new fd or connector on `connect` successful
 	//
 	// Call OnClose() when return false
-	OnOpen(fd int) bool
+	OnOpen() bool
 
 	// OnRead evpoll catch readable i/o event
 	//

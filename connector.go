@@ -142,7 +142,8 @@ func (c *Connector) connect(fd int, sa syscall.Sockaddr, eh EvHandler, timeout i
 		return nil
 	} else if err == nil { // success
 		eh.setReactor(reactor)
-		if eh.OnOpen(fd) == false {
+		eh.setFd(fd)
+		if eh.OnOpen() == false {
 			eh.OnClose()
 		}
 		return nil
@@ -155,24 +156,28 @@ func (c *Connector) connect(fd int, sa syscall.Sockaddr, eh EvHandler, timeout i
 type inProgressConnect struct {
 	IOHandle
 
-	eh EvHandler
+	ioHandled bool
+	eh        EvHandler
 }
 
 // Called by reactor when asynchronous connections fail.
 func (p *inProgressConnect) OnRead() bool {
 	p.eh.OnConnectFail(ErrConnectFail)
+	p.ioHandled = true
 	return false // goto p.OnClose()
 }
 
 // Called by reactor when asynchronous connections succeed.
 func (p *inProgressConnect) OnWrite() bool {
 	// From here on, the `fd` resources will be managed by h.
-	p.GetReactor().RemoveEvHandler(p, p.Fd()) // p will auto release
 	fd := p.Fd()
+	p.GetReactor().RemoveEvHandler(p, fd) // p will auto release
 	p.setFd(-1)
+	p.ioHandled = true
 
 	p.eh.setReactor(p.GetReactor())
-	if p.eh.OnOpen(fd) == false {
+	p.eh.setFd(fd)
+	if p.eh.OnOpen() == false {
 		p.eh.OnClose()
 	}
 	return true
@@ -180,15 +185,17 @@ func (p *inProgressConnect) OnWrite() bool {
 
 // Called if a connection times out before completing.
 func (p *inProgressConnect) OnTimeout(now int64) bool {
+	if p.ioHandled {
+		return false
+	}
+
 	// i/o event not catched
+	p.GetReactor().RemoveEvHandler(p, p.Fd())
 	p.eh.OnConnectFail(ErrConnectTimeout)
 	p.OnClose()
 	return false
 }
 
 func (p *inProgressConnect) OnClose() {
-	if p.Fd() != -1 {
-		syscall.Close(p.Fd())
-		p.setFd(-1)
-	}
+	p.Destroy(p)
 }

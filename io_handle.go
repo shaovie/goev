@@ -187,7 +187,7 @@ func (h *IOHandle) Destroy(eh EvHandler) {
 //= EvHandler interface
 
 // OnOpen please make sure you want to reimplement it.
-func (*IOHandle) OnOpen(fd int) bool {
+func (*IOHandle) OnOpen() bool {
 	panic("goev: IOHandle OnOpen")
 }
 

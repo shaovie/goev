@@ -12,7 +12,7 @@ type fheapTimerOnce struct {
 	IOHandle
 }
 
-func (t *fheapTimerOnce) OnOpen(fd int) bool {
+func (t *fheapTimerOnce) OnOpen() bool {
 	t.ScheduleTimer(t, 1000, 0)
 	return true
 }
@@ -25,7 +25,7 @@ type fheapTimer struct {
 	IOHandle
 }
 
-func (t *fheapTimer) OnOpen(fd int) bool {
+func (t *fheapTimer) OnOpen() bool {
 	t.ScheduleTimer(t, 1000, 2020)
 	return true
 }
@@ -59,12 +59,12 @@ func TestTimer4Heap(t *testing.T) {
 	fd, _ := unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC)
 	ft := &fheapTimer{}
 	reactor.AddEvHandler(ft, fd, EvIn)
-	ft.OnOpen(fd)
+	ft.OnOpen()
 
 	fd, _ = unix.Eventfd(0, unix.EFD_NONBLOCK|unix.EFD_CLOEXEC)
 	ft2 := &fheapTimerOnce{}
 	reactor.AddEvHandler(ft2, fd, EvIn)
-	ft2.OnOpen(fd)
+	ft2.OnOpen()
 
 	go func() {
 		reactor.Run()

@@ -20,9 +20,9 @@ type AsyncPushLog struct {
 	goev.ConnectPoolItem
 }
 
-func (s *AsyncPushLog) OnOpen(fd int) bool {
-	if err := s.GetReactor().AddEvHandler(s, fd, goev.EvIn); err != nil {
-		fmt.Printf("error: fd %d %s\n", fd, err.Error())
+func (s *AsyncPushLog) OnOpen() bool {
+	if err := s.GetReactor().AddEvHandler(s, s.Fd(), goev.EvIn); err != nil {
+		fmt.Printf("error: fd %d %s\n", s.Fd(), err.Error())
 		return false
 	}
 	return true

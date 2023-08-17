@@ -185,7 +185,8 @@ func (a *Acceptor) OnRead() bool {
 			break
 		}
 		h := a.newEvHanlderFunc()
-		if h.OnOpen(conn) == false {
+		h.setFd(conn)
+		if h.OnOpen() == false {
 			h.OnClose()
 		}
 	}
