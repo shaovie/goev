@@ -13,15 +13,16 @@ import (
 // MemPool 核心:
 //         1. 根据sizeclass分配大块连续的mmap内存(span), 然后再切片使用
 //         2. 定时回收不常使用的span
-//         3. 运行时统计各size的分配情况, 然后可以定制各size的span大小
-//            定制就是替换getMallocSizeInfo()方法
+//         3. 运行时统计各size的分配情况, 然后可以定制各size的span大小,
+//            定制size就是通过替换getMallocSizeInfo()实现,
 //            这样就可以针对hot size进行优化处理
 
 // MemPool 优势:
-//         1. 分配速度快, 并且不随请求的内存大小波动(make 耗时会根据分配大小,线性增长)
+//         1. 分配速度快, 并且不随请求的内存大小波动(make([]byte, N)耗时会根据N大小,线性增长)
+//         2. 没有memclr处理, 对于分配大块[]byte更轻松
 
 // MemPool 缺陷:
-//         1. 分配到的[]byte, 不能使用cap(), 因为它是切片出来的
+//         1. 分配到的[]byte, 不能使用cap(), 因为它是切片出来的(也就不能使用append操作)
 
 // mmItem save alloc info
 type mmItem struct {
@@ -98,6 +99,8 @@ func getMallocSizeInfo(s int) (size, n int) {
 	// { (1024*256-1024*512],     1024*512      16     },  // span size (1024*512)*(16)    8M
 	// ...
 	// { (1024*1023-1024*1024],   1024*1024     16     },  // span size (1024*1024)*(16)   16M
+    
+    // 以上只是示意, 你也可以定义其他size(注意: 绝对不能重复)
 
 	if s <= 1024 {
 		n = 2048
