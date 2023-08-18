@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 )
 
 // mmItem save alloc info
@@ -19,6 +20,10 @@ type mmItem struct {
 
 var lockedMemPool = newMemPool(getMallocSizeInfo)
 var lockedMemPoolMtx sync.Mutex
+
+func init() {
+	go memPoolGCTiming(time.Second * 60 * 3)
+}
 
 // Malloc alloc []byte
 func Malloc(s int) []byte {
@@ -46,6 +51,17 @@ func MemPoolGC() {
 	lockedMemPoolMtx.Lock()
 	defer lockedMemPoolMtx.Unlock()
 	lockedMemPool.GC()
+}
+func memPoolGCTiming(period time.Duration) {
+	ticker := time.NewTicker(period)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			MemPoolGC()
+		}
+	}
 }
 
 // This method can provide a size class along with the initial quantity 'n' for each size.
