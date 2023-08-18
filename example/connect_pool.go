@@ -37,7 +37,7 @@ func (s *AsyncPushLog) OnRead() bool {
 	return true
 }
 func (s *AsyncPushLog) Push(log string) {
-	netfd.Write(s.Fd(), []byte(log))
+	s.Write([]byte(log))
 }
 func (s *AsyncPushLog) OnClose() {
 	fmt.Printf("closed\n")
