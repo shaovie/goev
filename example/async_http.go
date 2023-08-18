@@ -19,7 +19,7 @@ var (
 	ticker                *time.Ticker
 	liveDate              atomic.Value
 	forNewFdReactor       *goev.Reactor
-    gp                    *gopool.GoPool
+	gp                    *gopool.GoPool
 )
 
 // Launch args
@@ -66,9 +66,9 @@ func (h *Http) OnRead() bool {
 	if n == 0 { // Abnormal connection
 		return false
 	}
-    gp.Go(func() {
-        h.AsyncHandle()
-    }
+	gp.Go(func() {
+		h.AsyncHandle()
+	})
 	return true
 }
 func (h *Http) OnWrite() bool {
@@ -104,7 +104,7 @@ func main() {
 	fmt.Printf("hello boy! GOMAXPROCS=%d evpoll num=%d\n", procNum, evPollNum)
 	runtime.GOMAXPROCS(procNum)
 
-	gp := gopool.NewGoPool(
+	gp = gopool.NewGoPool(
 		gopool.MinWorkers(128),
 		gopool.MaxWorkers(10016),
 		gopool.QueueCap(2048),
