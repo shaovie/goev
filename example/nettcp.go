@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"runtime"
@@ -37,6 +38,13 @@ func oneConn(conn net.Conn) {
 			break
 		}
 
+		if true {
+			v := rand.Int63() % 3
+			if v > 0 {
+				time.Sleep(time.Duration(v) * time.Millisecond) // Simulate time-consuming work
+			}
+		}
+
 		bf := buf[:0]
 		bf = append(bf, httpRespHeader...)
 		bf = append(bf, []byte(liveDate.Load().(string))...)
@@ -46,6 +54,7 @@ func oneConn(conn net.Conn) {
 }
 func main() {
 	fmt.Println("hello boy")
+	rand.Int63()
 	runtime.GOMAXPROCS(runtime.NumCPU() * 2)
 	liveDate.Store(time.Now().Format("Mon, 02 Jan 2006 15:04:05 GMT"))
 	ticker = time.NewTicker(time.Millisecond * 1000)
