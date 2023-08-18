@@ -169,6 +169,7 @@ Transfer/sec:      6.82MB
 > Note: This is the most basic and simplest test, for reference only
 
 > Test environment Aliyun ECS, 32 vcore, 64GB RAM
+
 ![](images/bench-32v-64g.png)
 
 ## Why high-performance
