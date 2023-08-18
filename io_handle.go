@@ -123,7 +123,7 @@ func (h *IOHandle) Write(bf []byte) (n int, err error) {
 		return 0, syscall.EBADF
 	}
 	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
-		abf := make([]byte, len(bf)) // TODO optimize
+		abf := ioAllocBuff(len(bf))
 		n = copy(abf, bf)
 		h._asyncWriteBufQ.PushBack(asyncWriteBuf{
 			len: n,
@@ -143,7 +143,7 @@ func (h *IOHandle) Write(bf []byte) (n int, err error) {
 		break
 	}
 	if n < len(bf) {
-		abf := make([]byte, len(bf)-n) // TODO optimize
+		abf := ioAllocBuff(len(bf) - n)
 		n = copy(abf, bf[n:])
 		if h._asyncWriteBufQ == nil {
 			h._asyncWriteBufQ = NewRingBuffer[asyncWriteBuf](2)
@@ -175,10 +175,11 @@ func (h *IOHandle) Destroy(eh EvHandler) {
 
 	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
 		for {
-			_, ok := h._asyncWriteBufQ.PopFront()
+			abf, ok := h._asyncWriteBufQ.PopFront()
 			if !ok {
 				break
 			}
+			ioFreeBuff(abf.buf)
 		}
 	}
 }

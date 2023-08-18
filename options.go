@@ -1,5 +1,21 @@
 package goev
 
+import (
+	"sync"
+)
+
+// global option
+var (
+	ioBuffUseMemPool        bool = true
+	setIOBuffUseMemPoolOnce sync.Once
+)
+
+func SetIOBuffUseMemPool(v bool) {
+	setIOBuffUseMemPoolOnce.Do(func() {
+		ioBuffUseMemPool = v
+	})
+}
+
 // Options provides all optional parameters within the framework
 type Options struct {
 	noCopy

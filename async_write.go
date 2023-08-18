@@ -88,7 +88,7 @@ func (aw *asyncWrite) OnRead() bool {
 		if ed != nil && ed.eh == item.eh { // TODO Comparing interfaces, the performance is not very good
 			item.eh.asyncOrderedWrite(item.eh, item.abf)
 		} else {
-			//
+			ioFreeBuff(item.abf.buf)
 		}
 	}
 

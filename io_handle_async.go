@@ -4,8 +4,19 @@ import (
 	"syscall"
 )
 
+func ioAllocBuff(s int) []byte {
+	if ioBuffUseMemPool {
+		return Malloc(s)
+	}
+	return make([]byte, s)
+}
+func ioFreeBuff(bf []byte) {
+	if ioBuffUseMemPool {
+		Free(bf)
+	}
+}
+
 type asyncWriteBuf struct {
-	// fromMemPool bool
 	writen int    // wrote len
 	len    int    // buf original len. readonly
 	buf    []byte // readonly
@@ -35,6 +46,7 @@ func (h *IOHandle) AsyncOrderedFlush(eh EvHandler) {
 		if n > 0 {
 			h._asyncWriteBufSize -= n
 			if n == (abf.len - abf.writen) { // send completely
+				ioFreeBuff(abf.buf)
 				continue
 			}
 			abf.writen += n // Partially write, shift n
@@ -54,7 +66,7 @@ func (h *IOHandle) AsyncWrite(eh EvHandler, buf []byte) {
 	if fd < 1 { // NOTE fd must > 0
 		return
 	}
-	abf := make([]byte, len(buf)) // TODO optimize
+	abf := ioAllocBuff(len(buf))
 	n := copy(abf, buf)
 	h._ep.push(asyncWriteItem{
 		fd: fd,
@@ -69,6 +81,7 @@ func (h *IOHandle) AsyncWrite(eh EvHandler, buf []byte) {
 func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf asyncWriteBuf) {
 	fd := h.Fd()
 	if fd < 1 { // closed or except
+		ioFreeBuff(abf.buf)
 		return
 	}
 	h._asyncWriteBufSize += abf.len
@@ -81,6 +94,7 @@ func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf asyncWriteBuf) {
 	if n > 0 {
 		h._asyncWriteBufSize -= n
 		if n == (abf.len - abf.writen) {
+			ioFreeBuff(abf.buf)
 			return
 		}
 		abf.writen += n // Partially write, shift n
@@ -88,7 +102,7 @@ func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf asyncWriteBuf) {
 
 	// Error or Partially
 	if h._asyncWriteBufQ == nil {
-		h._asyncWriteBufQ = NewRingBuffer[asyncWriteBuf](2)
+		h._asyncWriteBufQ = NewRingBuffer[asyncWriteBuf](4)
 	}
 	h._asyncWriteBufQ.PushBack(abf)
 
