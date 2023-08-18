@@ -85,12 +85,8 @@ func updateLiveSecond() {
 }
 
 func main() {
-	if runtime.NumCPU() > 33 {
-		evPollNum = runtime.NumCPU()/2 + 4
-	} else if runtime.NumCPU() > 15 {
-		evPollNum = runtime.NumCPU()/2 + 2
-	} else if runtime.NumCPU() > 3 {
-		evPollNum = runtime.NumCPU() / 2
+	if runtime.NumCPU() > 3 {
+		evPollNum = runtime.NumCPU() * 3 / 2
 	}
 	parseFlag()
 	fmt.Printf("hello boy! GOMAXPROCS=%d evpoll num=%d\n", procNum, evPollNum)
