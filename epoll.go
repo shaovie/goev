@@ -146,7 +146,7 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 
 	var nfds, i, msec int
 	var err error
-	events := make([]syscall.EpollEvent, 256) // does not escape
+	events := make([]syscall.EpollEvent, 128) // does not escape (该值不是越大越好)
 	msec = -1
 	for {
 		nfds, err = syscall.EpollWait(ep.efd, events, msec)
