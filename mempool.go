@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// Refer to https://zhuanlan.zhihu.com/p/650975993
 // MemPool 核心:
 //         1. 根据sizeclass分配大块连续的mmap内存(span), 然后再切片使用
 //         2. 定时回收不常使用的span
