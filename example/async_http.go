@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/shaovie/goev"
-	"github.com/shaovie/goev/netfd"
 )
 
 var (
