@@ -168,6 +168,9 @@ Transfer/sec:      6.82MB
 ```
 > Note: This is the most basic and simplest test, for reference only
 
+> Test environment Aliyun ECS, 32 vcore, 64GB RAM
+![](images/bench-32v-64g.png)
+
 ## Why high-performance
 
 * Connection bind threads/coroutines, no need for mutex locks within the 'polling stack' loop, provide global shared memory within the 'polling stack' for easy data reading, saving memory, and avoiding frequent memory allocation (also unnecessary for mutex locks)
