@@ -168,7 +168,7 @@ Transfer/sec:      6.82MB
 ```
 > Note: This is the most basic and simplest test, for reference only
 
-> Test environment Aliyun ECS, 32 vcore, 64GB RAM
+> Test environment Aliyun ECS, 32 vcore, 64GB RAM  ./techempower -c 48 -p 64
 
 ![](images/bench-32v-64g.png)
 
