@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"time"
 	"runtime"
 	"strconv"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/shaovie/goev"
@@ -40,7 +40,7 @@ func (c *Conn) OnOpen() bool {
 		return false
 	}
 
-    // Must after eactor.AddEvHandler
+	// Must after eactor.AddEvHandler
 	confSpeed, ok := c.PCachedGet(ConfigSpeed)
 	if ok {
 		c.confSpeed = confSpeed.(int64)
@@ -137,13 +137,14 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-    go func() {
-        time.Sleep(time.Second * 5)
-        reactor.PollSyncOpt(goev.PollSyncCache, goev.PollSyncCacheOpt{
-            ID:    ConfigSpeed,
-            Value: int64(5000),
-        })
-    }()
+	go func() {
+		time.Sleep(time.Second * 10)
+		fmt.Println("to update conf speed")
+		reactor.PollSyncOpt(goev.PollSyncCache, goev.PollSyncCacheOpt{
+			ID:    ConfigSpeed,
+			Value: int64(5000),
+		})
+	}()
 
 	if err = reactor.Run(); err != nil {
 		panic(err.Error())
