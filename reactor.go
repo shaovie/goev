@@ -33,6 +33,7 @@ func NewReactor(opts ...Option) (*Reactor, error) {
 		evPolls:            make([]evPoll, evOptions.evPollNum),
 	}
 	for i := 0; i < r.evPollNum; i++ {
+		r.evPolls[i].id = i
 		timer := newTimer4Heap(evOptions.timerHeapInitSize)
 		if err := r.evPolls[i].open(evOptions.evFdMaxSize, timer,
 			evOptions.evPollReadBuffSize, evOptions.evPollWriteBuffSize); err != nil {
@@ -88,6 +89,20 @@ func (r *Reactor) RemoveEvent(fd int, events uint32) error {
 	return r.evPolls[i].remove(fd, events)
 }
 
+// InitPollSyncOpt called before Reactor.Run
+func (r *Reactor) InitPollSyncOpt(typ int, val any) {
+	for i := 0; i < r.evPollNum; i++ {
+		r.evPolls[i].pollSyncOpt(typ, val)
+	}
+}
+
+// PollSyncOpt xx
+func (r *Reactor) PollSyncOpt(typ int, val any) {
+	for i := 0; i < r.evPollNum; i++ {
+		r.evPolls[i].pollSyncOpt(typ, val)
+	}
+}
+
 // Run starts the multi-event evpolling to run.
 func (r *Reactor) Run() error {
 	var wg sync.WaitGroup
@@ -104,7 +119,7 @@ func (r *Reactor) Run() error {
 			}
 			err := r.evPolls[j].run(&wg)
 			errSMtx.Lock()
-			errS = append(errS, fmt.Sprintf("epoll#%d err: %s", j, err.Error()))
+			errS = append(errS, fmt.Sprintf("evPoll#%d err: %s", j, err.Error()))
 			errSMtx.Unlock()
 		}(i)
 	}

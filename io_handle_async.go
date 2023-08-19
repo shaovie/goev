@@ -68,8 +68,11 @@ func (h *IOHandle) AsyncWrite(eh EvHandler, buf []byte) {
 	if fd < 1 { // NOTE fd must > 0
 		return
 	}
+	if fd != eh.Fd() { // Ensure that it is the same object
+		panic("goev: AsyncWrite EvHandler is invalid")
+	}
 	abf := ioAllocBuff(len(buf))
-	n := copy(abf, buf)
+	n := copy(abf, buf) // if n != len(buf) panic ?
 	h._ep.push(asyncWriteItem{
 		fd: fd,
 		eh: eh,

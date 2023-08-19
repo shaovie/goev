@@ -9,8 +9,9 @@ import (
 )
 
 type evPoll struct {
-	efd             int // epoll fd
-	cachedTimestamp int64
+	id              int   //
+	efd             int   // epoll fd
+	cachedTimestamp int64 // milliseconds
 
 	//ioReadWriter IOReadWriter
 	evPollReadBuff  []byte
@@ -19,8 +20,9 @@ type evPoll struct {
 	evHandlerMap *evDataMap // Refer to https://zhuanlan.zhihu.com/p/640712548
 	timer        *timer4Heap
 
-	// async write
-	asyncWrite *asyncWrite
+	asyncWrite       *asyncWrite
+	pollSyncOpterate *pollSyncOpt
+	pCache           map[int]any
 }
 
 func (ep *evPoll) open(evFdMaxSize int, timer *timer4Heap,
@@ -33,9 +35,12 @@ func (ep *evPoll) open(evFdMaxSize int, timer *timer4Heap,
 	ep.timer = timer
 	ep.evPollReadBuff = make([]byte, evPollReadBuffSize)
 	ep.evPollWriteBuff = make([]byte, evPollWriteBuffSize)
+	ep.pCache = make(map[int]any, 16)
 	ep.evHandlerMap = newEvDataMap(evFdMaxSize)
-	ep.asyncWrite, err = newAsyncWrite(ep)
-	if err != nil {
+	if ep.asyncWrite, err = newAsyncWrite(ep); err != nil {
+		return err
+	}
+	if ep.pollSyncOpterate, err = newPollSyncOpt(ep); err != nil {
 		return err
 	}
 
@@ -43,15 +48,6 @@ func (ep *evPoll) open(evFdMaxSize int, timer *timer4Heap,
 	// show using `ulimit -Hn`
 	// $GOROOT/src/os/rlimit.go Go had raise the limit to 'Max Hard Limit'
 	return nil
-}
-func (ep *evPoll) updateCachedTime(t int64) {
-	ep.cachedTimestamp = t
-}
-func (ep *evPoll) cachedTime() int64 {
-	return ep.cachedTimestamp
-}
-func (ep *evPoll) loadEvData(fd int) *evData {
-	return ep.evHandlerMap.load(fd)
 }
 
 // first register
@@ -118,36 +114,6 @@ func (ep *evPoll) append(fd int, events uint32) error {
 	ed.events |= events
 	return nil
 }
-func (ep *evPoll) scheduleTimer(eh EvHandler, delay, interval int64) (err error) {
-	err = ep.timer.schedule(eh, delay, interval)
-	return
-}
-func (ep *evPoll) cancelTimer(eh EvHandler) {
-	ep.timer.cancel(eh)
-}
-
-// io handle
-func (ep *evPoll) writeBuff() []byte {
-	return ep.evPollWriteBuff
-}
-func (ep *evPoll) read(fd int) (bf []byte, n int, err error) {
-	for {
-		n, err = syscall.Read(fd, ep.evPollReadBuff)
-		if n > 0 {
-			bf = ep.evPollReadBuff[:n]
-		} else if n < 0 && err == syscall.EINTR {
-			continue
-		}
-		return
-	}
-}
-
-func (ep *evPoll) push(awi asyncWriteItem) {
-	ep.asyncWrite.push(awi)
-}
-
-// end of `io handle'
-
 func (ep *evPoll) run(wg *sync.WaitGroup) error {
 	if wg != nil {
 		defer wg.Done()
@@ -194,3 +160,56 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 		}
 	}
 }
+
+func (ep *evPoll) scheduleTimer(eh EvHandler, delay, interval int64) (err error) {
+	err = ep.timer.schedule(eh, delay, interval)
+	return
+}
+func (ep *evPoll) cancelTimer(eh EvHandler) {
+	ep.timer.cancel(eh)
+}
+func (ep *evPoll) updateCachedTime(t int64) {
+	ep.cachedTimestamp = t
+}
+func (ep *evPoll) cachedTime() int64 {
+	return ep.cachedTimestamp
+}
+
+// poll sync opt
+func (ep *evPoll) initPollSyncOpt(typ int, val any) {
+	ep.pollSyncOpterate.init(typ, val)
+}
+func (ep *evPoll) pollSyncOpt(typ int, val any) {
+	ep.pollSyncOpterate.push(typ, val)
+}
+func (ep *evPoll) pCacheSet(id int, val any) {
+	ep.pCache[id] = val
+}
+func (ep *evPoll) pCacheGet(id int) (any, bool) {
+	if v, ok := ep.pCache[id]; ok {
+		return v, true
+	}
+	return nil, false
+}
+
+// io handle
+func (ep *evPoll) writeBuff() []byte {
+	return ep.evPollWriteBuff
+}
+func (ep *evPoll) read(fd int) (bf []byte, n int, err error) {
+	for {
+		n, err = syscall.Read(fd, ep.evPollReadBuff)
+		if n > 0 {
+			bf = ep.evPollReadBuff[:n]
+		} else if n < 0 && err == syscall.EINTR {
+			continue
+		}
+		return
+	}
+}
+
+func (ep *evPoll) push(awi asyncWriteItem) {
+	ep.asyncWrite.push(awi)
+}
+
+// end of `io handle'

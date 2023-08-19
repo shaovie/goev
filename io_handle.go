@@ -115,6 +115,11 @@ func (h *IOHandle) CachedTime() int64 {
 	return h._ep.cachedTime()
 }
 
+// PCachedGet returns cached data store in evPoll, it's lock free
+func (h *IOHandle) PCachedGet(id int) (any, bool) {
+	return h._ep.pCacheGet(id)
+}
+
 // Write synchronous write.
 // n = [n, len(bf]
 func (h *IOHandle) Write(bf []byte) (n int, err error) {

@@ -84,12 +84,7 @@ func (aw *asyncWrite) OnRead() bool {
 		if !ok {
 			break
 		}
-		ed := aw.evPoll.loadEvData(item.fd)
-		if ed != nil && ed.eh == item.eh { // TODO Comparing interfaces, the performance is not very good
-			item.eh.asyncOrderedWrite(item.eh, item.abf)
-		} else {
-			ioFreeBuff(item.abf.buf)
-		}
+		item.eh.asyncOrderedWrite(item.eh, item.abf)
 	}
 
 	if !aw.readq.IsEmpty() { // Ignore readable eventfd, continue
