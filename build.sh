@@ -10,3 +10,5 @@ GOOS=linux GOARCH=amd64 go build -o /dev/null example/websocket.go
 GOOS=linux GOARCH=amd64 go build -o /dev/null example/connect_pool.go
 GOOS=linux GOARCH=amd64 go build -o /dev/null example/async_http.go
 GOOS=linux GOARCH=amd64 go test -o /dev/null -c .
+GOOS=linux GOARCH=amd64 go vet .
+GOOS=linux GOARCH=amd64 golint .

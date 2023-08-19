@@ -10,6 +10,7 @@ var (
 	setIOBuffUseMemPoolOnce sync.Once
 )
 
+// SetIOBuffUseMemPool switch
 func SetIOBuffUseMemPool(v bool) {
 	setIOBuffUseMemPoolOnce.Do(func() {
 		ioBuffUseMemPool = v
@@ -18,8 +19,6 @@ func SetIOBuffUseMemPool(v bool) {
 
 // Options provides all optional parameters within the framework
 type Options struct {
-	noCopy
-
 	// acceptor options
 	reuseAddr     bool // SO_REUSEADDR
 	reusePort     bool // SO_REUSEPORT

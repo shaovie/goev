@@ -333,7 +333,7 @@ func (s *span) alloc() (int, []byte) {
 	idleIdx := s.bitmap.FirstUnSet()
 	if idleIdx < 0 { // full
 		panic(fmt.Errorf("goev: span:%d idle idx < 0", s.sliceSize)) // TODO for debug
-		return 0, nil
+		//return 0, nil
 	}
 	s.bitmap.Set(idleIdx)
 	s.freeN--
