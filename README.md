@@ -17,6 +17,7 @@ Goev provides a high-performance, lightweight, non-blocking, I/O event-driven ne
 * Controllable number of underlying threads. The per-connection per-goroutine approach usually leads to a surge in the number of threads, but using pollers helps maintain a consistent thread count, keeping it at the initial level
 * Garbage collection (GC)-friendly, minimizing additional heap memory usage during runtime.
 * Customizable mempool for faster memory allocation compared to make and more precise memory management
+* Support interaction between the application layer and the poller, e.g. creating a cache within the poller coroutine, enabling lock-free usage. (like runtime.mcache)
 * Few APIs and low learning costs
 
 ## Installation
@@ -177,7 +178,8 @@ Transfer/sec:      6.82MB
 - [x] Async write (refer example/async_http.go)
 - [x] Websocket example
 - [x] Goev runtime GC zero pressure
-- [ ] Poller cache(like thread cache)
+- [x] Poller cache(like thread cache)
+- [x] Poller sync. Allow the application layer to interact with the poller (limited to the operations supported by the framework) (refer example/download.go)
 - [ ] Service oriented model
 
 ## Contributing
