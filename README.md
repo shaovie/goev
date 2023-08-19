@@ -7,14 +7,16 @@ Goev provides a high-performance, lightweight, non-blocking, I/O event-driven ne
 ## Features
 
 * I/O event-driven architecture
-* Lightweight and easy-to-use
+* Lightweight and minimalist implementation of the Reactor pattern, allowing flexible combinations of multiple reactors
+* Object-oriented implementation for easier encapsulation of business logic.
 * Supporting asynchronous sending allows higher-level applications to perform synchronous I/O operations while asynchronously handling business processing
-* Support multi-threaded polling
-* Perfect support for REUSEPORT multi-threading mode
-* Lock-free operations in a polling stack
-* Built-in quad-heap timer, suitable for performance-demanding scenarios with a large number of timers
-* Provide multiple optimization options
-* Build-in connection pool
+* Lock-free operations in a polling stack, enabling zero-copy data transfer for synchronous I/O.
+* Perfect support for REUSEPORT multi-poller mode
+* Built-in four-heap timer implementation, enabling lock-free/synchronous handling of I/O and timer events.
+* Fully native implementation of acceptor/connector, providing maximum customizability.
+* Controllable number of underlying threads. The per-connection per-goroutine approach usually leads to a surge in the number of threads, but using pollers helps maintain a consistent thread count, keeping it at the initial level
+* Garbage collection (GC)-friendly, minimizing additional heap memory usage during runtime.
+* Customizable mempool for faster memory allocation compared to make and more precise memory management
 * Few APIs and low learning costs
 
 ## Installation
@@ -36,62 +38,58 @@ import (
     "github.com/shaovie/goev"
 )
 
-var forNewFdReactor *goev.Reactor
+var connReactor *goev.Reactor
 
-type Http struct {
+type Conn struct {
 	goev.Event
 }
 
-func (h *Http) OnOpen(fd int) bool {
-	if err := forNewFdReactor.AddEvHandler(h, fd, goev.EvIn); err != nil {
+func (c *Conn) OnOpen() bool {
+	if err := connReactor.AddEvHandler(c, c.Fd(), goev.EvIn); err != nil {
 		return false
 	}
 	return true
 }
-func (h *Http) OnRead() bool {
-	_, n, _ := h.Read()
+func (c *Conn) OnRead() bool {
+	buf, n, _ := h.Read()
 	if n == 0 { // Abnormal connection
 		return false
 	}
+    // parse msg
     return true
 }
-func (h *Http) OnClose() {
-    if h.Fd() != -1 {
-        netfd.Close(h.Fd())
-        h.Destroy(h)
-    }
+func (c *Conn) OnClose() {
+    h.Destroy(h) // release resource
 }
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU()*2 - 1)
-	forAcceptReactor, err := goev.NewReactor(
+	listenReactor, err := goev.NewReactor(
 		goev.EvPollNum(1),
 	)
 	if err != nil {
 		panic(err.Error())
 	}
-	forNewFdReactor, err := goev.NewReactor(
-		goev.EvPollNum(runtime.NumCPU()*2-1),
+	connReactor, err := goev.NewReactor(
+		goev.EvPollNum(runtime.NumCPU()/2),
 	)
 	if err != nil {
 		panic(err.Error())
 	}
-	_, err = goev.NewAcceptor(forAcceptReactor, func() goev.EvHandler { return new(Http) },
+	_, err = goev.NewAcceptor(listenReactor, func() goev.EvHandler { return new(Conn) },
 		":8080",
-		goev.ListenBacklog(256),
-		goev.SockRcvBufSize(16*1024),
 	)
 	if err != nil {
 		panic(err.Error())
 	}
 
 	go func() {
-		if err = forAcceptReactor.Run(); err != nil {
+		if err = listenReactor.Run(); err != nil {
 			panic(err.Error())
 		}
 	}()
     
-	if err = forNewFdReactor.Run(); err != nil {
+	if err = connReactor.Run(); err != nil {
 		panic(err.Error())
 	}
 }
@@ -106,26 +104,24 @@ package main
 ...
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU()*2 - 1)
-	evPollNum := runtime.NumCPU()*2-1
-	forNewFdReactor, err := goev.NewReactor(
+	runtime.GOMAXPROCS(runtime.NumCPU()*2)
+	evPollNum := runtime.NumCPU()/2
+	connReactor, err := goev.NewReactor(
 		goev.EvPollNum(evPollNum),
 	)
 	if err != nil {
 		panic(err.Error())
 	}
     for i := 0; i < evPollNum; i++ {
-        _, err = goev.NewAcceptor(forNewFdReactor, func() goev.EvHandler { return new(Http) },
+        _, err = goev.NewAcceptor(connReactor, func() goev.EvHandler { return new(Conn) },
             ":8080",
-            goev.ListenBacklog(256),
-            goev.SockRcvBufSize(16*1024),
             goev.ReusePort(true),
         )
         if err != nil {
             panic(err.Error())
         }
     }
-	if err = forNewFdReactor.Run(); err != nil {
+	if err = connReactor.Run(); err != nil {
 		panic(err.Error())
 	}
 }

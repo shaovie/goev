@@ -113,10 +113,7 @@ func (h *Http) OnRead() bool {
 }
 func (h *Http) OnClose() {
     // 释放资源, Http对象也会被gc回收的(前提是开发都没有单独将Http对象另外保存起来)
-    if h.Fd() != -1 {
-        netfd.Close(h.Fd())
-        h.Destroy(h) // 必须的, 框架内部申请的资源也需要销毁
-    }
+    h.Destroy(h) // 必须的, 框架内部申请的资源也需要销毁
 }
 ```
 
@@ -159,10 +156,10 @@ func (h *Http) OnTimeout(now int64) bool {
 func (h *Http) OnClose() {
     // 释放资源, Http对象也会被gc回收的(前提是开发都没有单独将Http对象另外保存起来)
     if h.Fd() != -1 {
-        netfd.Close(h.Fd())
         h.closed = true
-        h.CancelTimer(h)
     }
+    h.CancelTimer(h)
+    h.Destroy(h) // 必须的, 框架内部申请的资源也需要销毁
 }
 ```
 
