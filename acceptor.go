@@ -179,7 +179,7 @@ func (a *Acceptor) OnRead() bool {
 			} else if err == syscall.EMFILE {
 				// The per-process limit on the number of open file descriptors has been reached
 				if a.ScheduleTimer(a, 100 /*msec*/, 0) == nil {
-					a.reactor.RemoveEvHandler(a, a.fd)
+					a.reactor.RemoveEvent(a.fd, EvAll)
 				}
 			}
 			break

@@ -61,15 +61,31 @@ func (r *Reactor) AddEvHandler(eh EvHandler, fd int, events uint32) error {
 	return r.evPolls[i].add(fd, events, eh)
 }
 
-// RemoveEvHandler removes the handler object from the Reactor.
-func (r *Reactor) RemoveEvHandler(eh EvHandler, fd int) error {
-	if eh == nil || fd < 0 {
-		return errors.New("invalid EvHandler or fd")
+// AppendEvent appending events to EvHandler that has already been added to the poller
+// via AddEvHandler (EvHandler value does not need to be provided here)
+func (r *Reactor) AppendEvent(fd int, events uint32) error {
+	if fd < 1 || events == 0 { // NOTE fd must > 0
+		return errors.New("AppendEvent: invalid params")
 	}
-	if ep := eh.getEvPoll(); ep != nil {
-		return ep.remove(fd)
+	i := 0
+	if r.evPollNum > 1 {
+		i = fd % r.evPollNum
 	}
-	return errors.New("ev handler not add")
+	return r.evPolls[i].append(fd, events)
+}
+
+// RemoveEvent removes the events registered for fd.
+//
+// By using EvAll, all associated events can be removed, and the EvHandler will be unbound from the evPoll
+func (r *Reactor) RemoveEvent(fd int, events uint32) error {
+	if fd < 1 || events == 0 { // NOTE fd must > 0
+		return errors.New("RemoveEvent: invalid params")
+	}
+	i := 0
+	if r.evPollNum > 1 {
+		i = fd % r.evPollNum
+	}
+	return r.evPolls[i].remove(fd, events)
 }
 
 // Run starts the multi-event evpolling to run.

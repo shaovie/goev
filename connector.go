@@ -172,7 +172,7 @@ func (p *inProgressConnect) OnRead() bool {
 func (p *inProgressConnect) OnWrite() bool {
 	// From here on, the `fd` resources will be managed by h.
 	fd := p.Fd()
-	p.GetReactor().RemoveEvHandler(p, fd) // p will auto release
+	p.GetReactor().RemoveEvent(fd, EvAll) // p will auto release
 	p.setFd(-1)
 	p.ioHandled = true
 
@@ -191,7 +191,7 @@ func (p *inProgressConnect) OnTimeout(now int64) bool {
 	}
 
 	// i/o event not catched
-	p.GetReactor().RemoveEvHandler(p, p.Fd())
+	p.GetReactor().RemoveEvent(p.Fd(), EvAll)
 	p.eh.OnConnectFail(ErrConnectTimeout)
 	p.OnClose()
 	return false

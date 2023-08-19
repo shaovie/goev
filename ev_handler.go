@@ -29,6 +29,9 @@ const (
 
 	// EvConnect used for connector
 	EvConnect uint32 = syscall.EPOLLIN | syscall.EPOLLOUT | syscall.EPOLLRDHUP
+
+	// EvAll all events
+	EvAll uint32 = EvIn | EvOut | EPOLLET
 )
 
 // EvHandler is the event handling interface of the Reactor core

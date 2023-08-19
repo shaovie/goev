@@ -53,6 +53,8 @@ func (ep *evPoll) cachedTime() int64 {
 func (ep *evPoll) loadEvData(fd int) *evData {
 	return ep.evHandlerMap.load(fd)
 }
+
+// first register
 func (ep *evPoll) add(fd int, events uint32, eh EvHandler) error {
 	eh.setParams(fd, ep)
 
@@ -70,13 +72,35 @@ func (ep *evPoll) add(fd int, events uint32, eh EvHandler) error {
 	}
 	return nil
 }
-func (ep *evPoll) remove(fd int) error {
-	// The event argument is ignored and can be NULL (but see `man 2 epoll_ctl` BUGS)
-	// kernel versions > 2.6.9
-	ep.evHandlerMap.del(fd)
-	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_DEL, fd, nil); err != nil {
-		return errors.New("epoll_ctl del: " + err.Error())
+func (ep *evPoll) remove(fd int, events uint32) error {
+	if events == EvAll {
+		// The event argument is ignored and can be NULL (but see `man 2 epoll_ctl` BUGS)
+		// kernel versions > 2.6.9
+		ep.evHandlerMap.del(fd)
+		if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_DEL, fd, nil); err != nil {
+			return errors.New("epoll_ctl del: " + err.Error())
+		}
+		return nil
 	}
+	ed := ep.evHandlerMap.load(fd)
+	if ed == nil {
+		return errors.New("remove: not found")
+	}
+
+	if ed.events&^events == 0 {
+		ep.evHandlerMap.del(fd)
+		if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_DEL, fd, nil); err != nil {
+			return errors.New("epoll_ctl del: " + err.Error())
+		}
+		return nil
+	}
+	ev := syscall.EpollEvent{Events: ed.events &^ events}
+	*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
+
+	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd, &ev); err != nil {
+		return errors.New("epoll_ctl mod: " + err.Error())
+	}
+	ed.events &= ^events
 	return nil
 }
 func (ep *evPoll) append(fd int, events uint32) error {
@@ -92,21 +116,6 @@ func (ep *evPoll) append(fd int, events uint32) error {
 		return errors.New("epoll_ctl mod: " + err.Error())
 	}
 	ed.events |= events
-	return nil
-}
-func (ep *evPoll) subtract(fd int, events uint32) error {
-	ed := ep.evHandlerMap.load(fd)
-	if ed == nil {
-		return errors.New("subtract: not found")
-	}
-
-	ev := syscall.EpollEvent{Events: ed.events &^ events}
-	*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
-
-	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd, &ev); err != nil {
-		return errors.New("epoll_ctl mod: " + err.Error())
-	}
-	ed.events &= ^events
 	return nil
 }
 func (ep *evPoll) scheduleTimer(eh EvHandler, delay, interval int64) (err error) {
@@ -157,20 +166,20 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 				ed := *(**evData)(unsafe.Pointer(&ev.Fd))
 				// EPOLLHUP refer to man 2 epoll_ctl
 				if ev.Events&(syscall.EPOLLHUP|syscall.EPOLLERR) != 0 {
-					ep.remove(ed.fd) // MUST before OnClose()
+					ep.remove(ed.fd, EvAll) // MUST before OnClose()
 					ed.eh.OnClose()
 					continue
 				}
 				if ev.Events&(syscall.EPOLLOUT) != 0 { // MUST before EPOLLIN (e.g. connect)
 					if ed.eh.OnWrite() == false {
-						ep.remove(ed.fd) // MUST before OnClose()
+						ep.remove(ed.fd, EvAll) // MUST before OnClose()
 						ed.eh.OnClose()
 						continue
 					}
 				}
 				if ev.Events&(syscall.EPOLLIN) != 0 {
 					if ed.eh.OnRead() == false {
-						ep.remove(ed.fd) // MUST before OnClose()
+						ep.remove(ed.fd, EvAll) // MUST before OnClose()
 						ed.eh.OnClose()
 						continue
 					}

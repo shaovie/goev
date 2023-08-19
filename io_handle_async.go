@@ -55,7 +55,7 @@ func (h *IOHandle) AsyncOrderedFlush(eh EvHandler) {
 		break
 	}
 	if h._asyncWriteBufQ.IsEmpty() {
-		h._ep.subtract(fd, EvOut)
+		h._ep.remove(fd, EvOut)
 		h._asyncWriteWaiting = false
 	}
 }
