@@ -46,7 +46,7 @@ func (rb *RingBuffer[T]) PushBack(data T) {
 		rb.grow()
 	}
 	rb.buffer[rb.tail] = data
-	rb.tail = (rb.tail + 1) % rb.size
+	rb.tail = (rb.tail + 1) % rb.size // TODO optimize to & operator
 	rb.len++
 }
 

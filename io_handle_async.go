@@ -61,6 +61,8 @@ func (h *IOHandle) AsyncOrderedFlush(eh EvHandler) {
 }
 
 // AsyncWrite asynchronous write
+//
+// It is safe for concurrent use by multiple goroutines
 func (h *IOHandle) AsyncWrite(eh EvHandler, buf []byte) {
 	fd := h.Fd()
 	if fd < 1 { // NOTE fd must > 0

@@ -86,7 +86,7 @@ func updateLiveSecond() {
 
 func main() {
 	if runtime.NumCPU() > 3 {
-		evPollNum = runtime.NumCPU() * 3 / 2
+		evPollNum = runtime.NumCPU() * 3 / 2 // 根据实际环境调整一下 pollnum 会有意想不到的提升
 	}
 	parseFlag()
 	fmt.Printf("hello boy! GOMAXPROCS=%d evpoll num=%d\n", procNum, evPollNum)
@@ -115,7 +115,7 @@ func main() {
 	//= http
 	_, err = goev.NewAcceptor(forAcceptReactor, func() goev.EvHandler { return new(Http) },
 		":8080",
-		goev.ListenBacklog(512),
+		goev.ListenBacklog(256),
 		//goev.SockRcvBufSize(16*1024), // 短链接, 不需要很大的缓冲区
 	)
 	if err != nil {

@@ -3,8 +3,6 @@
 
 Goev provides a high-performance, lightweight, non-blocking, I/O event-driven networking framework for the Go language. It draws inspiration from the design patterns of [ACE](http://www.dre.vanderbilt.edu/~schmidt/ACE-overview.html) and provides an elegant and concise solution for TCP network programming projects. With goev, you can seamlessly integrate your projects without worrying about the coroutine pressure introduced by the standard library (go net).
 
-Moreover, goev excels in terms of performance. In the TechEmpower benchmark tests, it has achieved first place among similar frameworks in the same environment (goev has been submitted to TechEmpower and is awaiting the next round of public evaluation).
-
 ![](images/goev.png)
 ## Features
 
@@ -109,7 +107,7 @@ package main
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU()*2 - 1)
-    evPollNum := runtime.NumCPU()*2-1
+	evPollNum := runtime.NumCPU()*2-1
 	forNewFdReactor, err := goev.NewReactor(
 		goev.EvPollNum(evPollNum),
 	)
@@ -182,8 +180,9 @@ Transfer/sec:      6.82MB
 
 - [x] Async write (refer example/async_http.go)
 - [x] Websocket example
+- [x] Goev runtime GC zero pressure
+- [ ] Poller cache(like thread cache)
 - [ ] Service oriented model
-- [ ] Goev runtime GC zero pressure
 
 ## Contributing
 Contributions are welcome! If you find any bugs or have suggestions for improvement, please open an issue or submit a pull request
