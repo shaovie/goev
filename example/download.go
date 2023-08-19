@@ -33,15 +33,17 @@ type Conn struct {
 }
 
 func (c *Conn) OnOpen() bool {
+	netfd.SetSendBuffSize(c.Fd(), 4*4096)
+	// AddEvHandler 尽量放在最后, (OnOpen 和ORead可能不在一个线程)
+	if err := reactor.AddEvHandler(c, c.Fd(), goev.EvIn); err != nil {
+		return false
+	}
+
+    // Must after eactor.AddEvHandler
 	confSpeed, ok := c.PCachedGet(ConfigSpeed)
 	if ok {
 		c.confSpeed = confSpeed.(int64)
 		fmt.Println("conf speed", c.confSpeed)
-	}
-	netfd.SetSendBuffSize(c.Fd(), 1*4096)
-	// AddEvHandler 尽量放在最后, (OnOpen 和ORead可能不在一个线程)
-	if err := reactor.AddEvHandler(c, c.Fd(), goev.EvIn); err != nil {
-		return false
 	}
 	return true
 }
