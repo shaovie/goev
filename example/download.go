@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 	"runtime"
 	"strconv"
 	"sync"
@@ -136,6 +137,13 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
+    go func() {
+        time.Sleep(time.Second * 5)
+        reactor.PollSyncOpt(goev.PollSyncCache, goev.PollSyncCacheOpt{
+            ID:    ConfigSpeed,
+            Value: int64(5000),
+        })
+    }()
 
 	if err = reactor.Run(); err != nil {
 		panic(err.Error())
