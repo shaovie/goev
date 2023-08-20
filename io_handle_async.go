@@ -6,13 +6,13 @@ import (
 
 func ioAllocBuff(s int) []byte {
 	if ioBuffUseMemPool {
-		return Malloc(s)
+		return BMalloc(s)
 	}
 	return make([]byte, s)
 }
 func ioFreeBuff(bf []byte) {
 	if ioBuffUseMemPool {
-		Free(bf)
+		BFree(bf)
 	}
 }
 

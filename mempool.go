@@ -269,6 +269,7 @@ func (sg *spanGroup) alloc() mmItem {
 			sp := e.Value.(*span)
 			idx, bp := sp.alloc()
 			if bp == nil { // empty
+				e.Value = nil // release pointer
 				sg.idleL.Remove(e)
 				sg.fullL.PushBack(sp)
 				sp.list = sg.fullL
@@ -283,6 +284,7 @@ func (sg *spanGroup) free(idx int, sp *span) {
 	if sp.list == sg.fullL {
 		for e := sg.fullL.Front(); e != nil; e = e.Next() {
 			if e.Value.(*span) == sp {
+				e.Value = nil // release pointer
 				sg.fullL.Remove(e)
 				break
 			}
@@ -300,6 +302,7 @@ func (sg *spanGroup) gc() {
 			sp := e.Value.(*span)
 			next = e.Next()
 			if sp.gc() {
+				e.Value = nil
 				sg.idleL.Remove(e)
 			}
 		}
