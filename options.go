@@ -30,12 +30,12 @@ type Options struct {
 	sockRcvBufSize int // ignore equal 0
 
 	// reactor options
-	evPollLockOSThread    bool
-	evPollNum             int //
-	evFdMaxSize           int
-	evPollReadBuffSize    int
-	evPollWriteBuffSize   int
-	evPollCacheTimePeriod int
+	evPollLockOSThread  bool
+	evPollNum           int //
+	evFdMaxSize         int
+	evPollReadBuffSize  int
+	evPollWriteBuffSize int
+	//evPollCacheTimePeriod int
 
 	// timer
 	timerHeapInitSize int //
@@ -47,16 +47,16 @@ type Option func(*Options)
 func setOptions(optL ...Option) Options {
 	//= defaut options
 	opts := Options{
-		reuseAddr:             true,
-		reusePort:             false,
-		evPollNum:             1,
-		evFdMaxSize:           8192,
-		listenBacklog:         512, // go default 128
-		timerHeapInitSize:     1024,
-		evPollCacheTimePeriod: 250,
-		evPollLockOSThread:    false,
-		evPollReadBuffSize:    8192,
-		evPollWriteBuffSize:   16 * 1024,
+		reuseAddr:         true,
+		reusePort:         false,
+		evPollNum:         1,
+		evFdMaxSize:       8192,
+		listenBacklog:     512, // go default 128
+		timerHeapInitSize: 1024,
+		//evPollCacheTimePeriod: 250,
+		evPollLockOSThread:  false,
+		evPollReadBuffSize:  8192,
+		evPollWriteBuffSize: 16 * 1024,
 	}
 
 	for _, opt := range optL {
@@ -175,11 +175,11 @@ func EvPollWriteBuffSize(n int) Option {
 // enabled (updated every `period' milliseconds)
 //
 // Turn off cache time if `period' equal zero
-func EvPollCacheTimePeriod(period int) Option {
-	return func(o *Options) {
-		o.evPollCacheTimePeriod = period
-	}
-}
+//func EvPollCacheTimePeriod(period int) Option {
+//	return func(o *Options) {
+//		o.evPollCacheTimePeriod = period
+//	}
+//}
 
 // TimerHeapInitSize is the initial array size of the heap structure used to implement timers
 func TimerHeapInitSize(n int) Option {

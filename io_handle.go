@@ -109,12 +109,6 @@ func (h *IOHandle) WriteBuff() []byte {
 	panic("goev: IOHandle.WriteBuff fd not register to evpoll")
 }
 
-// CachedTime returns a cached millisecond time, and the frequency of cache updates can be
-// adjusted by options.EvPollCacheTimePeriod, which defaults to updating every 250 milliseconds
-func (h *IOHandle) CachedTime() int64 {
-	return h._ep.cachedTime()
-}
-
 // PCachedGet returns cached data store in evPoll, it's lock free
 func (h *IOHandle) PCachedGet(id int) (any, bool) {
 	return h._ep.pCacheGet(id)

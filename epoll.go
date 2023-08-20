@@ -9,9 +9,8 @@ import (
 )
 
 type evPoll struct {
-	id              int   //
-	efd             int   // epoll fd
-	cachedTimestamp int64 // milliseconds
+	id  int //
+	efd int // epoll fd
 
 	//ioReadWriter IOReadWriter
 	evPollReadBuff  []byte
@@ -167,12 +166,6 @@ func (ep *evPoll) scheduleTimer(eh EvHandler, delay, interval int64) (err error)
 }
 func (ep *evPoll) cancelTimer(eh EvHandler) {
 	ep.timer.cancel(eh)
-}
-func (ep *evPoll) updateCachedTime(t int64) {
-	ep.cachedTimestamp = t
-}
-func (ep *evPoll) cachedTime() int64 {
-	return ep.cachedTimestamp
 }
 
 // poll sync opt
