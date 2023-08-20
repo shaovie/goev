@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-////// Operate type define
+///////////////////////// Operate type define
 
 // PollSyncCache to sync cache in evPoll
 const PollSyncCache int = 1
@@ -21,7 +21,7 @@ type PollSyncCacheOpt struct {
 	Value any
 }
 
-///////////////////////////////////////
+/////////////////////////////////////////////
 
 type pollSyncOptArg struct {
 	typ int
@@ -53,12 +53,23 @@ func newPollSyncOpt(ep *evPoll) (*pollSyncOpt, error) {
 	}
 	if err = ep.add(fd, EvEventfd, a); err != nil {
 		syscall.Close(fd)
-		return nil, errors.New("goev.asyncWrite add to evpoll fail! " + err.Error())
+		return nil, errors.New("goev: pollSyncOpt add to evpoll fail! " + err.Error())
 	}
 	a.efd = fd
 	a.evPoll = ep
 
 	return a, nil
+}
+func (c *pollSyncOpt) init(typ int, val any) {
+	c.doSync(pollSyncOptArg{
+		typ: typ,
+		arg: val,
+	})
+}
+func (c *pollSyncOpt) doSync(op pollSyncOptArg) {
+	if op.typ == PollSyncCache {
+		c.evPoll.pCacheSet(op.arg.(PollSyncCacheOpt).ID, op.arg.(PollSyncCacheOpt).Value)
+	}
 }
 func (c *pollSyncOpt) push(typ int, val any) {
 	c.mtx.Lock()
@@ -116,15 +127,4 @@ func (c *pollSyncOpt) OnRead() bool {
 		break
 	}
 	return true
-}
-func (c *pollSyncOpt) init(typ int, val any) {
-	c.doSync(pollSyncOptArg{
-		typ: typ,
-		arg: val,
-	})
-}
-func (c *pollSyncOpt) doSync(op pollSyncOptArg) {
-	if op.typ == PollSyncCache {
-		c.evPoll.pCacheSet(op.arg.(PollSyncCacheOpt).ID, op.arg.(PollSyncCacheOpt).Value)
-	}
 }
