@@ -6,6 +6,7 @@ type RingBuffer[T any] struct {
 	head   int
 	tail   int
 	len    int
+	zero   T
 	buffer []T
 }
 
@@ -56,6 +57,7 @@ func (rb *RingBuffer[T]) PopFront() (data T, ok bool) {
 		return
 	}
 	data = rb.buffer[rb.head]
+	rb.buffer[rb.head] = rb.zero // Quickly release memory
 	rb.head = (rb.head + 1) % rb.size
 	rb.len--
 	ok = true
