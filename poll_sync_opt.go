@@ -10,6 +10,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+////// Operate type define
+
 // PollSyncCache to sync cache in evPoll
 const PollSyncCache int = 1
 
@@ -18,6 +20,8 @@ type PollSyncCacheOpt struct {
 	ID    int
 	Value any
 }
+
+///////////////////////////////////////
 
 type pollSyncOptArg struct {
 	typ int

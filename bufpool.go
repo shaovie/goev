@@ -50,6 +50,7 @@ func init() {
 //
 // Returned []byte, with len representing the actual requested size,
 // and cap being greater than or equal to the size.
+// NOTE the []byte buffer cannot use 'append'
 func BMalloc(s int) []byte {
 	if s < 1 {
 		return make([]byte, 0)
@@ -67,6 +68,8 @@ func BMalloc(s int) []byte {
 	}
 	return make([]byte, s)
 }
+
+// BFree free memory
 func BFree(bf []byte) {
 	s := cap(bf)
 	if s < (128*7 + 1) {
