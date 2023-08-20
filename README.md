@@ -16,7 +16,6 @@ Goev provides a high-performance, lightweight, non-blocking, I/O event-driven ne
 * Fully native implementation of acceptor/connector, providing maximum customizability.
 * Controllable number of underlying threads. The per-connection per-goroutine approach usually leads to a surge in the number of threads, but using pollers helps maintain a consistent thread count, keeping it at the initial level
 * Garbage collection (GC)-friendly, minimizing additional heap memory usage during runtime.
-* Customizable mempool for faster memory allocation compared to make and more precise memory management
 * Support interaction between the application layer and the poller, e.g. creating a cache within the poller coroutine, enabling lock-free usage. (like runtime.mcache)
 * Few APIs and low learning costs
 
