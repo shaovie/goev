@@ -6,14 +6,14 @@ import (
 
 // global option
 var (
-	ioBuffUseMemPool        bool = true
-	setIOBuffUseMemPoolOnce sync.Once
+	ioBuffUsePool        bool = true
+	setIOBuffUsePoolOnce sync.Once
 )
 
-// SetIOBuffUseMemPool switch
-func SetIOBuffUseMemPool(v bool) {
-	setIOBuffUseMemPoolOnce.Do(func() {
-		ioBuffUseMemPool = v
+// SetIOBuffUsePool switch
+func SetIOBuffUsePool(v bool) {
+	setIOBuffUsePoolOnce.Do(func() {
+		ioBuffUsePool = v
 	})
 }
 
