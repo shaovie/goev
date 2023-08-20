@@ -12,8 +12,10 @@ import (
 
 ///////////////////////// Operate type define
 
-// PollSyncCache to sync cache in evPoll
-const PollSyncCache int = 1
+const (
+	// PollSyncCache to sync cache in evPoll
+	PollSyncCache int = 1
+)
 
 // PollSyncCacheOpt sync arg
 type PollSyncCacheOpt struct {
@@ -34,11 +36,11 @@ type pollSyncOpt struct {
 	efd      int
 	notified atomic.Int32 // used to avoid duplicate call evHandler
 
+	evPoll *evPoll
+
 	readq  *RingBuffer[pollSyncOptArg]
 	writeq *RingBuffer[pollSyncOptArg]
 	mtx    sync.Mutex
-
-	evPoll *evPoll
 }
 
 func newPollSyncOpt(ep *evPoll) (*pollSyncOpt, error) {

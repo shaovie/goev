@@ -27,11 +27,11 @@ type asyncWrite struct {
 	efd      int
 	notified atomic.Int32 // used to avoid duplicate call evHandler
 
+	evPoll *evPoll
+
 	readq  *RingBuffer[asyncWriteItem]
 	writeq *RingBuffer[asyncWriteItem]
 	mtx    sync.Mutex
-
-	evPoll *evPoll
 }
 
 func newAsyncWrite(ep *evPoll) (*asyncWrite, error) {
@@ -46,7 +46,7 @@ func newAsyncWrite(ep *evPoll) (*asyncWrite, error) {
 	}
 	if err = ep.add(fd, EvEventfd, a); err != nil {
 		syscall.Close(fd)
-		return nil, errors.New("goev.asyncWrite add to evpoll fail! " + err.Error())
+		return nil, errors.New("goev: asyncWrite add to evpoll fail! " + err.Error())
 	}
 	a.efd = fd
 	a.evPoll = ep
