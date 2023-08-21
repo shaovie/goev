@@ -20,12 +20,6 @@ Goev can achieve at least a 20% performance improvement in synchronous I/O compa
 * Support interaction between the application layer and the poller, e.g. creating a cache within the poller coroutine, enabling lock-free usage. (like runtime.mcache)
 * Few APIs and low learning costs
 
-## Installation
-
-```bash
-go get -u github.com/shaovie/goev
-```
-
 ## Benchmarks
 
 We're comparing gnet, which is ranked first on TechEmpower, using the test code from [gnet (GoLang) Benchmarking Test](https://github.com/TechEmpower/FrameworkBenchmarks/tree/master/frameworks/Go/gnet)
@@ -62,6 +56,12 @@ Transfer/sec:      6.82MB
 > Test environment Aliyun ECS, 32 vcore, 64GB RAM  ./techempower -c 48 -p 64
 
 ![](images/bench-32v-64g.png)
+
+## Installation
+
+```bash
+go get -u github.com/shaovie/goev
+```
 
 ## Getting Started
 
