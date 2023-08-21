@@ -26,6 +26,43 @@ Goev can achieve at least a 20% performance improvement in synchronous I/O compa
 go get -u github.com/shaovie/goev
 ```
 
+## Benchmarks
+
+We're comparing gnet, which is ranked first on TechEmpower, using the test code from [gnet (GoLang) Benchmarking Test](https://github.com/TechEmpower/FrameworkBenchmarks/tree/master/frameworks/Go/gnet)
+
+> Test environment GCP cloud VM, 2 cores, 4GB RAM
+
+The bench results of gnet.
+```text
+wrk -c 2 -t 2 -d10s http://127.0.0.1:8080/xxx
+Running 10s test @ http://127.0.0.1:8080/xxx
+  2 threads and 2 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    47.79us  170.86us   8.95ms   99.59%
+    Req/Sec    22.92k     1.00k   24.39k    78.11%
+  458456 requests in 10.10s, 56.40MB read
+Requests/sec:  45395.26
+Transfer/sec:      5.58MB
+```
+
+The bench results of goev. [test code](https://github.com/shaovie/goev/blob/main/example/techempower.go)
+```text
+wrk -c 2 -t 2 -d10s http://127.0.0.1:8080/xxx
+Running 10s test @ http://127.0.0.1:8080/xxx
+  2 threads and 2 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    42.69us   92.32us   6.33ms   99.57%
+    Req/Sec    23.49k     1.77k   26.37k    54.95%
+  471993 requests in 10.10s, 68.87MB read
+Requests/sec:  46733.75
+Transfer/sec:      6.82MB
+```
+> Note: This is the most basic and simplest test, for reference only
+
+> Test environment Aliyun ECS, 32 vcore, 64GB RAM  ./techempower -c 48 -p 64
+
+![](images/bench-32v-64g.png)
+
 ## Getting Started
 
 See the [中文指南](DOCUMENT_CN.md) for the Chinese documentation.
@@ -130,48 +167,6 @@ func main() {
 ```
 > Note: The reactor will bind different acceptors (listener fd) to different epoll instances to achieve multithreaded concurrent listening on the same IP:PORT
 
-## Benchmarks
-
-We're comparing gnet, which is ranked first on TechEmpower, using the test code from [gnet (GoLang) Benchmarking Test](https://github.com/TechEmpower/FrameworkBenchmarks/tree/master/frameworks/Go/gnet)
-
-> Test environment GCP cloud VM, 2 cores, 4GB RAM
-
-The bench results of gnet.
-```text
-wrk -c 2 -t 2 -d10s http://127.0.0.1:8080/xxx
-Running 10s test @ http://127.0.0.1:8080/xxx
-  2 threads and 2 connections
-  Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency    47.79us  170.86us   8.95ms   99.59%
-    Req/Sec    22.92k     1.00k   24.39k    78.11%
-  458456 requests in 10.10s, 56.40MB read
-Requests/sec:  45395.26
-Transfer/sec:      5.58MB
-```
-
-The bench results of goev. [test code](https://github.com/shaovie/goev/blob/main/example/techempower.go)
-```text
-wrk -c 2 -t 2 -d10s http://127.0.0.1:8080/xxx
-Running 10s test @ http://127.0.0.1:8080/xxx
-  2 threads and 2 connections
-  Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency    42.69us   92.32us   6.33ms   99.57%
-    Req/Sec    23.49k     1.77k   26.37k    54.95%
-  471993 requests in 10.10s, 68.87MB read
-Requests/sec:  46733.75
-Transfer/sec:      6.82MB
-```
-> Note: This is the most basic and simplest test, for reference only
-
-> Test environment Aliyun ECS, 32 vcore, 64GB RAM  ./techempower -c 48 -p 64
-
-![](images/bench-32v-64g.png)
-
-## Why high-performance
-
-* Connection bind threads/coroutines, no need for mutex locks within the 'polling stack' loop, provide global shared memory within the 'polling stack' for easy data reading, saving memory, and avoiding frequent memory allocation (also unnecessary for mutex locks)
-* All operations directly use syscall, avoiding the use of encapsulation in the Go standard library (with mutex locks).
-* Less is more, keep the code concise and embody the essence of network programming
 
 ## Development Roadmap
 
@@ -181,6 +176,7 @@ Transfer/sec:      6.82MB
 - [x] Poller cache(like thread cache)
 - [x] Poller sync. Allow the application layer to interact with the poller (limited to the operations supported by the framework) (refer example/download.go)
 - [ ] Service oriented model
+- [ ] Codec interface
 
 ## Contributing
 Contributions are welcome! If you find any bugs or have suggestions for improvement, please open an issue or submit a pull request
