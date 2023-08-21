@@ -160,9 +160,8 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 	}
 }
 
-func (ep *evPoll) scheduleTimer(eh EvHandler, delay, interval int64) (err error) {
-	err = ep.timer.schedule(eh, delay, interval)
-	return
+func (ep *evPoll) scheduleTimer(eh EvHandler, delay, interval int64) error {
+	return ep.timer.schedule(eh, delay, interval)
 }
 func (ep *evPoll) cancelTimer(eh EvHandler) {
 	ep.timer.cancel(eh)

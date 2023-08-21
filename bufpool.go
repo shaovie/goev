@@ -8,7 +8,10 @@ import (
 
 // Use sync.Pool for underlying memory reuse and employs finer-grained granularity management.
 
-const bufPoolMaxMBytes int = 16
+const (
+	bufPoolMaxMBytes   int = 16
+	bufPoolActiveTimes int = 5 // Active is enable, inactive is disable, periodic dynamic adjustment
+)
 
 var (
 	// 0 [1,       128*1] 128*1
@@ -18,16 +21,16 @@ var (
 	// 6 [128*6+1, 128*7] 128*7
 	btPool [7]buffPool
 
-	// 0 [128*7+1,   1024*1] 1024*1
-	// 1 [1024*1+1,  1024*2] 1024*2
-	// 2 [1024*2+1), 1024*3] 1024*3
+	// 0 [128*7+1,   1024*1] 1K
+	// 1 [1024*1+1,  1024*2] 2K
+	// 2 [1024*2+1), 1024*3] 3K
 	// ...
-	// 1022 [1024*1022+1), 1024*1023] 1024*1023
+	// 1022 [1024*1022+1), 1024*1023] 1023K
 	kbPool [1023]buffPool
 
-	// 0  [1024*1023+1,    1024*1024*1] 1M
-	// 1  [1024*1024*1+1,  1024*1024*2] 2M
-	// 2  [1024*1024*2+1,  1024*1024*3] 3M
+	// 0  [1024*1023+1,    1024*1024*1]  1M
+	// 1  [1024*1024*1+1,  1024*1024*2]  2M
+	// 2  [1024*1024*2+1,  1024*1024*3]  3M
 	// ...
 	// 15 (1024*1024*15+1, 1024*1024*16] 16M
 	mbPool [bufPoolMaxMBytes]buffPool // 1024K x n  <= 16M
@@ -138,7 +141,9 @@ func (bp *buffPool) free(c int, bf []byte) {
 	}
 }
 func (bp *buffPool) adjust() {
-	if atomic.SwapInt32(&(bp.allocTimes), 0) < 5 {
+	if atomic.SwapInt32(&(bp.allocTimes), 0) < bufPoolActiveTimes {
 		atomic.CompareAndSwapInt32(&(bp.disabled), 0, 1)
+	} else {
+		atomic.CompareAndSwapInt32(&(bp.disabled), 1, 0)
 	}
 }

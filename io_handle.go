@@ -92,11 +92,9 @@ func (h *IOHandle) Read() (bf []byte, n int, err error) {
 		return nil, 0, syscall.EBADF
 	}
 	if h._ep != nil {
-		bf, n, err = h._ep.read(fd)
-	} else {
-		panic("goev: IOHandle.Read fd not register to evpoll")
+		return h._ep.read(fd)
 	}
-	return
+	panic("goev: IOHandle.Read fd not register to evpoll")
 }
 
 // WriteBuff must be registered with evpoll in order to be used
@@ -115,7 +113,7 @@ func (h *IOHandle) PCachedGet(id int) (any, bool) {
 }
 
 // Write synchronous write.
-// n = [n, len(bf]
+// n = [0, len(bf)]
 func (h *IOHandle) Write(bf []byte) (n int, err error) {
 	fd := h.Fd()
 	if fd < 1 { // NOTE fd must > 0
