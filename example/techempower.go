@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -47,8 +50,18 @@ func parseFlag() {
 const httpHeaderS = "HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nServer: goev\r\nContent-Type: text/plain\r\nDate: "
 const contentLengthS = "\r\nContent-Length: 13\r\n\r\nHello, World!"
 
+type Request struct {
+	method        int
+	contentLength int
+	uri           string
+	host          string
+	headers       [][2]string
+}
+
 type Http struct {
 	goev.IOHandle
+
+	partialBuf []byte
 }
 
 func (h *Http) OnOpen() bool {
@@ -58,17 +71,180 @@ func (h *Http) OnOpen() bool {
 	}
 	return true
 }
-func (h *Http) OnRead() bool {
-	_, n, _ := h.Read()
-	if n == 0 { // Abnormal connection
-		return false
+func (h *Http) parseHeader(buf []byte) (req Request, headerLen int, res int) {
+	var bufLen = len(buf)
+	// 1. METHOD
+	bufOffset := 0
+	if bufLen < 18 { // GET / HTTP/1.x\r\nr\n
+		res = 1 // partial
+		return
+	}
+	method := 0                                          // 1:get 2:post 3:unsupport
+	if buf[0] == 'G' && buf[1] == 'E' && buf[2] == 'T' { // GET
+		if buf[3] == ' ' || buf[3] == '\t' {
+			method = 1
+			bufOffset += 4
+		}
+	} else if buf[0] == 'P' && buf[1] == 'O' && buf[2] == 'S' && buf[3] == 'T' { // POST
+		if buf[4] == ' ' || buf[4] == '\t' {
+			method = 2
+			bufOffset += 5
+		}
+	}
+	if method == 0 {
+		res = -1 // Abnormal connection. close it
+		return
+	}
+	req.method = method
+
+	// 2. URI  /a/b/c?p=x&p2=2#yyy
+	if buf[bufOffset] != '/' {
+		res = -1 // Abnormal connection. close it
+		return
+	}
+	pos := bytes.IndexByte(buf[bufOffset+1:], ' ') // \t ?
+	if pos < 0 {
+		res = 1 // partial
+		return
+	}
+	if pos == 0 {
+		req.uri = "/"
+		bufOffset += 2
+	} else {
+		req.uri = string(buf[bufOffset : bufOffset+1+pos])
+		bufOffset += 2 + pos
+	}
+	if bufOffset >= bufLen {
+		res = 1 // partial
+		return
 	}
 
-	buf := h.WriteBuff()[:0]
+	// 3. Parse headers
+	var CRLF []byte = []byte{'\r', '\n'}
+	pos = bytes.Index(buf[bufOffset:], CRLF) // skip first \r\n
+	if pos < 0 {
+		res = 1 // partial
+		return
+	}
+	bufOffset += pos + 2
+	headers := make([][2]string, 0, 8)
+	for bufOffset < bufLen {
+		pos = bytes.Index(buf[bufOffset:], CRLF)
+		if pos > 0 {
+			if (buf[bufOffset] < 'A' || buf[bufOffset] > 'Z') &&
+				(buf[bufOffset] < 'a' || buf[bufOffset] > 'z') {
+				// check first char
+				res = -1
+				return // Abnormal connection. close it
+			}
+			sepP := bytes.IndexByte(buf[bufOffset:bufOffset+pos], ':')
+			if sepP < 0 {
+				res = -1
+				return // Abnormal connection. close it
+			}
+			var header [2]string
+			header[0] = strings.TrimSpace(string(buf[bufOffset : bufOffset+sepP]))
+			header[1] = strings.TrimSpace(string(buf[bufOffset+sepP+1 : bufOffset+pos]))
+			headers = append(headers, header)
+			if strings.EqualFold(header[0], "Content-Length") {
+				if method != 2 { // only post
+					res = -1
+					return // Abnormal connection. close it
+				}
+				if len(header[1]) > 10 {
+					res = -1
+					return // Abnormal connection. close it
+				} else {
+					if l, err := strconv.ParseInt(header[1], 10, 64); err == nil {
+						req.contentLength = int(l)
+					}
+				}
+			} else if strings.EqualFold(header[0], "Host") {
+				req.host = header[1]
+			}
+			bufOffset += pos + 2
+		} else if pos == 0 {
+			bufOffset += pos + 2
+			break // EOF
+		} else {
+			res = 1 // partial
+			return
+		}
+	}
+	req.headers = headers
+	headerLen = bufOffset
+	res = 0
+	return
+}
+func (h *Http) OnRead() bool {
+	buf, n, _ := h.Read()
+	if n == 0 { // Abnormal connection
+		return false
+	} else if n < 0 {
+		return true
+	}
+
+	if idx := bytes.Index(buf, []byte{'\r', '\n', '\r', '\n'}); idx == -1 {
+		return false
+	}
+	buf = h.WriteBuff()[:0]
 	buf = append(buf, httpRespHeader...)
 	buf = append(buf, []byte(liveDate.Load().(string))...)
 	buf = append(buf, httpRespContentLength...)
 	h.Write(buf)
+	return true
+}
+func (h *Http) OnRead2() bool {
+	rawBuf, n, _ := h.Read()
+	if n == 0 { // Abnormal connection
+		return false
+	} else if n < 0 {
+		return true
+	}
+
+	rawBufLen := len(rawBuf)
+	if len(h.partialBuf) > 0 { // build partial data
+		h.partialBuf = append(h.partialBuf, rawBuf...)
+		rawBuf = h.partialBuf
+		rawBufLen = len(h.partialBuf)
+		h.partialBuf = h.partialBuf[:0] // reset
+	}
+
+	bufOffset := 0
+	for rawBufLen > 0 {
+		req, headerLen, res := h.parseHeader(rawBuf[bufOffset:])
+		if res == -1 {
+			return false
+		} else if res == 1 { // partial header
+			h.partialBuf = append(h.partialBuf, rawBuf[bufOffset:]...)
+			break
+		}
+
+		var payloadBuf []byte
+		payloadLen := req.contentLength
+		if headerLen > 0 {
+			if rawBufLen-headerLen < payloadLen { // partial payload
+				h.partialBuf = append(h.partialBuf, rawBuf[bufOffset:]...)
+				break
+			}
+			payloadBuf = rawBuf[bufOffset+headerLen : bufOffset+headerLen+payloadLen]
+		}
+
+		bufOffset += headerLen + payloadLen
+		rawBufLen -= headerLen + payloadLen
+		// get a complete request
+		// handle req
+		if req.method == 1 { // GET
+			buf := h.WriteBuff()[:0]
+			buf = append(buf, httpRespHeader...)
+			buf = append(buf, []byte(liveDate.Load().(string))...)
+			buf = append(buf, httpRespContentLength...)
+			h.Write(buf)
+		} else {
+			_ = payloadBuf
+			return false // close it
+		}
+	}
 	return true
 }
 func (h *Http) OnClose() {
