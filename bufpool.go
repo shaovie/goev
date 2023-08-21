@@ -9,8 +9,8 @@ import (
 // Use sync.Pool for underlying memory reuse and employs finer-grained granularity management.
 
 const (
-	bufPoolMaxMBytes   int = 16
-	bufPoolActiveTimes int = 5 // Active is enable, inactive is disable, periodic dynamic adjustment
+	bufPoolMaxMBytes   int   = 16
+	bufPoolActiveTimes int32 = 5 // Active is enable, inactive is disable, periodic dynamic adjustment
 )
 
 var (

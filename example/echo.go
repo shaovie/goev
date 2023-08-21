@@ -46,7 +46,7 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	_, err = goev.NewAcceptor(reactor, func() goev.EvHandler { return new(Conn) }, ":8080")
+	_, err = goev.NewAcceptor(reactor, ":8080", func() goev.EvHandler { return new(Conn) })
 	if err != nil {
 		panic(err.Error())
 	}

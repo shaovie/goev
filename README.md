@@ -79,7 +79,7 @@ import (
 var connReactor *goev.Reactor
 
 type Conn struct {
-	goev.Event
+	goev.IOHandle
 }
 
 func (c *Conn) OnOpen() bool {
@@ -89,7 +89,7 @@ func (c *Conn) OnOpen() bool {
 	return true
 }
 func (c *Conn) OnRead() bool {
-	buf, n, _ := h.Read()
+	buf, n, _ := c.Read()
 	if n == 0 { // Abnormal connection
 		return false
 	}
@@ -97,26 +97,20 @@ func (c *Conn) OnRead() bool {
     return true
 }
 func (c *Conn) OnClose() {
-    h.Destroy(h) // release resource
+    c.Destroc(h) // release resource
 }
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU()*2 - 1)
-	listenReactor, err := goev.NewReactor(
-		goev.EvPollNum(1),
-	)
+	listenReactor, err := goev.NewReactor(goev.EvPollNum(1))
 	if err != nil {
 		panic(err.Error())
 	}
-	connReactor, err := goev.NewReactor(
-		goev.EvPollNum(runtime.NumCPU()/2),
-	)
+	connReactor, err := goev.NewReactor(goev.EvPollNum(runtime.NumCPU()*3/2))
 	if err != nil {
 		panic(err.Error())
 	}
-	_, err = goev.NewAcceptor(listenReactor, func() goev.EvHandler { return new(Conn) },
-		":8080",
-	)
+	_, err = goev.NewAcceptor(listenReactor, ":8080", func() goev.EvHandler { return new(Conn) })
 	if err != nil {
 		panic(err.Error())
 	}
@@ -143,16 +137,13 @@ package main
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU()*2)
-	evPollNum := runtime.NumCPU()/2
-	connReactor, err := goev.NewReactor(
-		goev.EvPollNum(evPollNum),
-	)
+	evPollNum := runtime.NumCPU()*3/2
+	connReactor, err := goev.NewReactor(goev.EvPollNum(evPollNum))
 	if err != nil {
 		panic(err.Error())
 	}
     for i := 0; i < evPollNum; i++ {
-        _, err = goev.NewAcceptor(connReactor, func() goev.EvHandler { return new(Conn) },
-            ":8080",
+        _, err = goev.NewAcceptor(connReactor, ":8080", func() goev.EvHandler { return new(Conn) },
             goev.ReusePort(true),
         )
         if err != nil {

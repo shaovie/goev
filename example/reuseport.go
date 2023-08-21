@@ -94,9 +94,8 @@ func main() {
 	// ReusePort 模式下, 创建N个相同的acceptor(listener fd), 注册不到同的evPool中,
 	// 内核会将新链接调度到不同的listener fd的全链接队列中去), 这样不会出现惊群效应
 	for i := 0; i < evPollNum; i++ {
-		_, err = goev.NewAcceptor(reactor,
+		_, err = goev.NewAcceptor(reactor, ":8080",
 			func() goev.EvHandler { return new(Http) },
-			":8080",
 			goev.ListenBacklog(128),
 			goev.ReusePort(true),
 			//goev.SockRcvBufSize(16*1024), // 短链接, 不需要很大的缓冲区

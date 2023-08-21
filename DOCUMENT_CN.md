@@ -31,8 +31,8 @@ acceptor的使用方法:
 ```go
     _, err = goev.NewAcceptor(
         forAcceptReactor,  // 第1个参数负责轮询listener fd的I/O事件
-        func() goev.EvHandler { return new(Http) }, // 负责给新链接分配对象
         ":8080",           // 通常服务监听的地址格式 ipv4
+        func() goev.EvHandler { return new(Http) }, // 负责给新链接分配对象
         goev.ListenBacklog(256), // 后边是可选参数
         goev.ReuseAddr(true), // 一般服务器的标配参数(避免在TIME_WAIT状态下)
         goev.ReusePort(true), // 可以多进程/线程同时监听一个地址(ip:port)
@@ -61,7 +61,7 @@ connector的使用方法:
 开发者要继承(内嵌)Event对象  
 ```go
 type Http struct {
-    goev.Event  // 特别注意: 如果想使用sync.pool之类的技术复用Http对象, 要记得调用Event.Init()
+    goev.IOHandle  // 特别注意: 如果想使用sync.pool之类的技术复用Http对象, 要记得调用IOHandle.Init()
 }
 // 根据自己的需要, 实现具体的I/O事件处理方法
 // OnOpen 是当acceptor/connector得到链接后首先调用的方法

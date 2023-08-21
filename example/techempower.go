@@ -113,8 +113,7 @@ func main() {
 		panic(err.Error())
 	}
 	//= http
-	_, err = goev.NewAcceptor(forAcceptReactor, func() goev.EvHandler { return new(Http) },
-		":8080",
+	_, err = goev.NewAcceptor(forAcceptReactor, ":8080", func() goev.EvHandler { return new(Http) },
 		goev.ListenBacklog(256),
 		//goev.SockRcvBufSize(16*1024), // 短链接, 不需要很大的缓冲区
 	)

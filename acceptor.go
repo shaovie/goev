@@ -30,8 +30,8 @@ type Acceptor struct {
 // NewAcceptor return an acceptor
 //
 // New socket has been set to non-blocking
-func NewAcceptor(acceptorBindReactor *Reactor, newEvHanlderFunc func() EvHandler,
-	addr string, opts ...Option) (*Acceptor, error) {
+func NewAcceptor(acceptorBindReactor *Reactor, addr string,
+	newEvHanlderFunc func() EvHandler, opts ...Option) (*Acceptor, error) {
 	evOptions := setOptions(opts...)
 	a := &Acceptor{
 		fd:               -1,
