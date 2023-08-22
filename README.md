@@ -69,7 +69,7 @@ Transfer/sec:      5.05MB
 > Note: This is the most basic and simplest test, for reference only
 
 
-[**NEW**] Test environment Aliyun ECS, 32 vcore, 64GB RAM  ./techempower -c 48 -p 64
+[**NEW**] 1.6Million Req/sec Test environment Aliyun ECS, 32 vcore, 64GB RAM  ./techempower -c 48 -p 64
 
 ![](images/bench-32v-64g.png)
 
