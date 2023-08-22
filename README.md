@@ -52,9 +52,23 @@ Running 10s test @ http://127.0.0.1:8080/xxx
 Requests/sec:  46733.75
 Transfer/sec:      6.82MB
 ```
+
+By the way, let's compare the implementation of the standard library(go.net). [test code](https://github.com/shaovie/goev/blob/main/example/nettcp.go)
+```text
+wrk -c 10000 -t 2 -d10s http://127.0.0.1:8080/xxx
+Running 10s test @ http://127.0.0.1:8080/xxx
+  2 threads and 10000 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency   151.48ms   54.72ms 423.07ms   74.65%
+    Req/Sec    17.76k     6.94k   37.02k    64.60%
+  322499 requests in 10.20s, 47.06MB read
+Requests/sec:  31623.95
+Transfer/sec:      4.61MB
+
 > Note: This is the most basic and simplest test, for reference only
 
-> Test environment Aliyun ECS, 32 vcore, 64GB RAM  ./techempower -c 48 -p 64
+
+[**NEW**] Test environment Aliyun ECS, 32 vcore, 64GB RAM  ./techempower -c 48 -p 64
 
 ![](images/bench-32v-64g.png)
 
