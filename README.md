@@ -64,11 +64,12 @@ Running 10s test @ http://127.0.0.1:8080/xxx
   322499 requests in 10.20s, 47.06MB read
 Requests/sec:  31623.95
 Transfer/sec:      4.61MB
+```
 
 > Note: This is the most basic and simplest test, for reference only
 
 
-[**NEW**] Test environment Aliyun ECS, 32 vcore, 64GB RAM  ./techempower -c 48 -p 64
+[*NEW*] Test environment Aliyun ECS, 32 vcore, 64GB RAM  ./techempower -c 48 -p 64
 
 ![](images/bench-32v-64g.png)
 
