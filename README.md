@@ -182,6 +182,7 @@ func main() {
 - [x] Goev runtime GC zero pressure
 - [x] Poller cache(like thread cache)
 - [x] Poller sync. Allow the application layer to interact with the poller (limited to the operations supported by the framework) (refer example/download.go)
+- [ ] kqueue support
 - [ ] Service oriented model
 - [ ] Codec interface
 
