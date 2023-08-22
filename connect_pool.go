@@ -2,7 +2,6 @@ package goev
 
 import (
 	"container/list"
-	"errors"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -74,10 +73,6 @@ func NewConnectPool(c *Connector, addr string, minIdleNum, addNumOnceTime, maxLi
 
 	if minIdleNum < 1 || minIdleNum >= maxLiveNum || maxLiveNum < addNumOnceTime {
 		panic("NewConnectPool min/add/max  invalid")
-	}
-	r := c.GetReactor()
-	if r == nil {
-		return nil, errors.New("connector invalid")
 	}
 	cp := &ConnectPool{
 		minIdleNum:                minIdleNum,
@@ -206,7 +201,7 @@ func (cpc *connectPoolConn) OnOpen() bool {
 	netfd.SetKeepAlive(cpc.Fd(), 60, 40, 3)
 
 	connHandler := cpc.cp.newConnectPoolHandlerFunc()
-	connHandler.setReactor(cpc.GetReactor())
+	//connHandler.setReactor(cpc.cp.connector.reactor) // TODO delete
 	connHandler.setPool(cpc.cp)
 	connHandler.setFd(cpc.Fd())
 	cpc.cp.newConnChan <- connHandler

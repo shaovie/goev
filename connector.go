@@ -23,9 +23,9 @@ var (
 // It internally uses Reactor to achieve asynchronicity.
 // Connect success or failure will trigger specified methods for notification
 type Connector struct {
-	IOHandle
-
 	sockRcvBufSize int // ignore equal 0
+
+	reactor *Reactor
 }
 
 // NewConnector return an instance
@@ -33,8 +33,8 @@ func NewConnector(r *Reactor, opts ...Option) (*Connector, error) {
 	evOptions := setOptions(opts...)
 	c := &Connector{
 		sockRcvBufSize: evOptions.sockRcvBufSize,
+		reactor:        r,
 	}
-	c.setReactor(r)
 	return c, nil
 }
 
@@ -45,7 +45,7 @@ func NewConnector(r *Reactor, opts ...Option) (*Connector, error) {
 // The domain name format, such as qq.com:8080, is not supported.
 // You need to manually extract the IP address using gethostbyname.
 //
-// Timeout is relative time measurements with millisecond accuracy, for example, delay=5msec.
+// Timeout is relative time measurements with millisecond accuracy, for example, timeout=5msec.
 func (c *Connector) Connect(addr string, eh EvHandler, timeout int64) error {
 	if timeout < 0 {
 		return errors.New("Connector:Connect param:timeout < 0")
@@ -121,7 +121,6 @@ func (c *Connector) udsConnect(addr string, eh EvHandler, timeout int64) error {
 }
 
 func (c *Connector) connect(fd int, sa syscall.Sockaddr, eh EvHandler, timeout int64) (err error) {
-	reactor := c.GetReactor()
 	for {
 		err = syscall.Connect(fd, sa)
 		if err == syscall.EINTR {
@@ -134,15 +133,13 @@ func (c *Connector) connect(fd int, sa syscall.Sockaddr, eh EvHandler, timeout i
 			return ErrConnectInprogress
 		}
 		inh := &inProgressConnect{eh: eh}
-		inh.setReactor(reactor)
-		if err = reactor.AddEvHandler(inh, fd, EvConnect); err != nil {
+		if err = c.reactor.AddEvHandler(inh, fd, EvConnect); err != nil {
 			syscall.Close(fd)
 			return errors.New("InPorgress AddEvHandler in connector.Connect: " + err.Error())
 		}
 		inh.ScheduleTimer(inh, timeout, 0) // don't need to cancel it when conn error
 		return nil
 	} else if err == nil { // success
-		eh.setReactor(reactor)
 		eh.setFd(fd)
 		if eh.OnOpen() == false {
 			eh.OnClose()
@@ -176,7 +173,6 @@ func (p *inProgressConnect) OnWrite() bool {
 	p.setFd(-1)
 	p.ioHandled = true
 
-	p.eh.setReactor(p.GetReactor())
 	p.eh.setFd(fd)
 	if p.eh.OnOpen() == false {
 		p.eh.OnClose()

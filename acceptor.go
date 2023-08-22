@@ -19,8 +19,7 @@ type Acceptor struct {
 
 	reuseAddr        bool // SO_REUSEADDR
 	reusePort        bool // SO_REUSEPORT
-	fd               int
-	sockRcvBufSize   int // ignore equal 0
+	sockRcvBufSize   int  // ignore equal 0
 	listenBacklog    int
 	loopAcceptTimes  int
 	newEvHanlderFunc func() EvHandler
@@ -34,7 +33,6 @@ func NewAcceptor(acceptorBindReactor *Reactor, addr string,
 	newEvHanlderFunc func() EvHandler, opts ...Option) (*Acceptor, error) {
 	evOptions := setOptions(opts...)
 	a := &Acceptor{
-		fd:               -1,
 		reactor:          acceptorBindReactor,
 		newEvHanlderFunc: newEvHanlderFunc,
 		listenBacklog:    evOptions.listenBacklog,
@@ -165,27 +163,27 @@ func (a *Acceptor) listen(fd int, sa syscall.Sockaddr) error {
 	if err := a.reactor.AddEvHandler(a, fd, EvAccept); err != nil {
 		return errors.New("AddEvHandler in Acceptor.Open: " + err.Error())
 	}
-	a.fd = fd
+	a.setFd(fd)
 	return nil
 }
 
 // OnRead handle listner accept event
 func (a *Acceptor) OnRead() bool {
+	fd := a.Fd()
 	for i := 0; i < a.loopAcceptTimes; i++ {
-		conn, _, err := syscall.Accept4(a.fd, syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC)
+		conn, _, err := syscall.Accept4(fd, syscall.SOCK_NONBLOCK|syscall.SOCK_CLOEXEC)
 		if err != nil {
 			if err == syscall.EINTR {
 				continue
 			} else if err == syscall.EMFILE {
 				// The per-process limit on the number of open file descriptors has been reached
 				if a.ScheduleTimer(a, 100 /*msec*/, 0) == nil {
-					a.reactor.RemoveEvent(a.fd, EvAll)
+					a.reactor.RemoveEvent(fd, EvAll)
 				}
 			}
 			break
 		}
 		h := a.newEvHanlderFunc()
-		h.setReactor(a.reactor)
 		h.setFd(conn)
 		if h.OnOpen() == false {
 			h.OnClose()
@@ -196,16 +194,13 @@ func (a *Acceptor) OnRead() bool {
 
 // OnTimeout readd to evpoll
 func (a *Acceptor) OnTimeout(millisecond int64) bool {
-	if a.fd != -1 {
-		a.reactor.AddEvHandler(a, a.fd, EvAccept)
+	if a.Fd() > 0 {
+		a.reactor.AddEvHandler(a, a.Fd(), EvAccept)
 	}
 	return false
 }
 
 // OnClose will not happen
 func (a *Acceptor) OnClose() {
-	if a.fd != -1 {
-		syscall.Close(a.fd)
-		a.fd = -1
-	}
+	a.Destroy(a)
 }

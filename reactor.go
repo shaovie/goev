@@ -56,6 +56,7 @@ func (r *Reactor) AddEvHandler(eh EvHandler, fd int, events uint32) error {
 		// fd is a self-incrementing and cyclic integer, can be allocated through round-robin distribution.
 		i = fd % r.evPollNum
 	}
+	eh.setReactor(r) // MUST before add
 	return r.evPolls[i].add(fd, events, eh)
 }
 
