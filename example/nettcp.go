@@ -38,7 +38,7 @@ func oneConn(conn net.Conn) {
 			break
 		}
 
-		if true {
+		if false {
 			v := rand.Int63() % 3
 			if v > 0 {
 				time.Sleep(time.Duration(v) * time.Millisecond) // Simulate time-consuming work
