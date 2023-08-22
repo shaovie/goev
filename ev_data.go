@@ -75,7 +75,9 @@ func (dm *evDataMap) store(i int, v *evData) {
 func (dm *evDataMap) del(i int) {
 	if i < dm.arrSize {
 		p := &(dm.arr[i])
+		p.events = 0
 		p.fd = -1
+		p.eh = nil // release memory
 		return
 	}
 	dm.mapMtx.Lock()
