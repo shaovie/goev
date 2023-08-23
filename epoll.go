@@ -12,7 +12,6 @@ type evPoll struct {
 	id  int //
 	efd int // epoll fd
 
-	//ioReadWriter IOReadWriter
 	evPollReadBuff  []byte
 	evPollWriteBuff []byte
 
