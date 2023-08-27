@@ -130,14 +130,16 @@ func (c *Connector) connect(fd int, sa syscall.Sockaddr, eh EvHandler, timeout i
 	}
 	if err == syscall.EINPROGRESS {
 		if timeout < 1 {
+			syscall.Close(fd)
 			return ErrConnectInprogress
 		}
-		inh := &inProgressConnect{eh: eh}
-		if err = c.reactor.AddEvHandler(inh, fd, EvConnect); err != nil {
+		ipc := &inProgressConnect{eh: eh}
+		if err = c.reactor.AddEvHandler(ipc, fd, EvConnect); err != nil {
 			syscall.Close(fd)
 			return errors.New("InPorgress AddEvHandler in connector.Connect: " + err.Error())
 		}
-		inh.ScheduleTimer(inh, timeout, 0) // don't need to cancel it when conn error
+		// AddEvHandler 和 ScheduleTimer 不保证原子性, 有可能 ScheduleTimer的时候 ipc已经调用了OnClose()
+		ipc.ScheduleTimer(ipc, timeout, 0) // don't need to cancel it when conn error
 		return nil
 	} else if err == nil { // success
 		eh.setFd(fd)
@@ -162,16 +164,18 @@ type inProgressConnect struct {
 func (p *inProgressConnect) OnRead() bool {
 	p.eh.OnConnectFail(ErrConnectFail)
 	p.ioHandled = true
+	p.CancelTimer(p)
 	return false // goto p.OnClose()
 }
 
 // Called by reactor when asynchronous connections succeed.
 func (p *inProgressConnect) OnWrite() bool {
-	// From here on, the `fd` resources will be managed by h.
+	// From here on, the `fd` resources will be managed by eh.
 	fd := p.Fd()
-	p.GetReactor().RemoveEvent(fd, EvAll) // p will auto release
+	p.getEvPoll().remove(fd, EvAll) // p will auto release
 	p.setFd(-1)
 	p.ioHandled = true
+	p.CancelTimer(p)
 
 	p.eh.setFd(fd)
 	if p.eh.OnOpen() == false {
@@ -187,7 +191,7 @@ func (p *inProgressConnect) OnTimeout(now int64) bool {
 	}
 
 	// i/o event not catched
-	p.GetReactor().RemoveEvent(p.Fd(), EvAll)
+	p.getEvPoll().remove(p.Fd(), EvAll)
 	p.eh.OnConnectFail(ErrConnectTimeout)
 	p.OnClose()
 	return false
