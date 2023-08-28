@@ -182,8 +182,6 @@ func main() {
 - [x] Goev runtime GC zero pressure
 - [x] Poller cache(like thread cache)
 - [x] Poller sync. Allow the application layer to interact with the poller (limited to the operations supported by the framework) (refer example/download.go)
-- [ ] Service oriented model
-- [ ] Codec interface
 
 ## Contributing
 Contributions are welcome! If you find any bugs or have suggestions for improvement, please open an issue or submit a pull request
