@@ -2,6 +2,8 @@ package goev
 
 import (
 	"errors"
+	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -27,8 +29,6 @@ type asyncWrite struct {
 	efd      int
 	notified atomic.Int32 // used to avoid duplicate call evHandler
 
-	evPoll *evPoll
-
 	readq  *RingBuffer[asyncWriteItem]
 	writeq *RingBuffer[asyncWriteItem]
 	mtx    sync.Mutex
@@ -49,7 +49,6 @@ func newAsyncWrite(ep *evPoll) (*asyncWrite, error) {
 		return nil, errors.New("goev: asyncWrite add to evpoll fail! " + err.Error())
 	}
 	a.efd = fd
-	a.evPoll = ep
 
 	return a, nil
 }
@@ -100,7 +99,8 @@ func (aw *asyncWrite) OnRead() bool {
 			} else if err == syscall.EAGAIN {
 				return true
 			}
-			return false // TODO add evOptions.debug? panic("Notify: read eventfd failed!")
+			fmt.Fprintf(os.Stderr, "goev: eventfd read fail! "+err.Error())
+			// return false // TODO add evOptions.debug? panic("Notify: read eventfd failed!")
 		}
 		aw.notified.Store(0)
 		break
