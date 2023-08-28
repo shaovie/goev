@@ -88,13 +88,16 @@ func (ep *evPoll) remove(fd int, events uint32) error {
 		}
 		return nil
 	}
-	ev := syscall.EpollEvent{Events: ed.events &^ events}
-	*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
 
+	// Always save first, recover if failed  (this method is for multi-threading scenarios)."
+	ed.events &= ^events
+
+	ev := syscall.EpollEvent{Events: ed.events}
+	*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
 	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd, &ev); err != nil {
+		ed.events |= events;
 		return errors.New("epoll_ctl mod: " + err.Error())
 	}
-	ed.events &= ^events
 	return nil
 }
 func (ep *evPoll) append(fd int, events uint32) error {
@@ -103,13 +106,15 @@ func (ep *evPoll) append(fd int, events uint32) error {
 		return errors.New("append: not found")
 	}
 
-	ev := syscall.EpollEvent{Events: events | ed.events}
-	*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
+	// Always save first, recover if failed  (this method is for multi-threading scenarios)."
+	ed.events |= events
 
+	ev := syscall.EpollEvent{Events: ed.events}
+	*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
 	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd, &ev); err != nil {
+		ed.events &= ^events
 		return errors.New("epoll_ctl mod: " + err.Error())
 	}
-	ed.events |= events
 	return nil
 }
 func (ep *evPoll) run(wg *sync.WaitGroup) error {
