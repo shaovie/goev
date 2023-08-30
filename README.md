@@ -1,6 +1,8 @@
 # Event-driven network framework in Go
 [中文文档](https://zhuanlan.zhihu.com/p/648641683)
 
+[C++ Implementation Version](https://github.com/shaovie/reactor)
+
 Goev provides a high-performance, lightweight, non-blocking, I/O event-driven networking framework for the Go language. It draws inspiration from the design patterns of [ACE](http://www.dre.vanderbilt.edu/~schmidt/ACE-overview.html) and provides an elegant and concise solution for TCP network programming projects. With goev, you can seamlessly integrate your projects without worrying about the coroutine pressure introduced by the standard library (go net). 
 
 Goev can achieve at least a 20% performance improvement in synchronous I/O compared to the go net library. Additionally, combined with lock-free processing within the framework, it provides better optimization opportunities, resulting in even higher overall performance gains.
