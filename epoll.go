@@ -95,7 +95,7 @@ func (ep *evPoll) remove(fd int, events uint32) error {
 	ev := syscall.EpollEvent{Events: ed.events}
 	*(**evData)(unsafe.Pointer(&ev.Fd)) = ed
 	if err := syscall.EpollCtl(ep.efd, syscall.EPOLL_CTL_MOD, fd, &ev); err != nil {
-		ed.events |= events;
+		ed.events |= events
 		return errors.New("epoll_ctl mod: " + err.Error())
 	}
 	return nil

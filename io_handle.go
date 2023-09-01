@@ -12,57 +12,54 @@ import (
 type IOHandle struct {
 	noCopy
 
-	_asyncWriteWaiting bool
-	_fd                int32
-	_asyncWriteBufSize int // total size of wait to write
+	asyncWriteWaiting bool
+	fd                int32
+	asyncWriteBufSize int // total size of wait to write
 
-	_r *Reactor
-
-	_ep *evPoll
-
-	_ti *timerItem
-
-	_asyncWriteBufQ *RingBuffer[asyncWriteBuf] // 保存未直接发送完成的
+	r              *Reactor
+	ep             *evPoll
+	ti             *timerItem
+	asyncWriteBufQ *RingBuffer[asyncWriteBuf] // 保存未直接发送完成的
 }
 
 // Init IOHandle must be called when reusing it.
 func (h *IOHandle) Init() {
-	h._r, h._ep, h._ti = nil, nil, nil
+	h.r, h.ep, h.ti = nil, nil, nil
 	h.setFd(-1)
 }
 
 func (h *IOHandle) setParams(fd int, ep *evPoll) {
 	h.setFd(fd)
-	h._ep = ep
+	h.ep = ep
 }
 
 func (h *IOHandle) getEvPoll() *evPoll {
-	return h._ep
+	return h.ep
 }
 
 func (h *IOHandle) setReactor(r *Reactor) {
-	h._r = r
+	h.r = r
 }
 
 // GetReactor can retrieve the current event object bound to which Reactor
 func (h *IOHandle) GetReactor() *Reactor {
-	return h._r
+	return h.r
 }
 
 func (h *IOHandle) setTimerItem(ti *timerItem) {
-	h._ti = ti
+	h.ti = ti
 }
 
 func (h *IOHandle) getTimerItem() *timerItem {
-	return h._ti
+	return h.ti
 }
 
 // Fd return fd
 func (h *IOHandle) Fd() int {
-	return int(atomic.LoadInt32(&(h._fd)))
+	return int(atomic.LoadInt32(&(h.fd)))
 }
 func (h *IOHandle) setFd(fd int) {
-	atomic.StoreInt32(&(h._fd), int32(fd))
+	atomic.StoreInt32(&(h.fd), int32(fd))
 }
 
 // ScheduleTimer Add a timer event to an IOHandle that is already registered with the reactor
@@ -70,16 +67,16 @@ func (h *IOHandle) setFd(fd int) {
 //
 // Only supports binding timers to I/O objects within evpoll internally.
 func (h *IOHandle) ScheduleTimer(eh EvHandler, delay, interval int64) error {
-	if h._ep != nil {
-		return h._ep.scheduleTimer(eh, delay, interval)
+	if h.ep != nil {
+		return h.ep.scheduleTimer(eh, delay, interval)
 	}
 	return errors.New("ev handler has not been added to the reactor yet")
 }
 
 // CancelTimer cancels a timer that has been successfully scheduled
 func (h *IOHandle) CancelTimer(eh EvHandler) {
-	if h._ep != nil {
-		h._ep.cancelTimer(eh)
+	if h.ep != nil {
+		h.ep.cancelTimer(eh)
 	}
 }
 
@@ -91,8 +88,8 @@ func (h *IOHandle) Read() (bf []byte, n int, err error) {
 	if fd < 1 {
 		return nil, 0, syscall.EBADF
 	}
-	if h._ep != nil {
-		return h._ep.read(fd)
+	if h.ep != nil {
+		return h.ep.read(fd)
 	}
 	panic("goev: IOHandle.Read fd not register to evpoll")
 }
@@ -101,15 +98,15 @@ func (h *IOHandle) Read() (bf []byte, n int, err error) {
 //
 // Can only be used within the poller goroutine
 func (h *IOHandle) WriteBuff() []byte {
-	if h._ep != nil {
-		return h._ep.writeBuff()
+	if h.ep != nil {
+		return h.ep.writeBuff()
 	}
 	panic("goev: IOHandle.WriteBuff fd not register to evpoll")
 }
 
 // PCachedGet returns cached data store in evPoll, it's lock free
 func (h *IOHandle) PCachedGet(id int) (any, bool) {
-	return h._ep.pCacheGet(id)
+	return h.ep.pCacheGet(id)
 }
 
 // Write synchronous write.
@@ -119,14 +116,14 @@ func (h *IOHandle) Write(bf []byte) (n int, err error) {
 	if fd < 1 { // NOTE fd must > 0
 		return 0, syscall.EBADF
 	}
-	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
+	if h.asyncWriteBufQ != nil && !h.asyncWriteBufQ.IsEmpty() {
 		abf := ioAllocBuff(len(bf))
 		n = copy(abf, bf)
-		h._asyncWriteBufQ.PushBack(asyncWriteBuf{
+		h.asyncWriteBufQ.PushBack(asyncWriteBuf{
 			len: n,
 			buf: abf,
 		})
-		h._asyncWriteBufSize += n
+		h.asyncWriteBufSize += n
 		return
 	}
 	for {
@@ -142,17 +139,17 @@ func (h *IOHandle) Write(bf []byte) (n int, err error) {
 	if n < len(bf) {
 		abf := ioAllocBuff(len(bf) - n)
 		n = copy(abf, bf[n:])
-		if h._asyncWriteBufQ == nil {
-			h._asyncWriteBufQ = NewRingBuffer[asyncWriteBuf](2)
+		if h.asyncWriteBufQ == nil {
+			h.asyncWriteBufQ = NewRingBuffer[asyncWriteBuf](2)
 		}
-		h._asyncWriteBufQ.PushBack(asyncWriteBuf{
+		h.asyncWriteBufQ.PushBack(asyncWriteBuf{
 			len: n,
 			buf: abf,
 		})
-		h._asyncWriteBufSize += n
-		if h._asyncWriteWaiting == false {
-			h._asyncWriteWaiting = true
-			h._ep.append(fd, EvOut) // No need to use ET mode
+		h.asyncWriteBufSize += n
+		if h.asyncWriteWaiting == false {
+			h.asyncWriteWaiting = true
+			h.ep.append(fd, EvOut) // No need to use ET mode
 			// eh needs to implement the OnWrite method, and the OnWrite method
 			// needs to call AsyncOrderedFlush.
 		}
@@ -170,9 +167,9 @@ func (h *IOHandle) Destroy(eh EvHandler) {
 		h.setFd(-1)
 	}
 
-	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
+	if h.asyncWriteBufQ != nil && !h.asyncWriteBufQ.IsEmpty() {
 		for {
-			abf, ok := h._asyncWriteBufQ.PopFront()
+			abf, ok := h.asyncWriteBufQ.PopFront()
 			if !ok {
 				break
 			}

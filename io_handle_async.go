@@ -34,29 +34,29 @@ func (h *IOHandle) AsyncOrderedFlush(eh EvHandler) {
 	if fd < 1 {
 		return
 	}
-	n := h._asyncWriteBufQ.Len()
+	n := h.asyncWriteBufQ.Len()
 	// It is necessary to use n to limit the number of sending attempts.
 	// If there is a possibility of sending failure, the data should be saved again in _asyncWriteBufQ
 	for i := 0; i < n; i++ {
-		abf, ok := h._asyncWriteBufQ.PopFront()
+		abf, ok := h.asyncWriteBufQ.PopFront()
 		if !ok {
 			break
 		}
 		n, _ := syscall.Write(fd, abf.buf[abf.writen:abf.len])
 		if n > 0 {
-			h._asyncWriteBufSize -= n
+			h.asyncWriteBufSize -= n
 			if n == (abf.len - abf.writen) { // send completely
 				ioFreeBuff(abf.buf)
 				continue
 			}
 			abf.writen += n // Partially write, shift n
 		}
-		h._asyncWriteBufQ.PushFront(abf)
+		h.asyncWriteBufQ.PushFront(abf)
 		break
 	}
-	if h._asyncWriteBufQ.IsEmpty() {
-		h._ep.remove(fd, EvOut)
-		h._asyncWriteWaiting = false
+	if h.asyncWriteBufQ.IsEmpty() {
+		h.ep.remove(fd, EvOut)
+		h.asyncWriteWaiting = false
 	}
 }
 
@@ -73,7 +73,7 @@ func (h *IOHandle) AsyncWrite(eh EvHandler, buf []byte) {
 	}
 	abf := ioAllocBuff(len(buf))
 	n := copy(abf, buf) // if n != len(buf) panic ?
-	h._ep.push(asyncWriteItem{
+	h.ep.push(asyncWriteItem{
 		fd: fd,
 		eh: eh,
 		abf: asyncWriteBuf{
@@ -89,15 +89,15 @@ func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf asyncWriteBuf) {
 		ioFreeBuff(abf.buf)
 		return
 	}
-	h._asyncWriteBufSize += abf.len
-	if h._asyncWriteBufQ != nil && !h._asyncWriteBufQ.IsEmpty() {
-		h._asyncWriteBufQ.PushBack(abf)
+	h.asyncWriteBufSize += abf.len
+	if h.asyncWriteBufQ != nil && !h.asyncWriteBufQ.IsEmpty() {
+		h.asyncWriteBufQ.PushBack(abf)
 		return
 	}
 
 	n, _ := syscall.Write(fd, abf.buf[abf.writen:abf.len])
 	if n > 0 {
-		h._asyncWriteBufSize -= n
+		h.asyncWriteBufSize -= n
 		if n == (abf.len - abf.writen) {
 			ioFreeBuff(abf.buf)
 			return
@@ -106,14 +106,14 @@ func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf asyncWriteBuf) {
 	}
 
 	// Error or Partially
-	if h._asyncWriteBufQ == nil {
-		h._asyncWriteBufQ = NewRingBuffer[asyncWriteBuf](4)
+	if h.asyncWriteBufQ == nil {
+		h.asyncWriteBufQ = NewRingBuffer[asyncWriteBuf](4)
 	}
-	h._asyncWriteBufQ.PushBack(abf)
+	h.asyncWriteBufQ.PushBack(abf)
 
-	if h._asyncWriteWaiting == false {
-		h._asyncWriteWaiting = true
-		h._ep.append(fd, EvOut) // No need to use ET mode
+	if h.asyncWriteWaiting == false {
+		h.asyncWriteWaiting = true
+		h.ep.append(fd, EvOut) // No need to use ET mode
 		// eh needs to implement the OnWrite method, and the OnWrite method
 		// needs to call AsyncOrderedFlush.
 	}
@@ -123,8 +123,8 @@ func (h *IOHandle) asyncOrderedWrite(eh EvHandler, abf asyncWriteBuf) {
 //
 // If it is too long, it indicates that the sending is slow and the receiving end is abnormal
 func (h *IOHandle) AsyncWaitWriteQLen() int {
-	if h._asyncWriteBufQ == nil {
+	if h.asyncWriteBufQ == nil {
 		return 0
 	}
-	return h._asyncWriteBufQ.Len()
+	return h.asyncWriteBufQ.Len()
 }
