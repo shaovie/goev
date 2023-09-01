@@ -128,9 +128,10 @@ func EvPollLockOSThread(v bool) Option {
 // 网络程序I/O密集, cpu切换会比较频繁, 所以1个cpu绑定2个evpoll最好
 func EvPollNum(n int) Option {
 	return func(o *options) {
-		if n > 0 {
-			o.evPollNum = n
+		if n < 1 {
+			panic("goev:EvPollNum param is illegal")
 		}
+		o.evPollNum = n
 	}
 }
 
@@ -156,18 +157,20 @@ func EvPollNum(n int) Option {
 // 另: 如果是Epoll-ET模式, 就需要有足够大的内存来一次性读完缓冲区的数据
 func EvPollReadBuffSize(n int) Option {
 	return func(o *options) {
-		if n > 0 {
-			o.evPollReadBuffSize = n
+		if n < 1 {
+			panic("goev:EvPollReadBuffSize param is illegal")
 		}
+		o.evPollReadBuffSize = n
 	}
 }
 
 // EvPollWriteBuffSize is the global shared memory within a single evpoll,
 func EvPollWriteBuffSize(n int) Option {
 	return func(o *options) {
-		if n > 0 {
-			o.evPollWriteBuffSize = n
+		if n < 1 {
+			panic("goev:EvPollWriteBuffSize param is illegal")
 		}
+		o.evPollWriteBuffSize = n
 	}
 }
 
@@ -184,8 +187,9 @@ func EvPollWriteBuffSize(n int) Option {
 // TimerHeapInitSize is the initial array size of the heap structure used to implement timers
 func TimerHeapInitSize(n int) Option {
 	return func(o *options) {
-		if n > 0 {
-			o.timerHeapInitSize = n
+		if n < 1 {
+			panic("goev:TimerHeapInitSize param is illegal")
 		}
+		o.timerHeapInitSize = n
 	}
 }
