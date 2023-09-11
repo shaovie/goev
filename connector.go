@@ -156,6 +156,7 @@ func (c *Connector) connect(fd int, sa syscall.Sockaddr, eh EvHandler, timeout i
 type inProgressConnect struct {
 	IOHandle
 
+	ok        bool
 	ioHandled bool
 	eh        EvHandler
 }
@@ -172,16 +173,13 @@ func (p *inProgressConnect) OnRead() bool {
 func (p *inProgressConnect) OnWrite() bool {
 	// From here on, the `fd` resources will be managed by eh.
 	fd := p.Fd()
-	p.getEvPoll().remove(fd, EvAll) // p will auto release
 	p.setFd(-1)
 	p.ioHandled = true
 	p.CancelTimer(p)
 
+	p.ok = true
 	p.eh.setFd(fd)
-	if p.eh.OnOpen() == false {
-		p.eh.OnClose()
-	}
-	return true
+	return false
 }
 
 // Called if a connection times out before completing.
@@ -197,6 +195,11 @@ func (p *inProgressConnect) OnTimeout(now int64) bool {
 	return false
 }
 
+// OnClose maybe trigger EPOLLHUP | EPOLLERR
 func (p *inProgressConnect) OnClose() {
 	p.Destroy(p)
+
+	if p.ok == true && p.eh.OnOpen() == false {
+		p.eh.OnClose()
+	}
 }
