@@ -135,12 +135,17 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 				ed := *(**evData)(unsafe.Pointer(&ev.Fd))
 				// EPOLLHUP refer to man 2 epoll_ctl
 				if ev.Events&(syscall.EPOLLHUP|syscall.EPOLLERR) != 0 {
-					eh := ed.eh
-					ep.remove(ed.fd, EvAll) // MUST before OnClose()
-					eh.OnClose()
+					if ed.eh != nil {
+						eh := ed.eh
+						ep.remove(ed.fd, EvAll) // MUST before OnClose()
+						eh.OnClose()
+					}
 					continue
 				}
 				if ev.Events&(syscall.EPOLLOUT) != 0 { // MUST before EPOLLIN (e.g. connect)
+					if ed.eh == nil {
+						continue
+					}
 					if ed.eh.OnWrite() == false {
 						eh := ed.eh
 						ep.remove(ed.fd, EvAll) // MUST before OnClose()
@@ -149,6 +154,9 @@ func (ep *evPoll) run(wg *sync.WaitGroup) error {
 					}
 				}
 				if ev.Events&(syscall.EPOLLIN) != 0 {
+					if ed.eh == nil {
+						continue
+					}
 					if ed.eh.OnRead() == false {
 						eh := ed.eh
 						ep.remove(ed.fd, EvAll) // MUST before OnClose()
