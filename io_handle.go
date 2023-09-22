@@ -178,6 +178,10 @@ func (h *IOHandle) Destroy(eh EvHandler) {
 	}
 }
 
+// OnWriteBufferDrained called by asyncWriteBufQ drained
+func (h *IOHandle) OnWriteBufferDrained() {
+}
+
 //
 //= EvHandler interface
 
